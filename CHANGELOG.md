@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.2.0.rc.2] - 2026-10-08
+
 #### Changed
 
 - **[Pro]** **React 19.3 support now requires stable `react-on-rails-rsc` 19.3.1**: The Pro packages build and
@@ -3501,7 +3503,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.0.rc.1...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.0.rc.2...main
+[17.2.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.2.0.rc.1...v17.2.0.rc.2
 [17.2.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.2.0.rc.0...v17.2.0.rc.1
 [17.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...v17.2.0.rc.0
 [17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
