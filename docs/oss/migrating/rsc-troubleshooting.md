@@ -443,11 +443,12 @@ React on Rails Pro 17 RSC release set. Key constraints:
 - The fix landed in `react-on-rails-rsc` 19.2.0-rc.3 and is included in the 19.2.1 package line. Check the
   [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
   and the Pro release notes for the exact package to install. React on Rails Pro 17 requires stable
-  `react-on-rails-rsc >= 19.2.1` on the supported RSC 19.2.x package line.
+  `react-on-rails-rsc >= 19.2.1` on a supported RSC package line (19.2.x or 19.3.x).
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
-- Use React 19.2.x with patch >= 19.2.7 and React DOM on the same version. React 19.0.x is no longer a
+- Use the React line that matches your `react-on-rails-rsc` package (19.3.x for 19.3.x starting at 19.3.1, 19.2.8 or
+  newer for 19.3.0, 19.2.7 or newer for 19.2.x) and React DOM on the same version. React 19.0.x is no longer a
   supported Pro RSC runtime line in v17.
 
 On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
