@@ -5435,7 +5435,7 @@ module ReactOnRails
         end
       end
 
-      [RSC_PACKAGE_INSTALL_VERSION, RSC_MINIMUM_REACT_VERSION]
+      [RSC_PACKAGE_INSTALL_VERSION, recommended_react_install_version_for_rsc_package(RSC_PACKAGE_INSTALL_VERSION)]
     end
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
@@ -5644,8 +5644,13 @@ module ReactOnRails
       installed_version = rsc_package["version"].to_s
       return if installed_version.blank?
 
-      rsc_dist_tags(package_root).each do |tag, tag_version|
+      dist_tags = rsc_dist_tags(package_root)
+      latest_version = dist_tags["latest"].to_s
+      dist_tags.each do |tag, tag_version|
         next unless RSC_DIST_TAGS_TO_CHECK.include?(tag)
+        # A prerelease tag that the stable `latest` release has caught up with or passed (for example
+        # next 19.3.1-rc.1 once latest is 19.3.1) is not an upgrade target, and this version rejects it.
+        next if latest_version.present? && !npm_version_greater?(tag_version, latest_version)
         next unless npm_version_greater?(tag_version, installed_version)
 
         checker.add_warning(<<~MSG.strip)

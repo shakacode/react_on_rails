@@ -12060,8 +12060,9 @@ RSpec.describe ReactOnRails::Doctor do
 
             expect(errors).to contain_exactly(
               a_string_including(
-                "Fix: npm install react@~19.2.7 react-dom@~19.2.7 " \
-                "react-on-rails-rsc@19.2.1 --save-exact"
+                "with React/React DOM 19.3.0+.",
+                "Fix: npm install react@~19.3.0 react-dom@~19.3.0 " \
+                "react-on-rails-rsc@19.3.1 --save-exact"
               )
             )
           end
@@ -12370,6 +12371,22 @@ RSpec.describe ReactOnRails::Doctor do
             "React Server Components track React minor versions"
           )
         )
+      end
+
+      it "does not warn about a next prerelease that the stable latest release has superseded" do
+        allow(doctor).to receive(:capture_rsc_dist_tags)
+          .with(Dir.pwd)
+          .and_return(
+            [
+              JSON.generate("latest" => "19.3.1", "next" => "19.3.1-rc.1"),
+              instance_double(Process::Status, success?: true)
+            ]
+          )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(warning_msgs.none? { |msg| msg.include?("is behind the npm") }).to be true
       end
 
       it "reports an info message once when the dist-tag lookup is unavailable" do
