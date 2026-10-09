@@ -266,6 +266,63 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           .with(:renderer_artifact_snapshot, identities).twice
       end
 
+      context "when rendering on the RSC payload endpoint (rsc_payload_streaming)" do
+        let(:payload_render_options) do
+          instance_double(
+            ReactOnRails::ReactComponent::RenderOptions,
+            internal_option: nil,
+            streaming?: true,
+            rsc_payload_streaming?: true,
+            dom_id: "TestComponent-0",
+            trace: false
+          )
+        end
+
+        before do
+          allow(payload_render_options).to receive(:set_option)
+        end
+
+        it "publishes rscBundleHash so the RSC runtime can initialize BUILD_ID (#5076)" do
+          result = described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            payload_render_options
+          )
+
+          expect(result).to include('rscBundleHash: "rsc-artifact-id-before-drift"')
+        end
+
+        it "still prevents nested RSC payload generation" do
+          result = described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            payload_render_options
+          )
+
+          expect(result).to include("throw new Error")
+          expect(result).to include("already running on the RSC bundle")
+        end
+
+        it "does not publish renderingRequest (only the page path needs it)" do
+          result = described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            payload_render_options
+          )
+
+          # The payload branch should not include renderingRequest in serverSideRSCPayloadParameters
+          expect(result).not_to include("renderingRequest,")
+          # But it should include rscBundleHash
+          expect(result).to include("rscBundleHash:")
+        end
+      end
+
       it "uses stable pool identities in Rails test when development mode is disabled" do
         server_id = "rorp-v2-s-#{'c' * 64}"
         rsc_id = "rorp-v2-r-#{'d' * 64}"
