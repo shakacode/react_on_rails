@@ -24,6 +24,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro]** **React 19.3 support now requires stable `react-on-rails-rsc` 19.3.1**: The Pro packages build and
+  test against stable `react-on-rails-rsc` 19.3.1 (npm `latest`) with React/React DOM 19.3.0, replacing the
+  19.3.1-rc.0 release candidate that 17.2.0.rc.0 and 17.2.0.rc.1 used. The `react-on-rails-pro` optional peer
+  range is `>=19.2.1 <20.0.0` again; the temporary `~19.3.1-rc.0` alternative is removed. The node renderer
+  startup check and `react_on_rails:doctor` accept only stable `react-on-rails-rsc` releases: 19.2.x with
+  React 19.2.7+, 19.3.0 with React 19.2.8+, and 19.3.1+ with React 19.3.x. **Action required for upgraders:**
+  apps that installed `react-on-rails-rsc` 19.3.1-rc.0 or 19.3.1-rc.1 while testing a 17.2.0 release candidate
+  must install stable 19.3.1 (React/React DOM stay on 19.3.0). The node renderer refuses those prereleases at
+  startup, and both its error and Doctor's Fix name 19.3.1. Apps on stable 19.2.x or 19.3.0 need no change.
+  [PR PRNUM](https://github.com/shakacode/react_on_rails/pull/PRNUM) by
+  [justin808](https://github.com/justin808).
+
 ### [17.2.0.rc.1] - 2026-10-07
 
 #### Fixed
