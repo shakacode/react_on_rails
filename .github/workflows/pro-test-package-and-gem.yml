@@ -348,6 +348,9 @@ jobs:
           --health-retries 5
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      # Points the env-gated RedisCacheHandler integration suite at the job's
+      # Redis service container above; without it the suite is describe.skip.
+      REDIS_TEST_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
         with:
