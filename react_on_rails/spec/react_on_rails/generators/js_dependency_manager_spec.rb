@@ -824,6 +824,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
 
     it "pairs the generated React range with the React line the pinned RSC package requires" do
+      require "react_on_rails/doctor"
+
       doctor_range = ReactOnRails::Doctor::RSC_REACT_SUPPORT_RANGES.find do |range|
         _major, rsc_minor, rsc_patch =
           ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN.split(".").map(&:to_i)
