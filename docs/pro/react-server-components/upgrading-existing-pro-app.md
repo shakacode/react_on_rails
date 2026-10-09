@@ -60,7 +60,7 @@ pnpm add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
 > **React must match the installed `react-on-rails-rsc` line** for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
 
 > [!NOTE]
-> Starting with React on Rails Pro 17.2, the RSC generator installs stable `react-on-rails-rsc@19.3.1`, which requires React 19.3.x, and it does not upgrade React for you. If `rails g react_on_rails:rsc` warns that React is on another line, run the install command above. Apps that already use RSC on an earlier set (`react-on-rails-rsc` 19.2.x with React 19.2.7 or later, or 19.3.0 with React 19.2.8 or later) stay supported and do not need to re-run the generator.
+> Starting with React on Rails Pro 17.2, the RSC generator installs stable `react-on-rails-rsc@19.3.1`, which requires React 19.3.x, and it does not upgrade React for you. If `rails g react_on_rails:rsc` warns that React is on another line, run the install command above. Apps that already use RSC on an earlier set (`react-on-rails-rsc` 19.2.x with React 19.2.x at 19.2.7 or later, or 19.3.0 with React 19.2.x at 19.2.8 or later) stay supported and do not need to re-run the generator.
 
 > [!NOTE]
 > Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set. The RSC bundler APIs are version-coupled, so do not bump `react-on-rails-rsc` by itself.
@@ -298,7 +298,7 @@ Then run `bundle install` before retrying the generator.
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
 - **Missing `react-on-rails-rsc` package**: Run `npm install react-on-rails-rsc@19.3.1` / `yarn add react-on-rails-rsc@19.3.1` / `pnpm add react-on-rails-rsc@19.3.1` with React 19.3.x. If the app stays on React 19.2.x, install `react-on-rails-rsc@19.2.1` instead.
-- **React or `react-on-rails-rsc` version mismatch**: RSC requires React to match the installed `react-on-rails-rsc` line: 19.3.x starting at 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.8 or later, or 19.2.x (patch >= 19.2.1) with React 19.2.7 or later. Check with `npm ls react react-dom react-on-rails-rsc`, `yarn why react` / `yarn why react-dom` / `yarn why react-on-rails-rsc`, or `pnpm list react react-dom react-on-rails-rsc`
+- **React or `react-on-rails-rsc` version mismatch**: RSC requires React to match the installed `react-on-rails-rsc` line: 19.3.x starting at 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.2.x (patch >= 19.2.1) with React 19.2.x at 19.2.7 or later. Check with `npm ls react react-dom react-on-rails-rsc`, `yarn why react` / `yarn why react-dom` / `yarn why react-on-rails-rsc`, or `pnpm list react react-dom react-on-rails-rsc`
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
 ### Manifest Files Not Generated
