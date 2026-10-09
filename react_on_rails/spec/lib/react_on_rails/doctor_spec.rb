@@ -11797,6 +11797,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "requires react-on-rails-rsc >= 19.2.1"
               )
             )
+            expect(error_msgs.none? { |msg| msg.include?("(stable releases only)\non the supported") }).to be true
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
           end
         end
@@ -11991,7 +11992,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(errors).to contain_exactly(
               a_string_including(
                 "react-on-rails-rsc #{rsc_version} is not supported by React on Rails Pro 17 RSC",
-                "requires react-on-rails-rsc >= 19.2.1\non the supported",
+                "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
                 "with React/React DOM 19.3.0+.",
                 "Fix: npm install react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1 --save-exact"
               )
@@ -12060,6 +12061,7 @@ RSpec.describe ReactOnRails::Doctor do
 
             expect(errors).to contain_exactly(
               a_string_including(
+                "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
                 "with React/React DOM 19.3.0+.",
                 "Fix: npm install react@~19.3.0 react-dom@~19.3.0 " \
                 "react-on-rails-rsc@19.3.1 --save-exact"
@@ -12074,7 +12076,7 @@ RSpec.describe ReactOnRails::Doctor do
           expect(errors).to contain_exactly(
             a_string_including(
               "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
-              "requires react-on-rails-rsc >= 19.2.1\non the supported",
+              "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
               "with React/React DOM 19.2.8+.",
               "Fix: npm install react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0 --save-exact"
             )
