@@ -7773,6 +7773,25 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "leaves registry verification to the caller when verify is false" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "package.json"),
+          JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
+        )
+        allow(self).to receive(:npm_package_already_published?).and_return(false)
+        allow(self).to receive(:release_write_fence!)
+        allow(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", chdir: dir)
+          .and_return(["published\n", instance_double(Process::Status, success?: true)])
+        expect(self).not_to receive(:verify_npm_package_published!)
+
+        publish_npm_with_retry(dir, "react-on-rails@17.0.0", max_retries: 1, verify: false)
+
+        expect(Open3).to have_received(:capture2e).once
+      end
+    end
+
     it "retries a transient npm E503 with bounded backoff and the same OTP" do
       Dir.mktmpdir do |dir|
         File.write(
@@ -8201,6 +8220,10 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#verify_npm_package_published!" do
+    it "waits at least ten minutes by default for npm to serve a just-published version" do
+      expect(NPM_PUBLISH_VERIFY_ATTEMPTS * NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS).to be >= 600
+    end
+
     it "retries transient npm metadata lookup failures before accepting the published package" do
       failed_status = instance_double(Process::Status, success?: false)
       successful_status = instance_double(Process::Status, success?: true)
@@ -17275,6 +17298,7 @@ RSpec.describe "release.rake helper methods" do
         events << [:npm, package]
         nil
       end
+      allow(task_receiver).to receive(:verify_npm_package_published!)
       allow(task_receiver).to receive(:publish_gem_with_retry) do |_dir, package, **_options|
         events << [:gem, package]
         nil
@@ -17385,6 +17409,32 @@ RSpec.describe "release.rake helper methods" do
         )
         expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
         expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
+      end
+    end
+
+    it "verifies every npm package after all npm publishes and before any gem publish" do
+      npm_publish_options = []
+      allow(task_receiver).to receive(:publish_npm_with_retry) do |_dir, package, **options|
+        events << [:npm, package]
+        npm_publish_options << options
+        nil
+      end
+      allow(task_receiver).to receive(:verify_npm_package_published!) do |name, version|
+        events << [:npm_verify, "#{name}@#{version}"]
+      end
+      allow(task_receiver).to receive(:sync_github_release_after_publish) { abort "stop after publication" }
+
+      invoke_accelerated_release_task(release_task)
+
+      packages = %w[react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app]
+                 .map { |name| "#{name}@17.0.0-rc.10" }
+      aggregate_failures do
+        expect(events.take(10)).to eq(
+          packages.map { |package| [:npm, package] } +
+          packages.map { |package| [:npm_verify, package] } +
+          [[:gem, "react_on_rails"], [:gem, "react_on_rails_pro"]]
+        )
+        expect(npm_publish_options).to all(include(verify: false))
       end
     end
 
