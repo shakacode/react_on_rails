@@ -219,6 +219,24 @@ const MyComponent = (props, _railsContext) => {
 };
 ```
 
+## HTTP Response Metadata
+
+A non-streaming server render function can return optional `httpResponse` metadata
+alongside `renderedHtml`:
+
+```jsx
+return { renderedHtml: <NotFound />, httpResponse: { status: 404 } };
+// For a redirect:
+return { renderedHtml: '', httpResponse: { status: 308, location: '/new-path?ids=1%2C2' } };
+```
+
+Rails applies the integer status (200–599) and exact optional `Location` before
+response headers are committed. A status of 200 preserves an existing controller
+status. Invalid metadata, including a newline in `Location`, raises an error.
+Render functions are trusted application code and choose their redirect destinations.
+This contract is available in the OSS package; the Pro TanStack Router helper
+supplies it automatically. It does not change the legacy `redirectLocation` field.
+
 ## Important Rendering Behavior
 
 Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/tests/serverRenderReactComponent.test.ts):

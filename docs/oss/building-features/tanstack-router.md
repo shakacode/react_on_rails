@@ -127,3 +127,28 @@ end
 - [View Helpers API](../api-reference/view-helpers-api.md)
 - [React Router Guide](./react-router.md)
 - [TanStack Query Guide](./tanstack-query.md) (the client-side server-state layer this pairs with)
+
+### HTTP status and redirects
+
+For non-streaming SSR, the helper passes the router's HTTP result to Rails before
+headers are committed. Loader redirects preserve their status (307 by default, or
+`redirect({ statusCode: 308 })`) and exact `Location` header. Trailing slashes and
+noncanonical query strings redirect to the canonical URL, whose response contains
+the rendered route for hydration. Loader `notFound()` and unmatched paths return
+404 with the not-found component; loader errors return 500 with the error component.
+Successful SSR preserves an HTTP status already chosen by the Rails controller.
+
+Choose one component to own the HTTP outcome for each request. Other components
+should omit `httpResponse` or return an ordinary 200 without `Location`. Coordinate
+conflicting router outcomes in the controller before rendering; concurrent async
+renders do not define precedence between conflicting outcomes. Resolve the owning
+render before headers are committed. Rendering a different outcome after headers
+commit raises `ReactOnRails::Error`, including when an async result is awaited.
+
+If you call `serverRenderTanStackAppAsync` directly, include its `httpResponse`
+property alongside `renderedHtml` and `clientProps` in your render function result.
+This response handling applies to non-streaming renders, including
+`cached_react_component`, `cached_react_component_hash`, and `cached_async_react_component`. Cached markup replays
+its HTTP outcome on cache hits. Server errors (5xx) bypass both component and prerender cache writes so a later
+request can recover. Include the route and search in the component
+cache key (for example, `request.fullpath`) so different URLs do not share responses.
