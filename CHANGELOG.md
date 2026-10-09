@@ -64,7 +64,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Rejected `react-on-rails-rsc` prereleases now say why**: When the node renderer startup check or
   `react_on_rails:doctor` rejects a prerelease such as 19.3.2-rc.0, the message now reads
   `>= 19.2.1 (stable releases only)`. The previous `>= 19.2.1` label was satisfied by the prerelease it rejected.
-  By [justin808](https://github.com/justin808).
+  [PR 5168](https://github.com/shakacode/react_on_rails/pull/5168) by
+  [justin808](https://github.com/justin808).
 
 ### [17.2.0.rc.1] - 2026-10-07
 
