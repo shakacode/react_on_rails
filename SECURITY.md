@@ -1,9 +1,9 @@
 # Security Policy
 
-- **Last reviewed:** 2026-05-20
+- **Last reviewed:** 2026-09-29
 - **Review owner:** React on Rails maintainers
 - **Initial triage owner:** ShakaCode; [@justin808](https://github.com/justin808) is the current primary maintainer and initial triage contact for both the OSS packages and `react_on_rails_pro`.
-- **Next review due:** 2027-05-20
+- **Next review due:** 2027-09-29
 
 ## Supported Versions
 
@@ -17,15 +17,15 @@ package, and the `react-on-rails-pro-node-renderer` npm package — they ship at
 release and are patched together. Pro customers on active commercial support agreements may have additional support
 windows negotiated privately; this public policy describes the floor, not the ceiling.
 
-The current released major line is **16.x**. The table below describes the policy in terms of "current major / current
+The current released major line is **17.x**. The table below describes the policy in terms of "current major / current
 minor" so it remains accurate as new releases ship; the [Current support window](#current-support-window) section
 restates the same policy with the specific version numbers in effect today.
 
 | Version line                                                              | Security support                                                                                                                                                                                      |
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Latest minor of the current major (e.g., `16.6.x` while `16.6` is latest) | Full security support. Fixes are released as a patch on this line.                                                                                                                                    |
-| Previous minor of the current major (e.g., `16.5.x`)                      | Backports for **High / Critical** severity (CVSS ≥ 7.0) for **six months** after the next minor's first release.                                                                                      |
-| Previous major (e.g., `15.x`) — only the latest minor of that major       | Backports for **Critical** severity (CVSS ≥ 9.0) for **six months** after the first stable release of the new major.                                                                                  |
+| Latest minor of the current major (e.g., `17.1.x` while `17.1` is latest) | Full security support. Fixes are released as a patch on this line.                                                                                                                                    |
+| Previous minor of the current major (e.g., `17.0.x`)                      | Backports for **High / Critical** severity (CVSS ≥ 7.0) for **six months** after the next minor's first stable release.                                                                               |
+| Previous major (e.g., `16.x`) — only the latest minor of that major       | Backports for **Critical** severity (CVSS ≥ 9.0) for **six months** after the first stable release of the new major.                                                                                  |
 | All other releases                                                        | Not supported. Reports are still triaged; if the issue also affects a supported line, the fix lands there and the recommended remediation for unsupported releases is to upgrade to a supported line. |
 
 Pre-release builds (`.rc`, `.beta`, `.alpha`) are not separately supported — once superseded by a stable release in the
@@ -50,11 +50,15 @@ maintainer commitment, not a ceiling on maintainer behavior.
 
 As of the **Last reviewed** date at the top of this file:
 
-| Status             | OSS gem & npm                             | Pro gem, Pro npm, Pro node renderer       | Until                                                |
-| ------------------ | ----------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| Full support       | `16.6.x`                                  | `16.6.x`                                  | Replaced when the next minor (e.g., `16.7.0`) ships. |
-| High/Critical only | `16.5.x`                                  | `16.5.x`                                  | 2026-10-09 (six months after `16.6.0` shipped).      |
-| Critical only      | _none — 15.x window closed on 2026-03-16_ | _none — 15.x window closed on 2026-03-16_ | Window closed six months after `16.0.0` shipped.     |
+| Status             | OSS gem & npm | Pro gem, Pro npm, Pro node renderer | Until                                                  |
+| ------------------ | ------------- | ----------------------------------- | ------------------------------------------------------ |
+| Full support       | `17.1.x`      | `17.1.x`                            | Replaced when stable `17.2.0` ships.                   |
+| High/Critical only | `17.0.x`      | `17.0.x`                            | 2027-03-19 (six months after stable `17.1.0` shipped). |
+| Critical only      | `16.6.x`      | `16.6.x`                            | 2027-01-17 (six months after stable `17.0.0` shipped). |
+
+`17.2.0.rc.0` is being prepared; it does not shift the stable support window. When stable `17.2.0` ships,
+`17.2.x` receives full support and `17.1.x` receives High/Critical backports for six months from that release date.
+`17.0.x` then leaves the supported window. The `16.6.x` Critical-only deadline remains 2027-01-17.
 
 When a new minor or major ships, the rows shift accordingly; maintainers update this section as part of the release
 checklist in [internal/contributor-info/releasing.md](internal/contributor-info/releasing.md).
