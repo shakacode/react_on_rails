@@ -46,6 +46,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `react-on-rails-rsc` 19.3.1 needs React 19.3.x; upgrade React and React DOM to `~19.3.0`, or keep React 19.2.x
   and pin `react-on-rails-rsc@19.2.1` yourself. When Doctor has no closer match, its Fix now recommends the same
   19.3.1 / React 19.3.0 set the generator installs.
+  [PR 5164](https://github.com/shakacode/react_on_rails/pull/5164) by
+  [justin808](https://github.com/justin808).
 
 #### Fixed
 
@@ -54,6 +56,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   release candidate that stable `latest` had already replaced (for example `next` 19.3.1-rc.1 with `latest`
   19.3.1), a prerelease this version rejects. Doctor now skips a `next` or `rc` tag that is not newer than
   `latest`.
+  [PR 5164](https://github.com/shakacode/react_on_rails/pull/5164) by
+  [justin808](https://github.com/justin808).
 
 ### [17.2.0.rc.1] - 2026-10-07
 
