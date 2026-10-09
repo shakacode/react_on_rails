@@ -45,8 +45,6 @@ const parseVersion = (version: string): ParsedVersion => {
   };
 };
 
-const parseTuple = (version: string): VersionTuple => parseVersion(version).tuple;
-
 const comparePrereleasePart = (left: string, right: string): number => {
   const leftNumeric = /^\d+$/.test(left);
   const rightNumeric = /^\d+$/.test(right);
@@ -94,7 +92,7 @@ const compareVersions = (actual: string, floor: string): number => {
 
 const isAtLeastVersion = (actual: string, floor: string): boolean => compareVersions(actual, floor) >= 0;
 
-const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
+const sameTuple = (left: readonly number[], right: readonly number[]): boolean =>
   left.every((value, index) => value === right[index]);
 
 const supportedRscRange = (
@@ -108,13 +106,7 @@ const supportedRscRange = (
   return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
 };
 
-const rscFloorRange = ({
-  minimumVersion,
-  minimumPrereleaseVersion,
-}: typeof RSC_PEER_SUPPORT.reactOnRailsRsc) =>
-  minimumPrereleaseVersion
-    ? `>= ${minimumVersion} (or ${minimumPrereleaseVersion} during the RC soak)`
-    : `>= ${minimumVersion}`;
+const rscFloorRange = ({ minimumVersion }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc) => `>= ${minimumVersion}`;
 
 type ReactSupportRange = (typeof RSC_PEER_SUPPORT.react.supportedRanges)[number];
 
@@ -142,7 +134,6 @@ const isSupportedReactVersion = (
   rscTuple: VersionTuple,
   react: typeof RSC_PEER_SUPPORT.react,
 ): boolean =>
-  // The prerelease exception is for the RSC package soak, not its React peers.
   !prerelease &&
   major === react.supportedMajor &&
   reactRangesForRsc(rscTuple, react).some((range) => minor === range.minor && patch >= range.minPatch);
@@ -162,14 +153,16 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
     `  (Set REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1 to downgrade this error to a warning.)`,
   ].join('\n');
 
-// The 19.3.0-rc.4 pin that React on Rails 17.1.0 generated has a known published stable successor.
-// Compatibility alone does not establish publication for other rejected prereleases.
+// Only the prerelease lines in `prereleaseLinesWithStableSuccessor` have a known published stable
+// successor. Compatibility alone does not establish publication for other rejected prereleases.
 const stableReleaseAdvice = (
   { tuple, prerelease }: ParsedVersion,
-  { minimumVersion }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+  { minimumVersion, prereleaseLinesWithStableSuccessor }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
   react: typeof RSC_PEER_SUPPORT.react,
 ): string | undefined => {
-  if (!prerelease || !sameTuple(tuple, [19, 3, 0])) return undefined;
+  if (!prerelease || !prereleaseLinesWithStableSuccessor.some((line) => sameTuple(tuple, line))) {
+    return undefined;
+  }
   const stableVersion = tuple.join('.');
   const reactRange = supportedReactRange(tuple, react);
   if (!reactRange || !isAtLeastVersion(stableVersion, minimumVersion)) return undefined;
@@ -203,16 +196,8 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
 
   const meetsStableFloor =
     !rscParsedVersion.prerelease && isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumVersion);
-  const minimumPrereleaseTuple = reactOnRailsRsc.minimumPrereleaseVersion
-    ? parseTuple(reactOnRailsRsc.minimumPrereleaseVersion)
-    : null;
-  const meetsPrereleaseFloor =
-    reactOnRailsRsc.minimumPrereleaseVersion &&
-    minimumPrereleaseTuple &&
-    sameTuple(rscTuple, minimumPrereleaseTuple) &&
-    isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumPrereleaseVersion);
 
-  if (!meetsStableFloor && !meetsPrereleaseFloor) {
+  if (!meetsStableFloor) {
     return {
       level: 'error',
       message: errorMessage(

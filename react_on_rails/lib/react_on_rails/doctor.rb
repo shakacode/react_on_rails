@@ -5070,7 +5070,7 @@ module ReactOnRails
     # Each row covers react-on-rails-rsc patches rsc_min_patch..rsc_max_patch (nil = open-ended)
     # on rsc_minor. React must match the Flight line the RSC package bundles:
     # 19.2.x ships Flight 19.2, published 19.3.0 ships Flight 19.2.8 (React on Rails 17.1.0),
-    # and 19.3.1+ (starting with 19.3.1-rc.0) ships Flight 19.3.0.
+    # and 19.3.1+ ships Flight 19.3.0. Only stable react-on-rails-rsc releases are supported.
     RSC_REACT_SUPPORT_RANGES = [
       { rsc_minor: 2, rsc_min_patch: 1, rsc_max_patch: nil, minor: 2, min_patch: 7 },
       { rsc_minor: 3, rsc_min_patch: 0, rsc_max_patch: 0, minor: 2, min_patch: 8 },
@@ -5084,9 +5084,10 @@ module ReactOnRails
       min_patch.positive? ? "#{line} starting at #{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.#{min_patch}" : line
     end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
-    # Admits the 19.3.1-rc.x soak. The generator pin stays on stable 19.2.1.
-    # Remove once react-on-rails-rsc 19.3.1 ships stable.
-    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION = "19.3.1-rc.0"
+    # Rejected prerelease lines with a known published stable successor: the 19.3.0-rc.4 pin that
+    # React on Rails 17.1.0 generated, and the 19.3.1-rc.x soak that 17.2.0.rc.0 and rc.1 admitted.
+    # Mirrors prereleaseLinesWithStableSuccessor in rscPeerSupport.ts.
+    RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR = [[19, 3, 0], [19, 3, 1]].freeze
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
@@ -5407,18 +5408,12 @@ module ReactOnRails
       rsc_version = rsc_package["version"].to_s
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
-      prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
-                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the RC soak)"
-                               else
-                                 ""
-                               end
-
       rsc_install, react_install = rsc_package_floor_install_versions(rsc_version)
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
-        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
+        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{react_install}+.
 
@@ -5427,11 +5422,13 @@ module ReactOnRails
       false
     end
 
-    # Only the 19.3.0 transition has a known published stable successor. Compatibility does not establish
-    # publication for other rejected prereleases; use the generator pin for those versions.
+    # Only the lines in RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR have a known published stable
+    # successor. Compatibility does not establish publication for other rejected prereleases; use the
+    # generator pin for those versions.
     # Returns [rsc_version_to_install, react_version_to_install].
     def rsc_package_floor_install_versions(rsc_version)
-      if npm_prerelease(rsc_version).present? && npm_version_tuple(rsc_version) == [19, 3, 0]
+      if npm_prerelease(rsc_version).present? &&
+         RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR.include?(npm_version_tuple(rsc_version))
         stable_version = npm_version_tuple(rsc_version).join(".")
         if rsc_stable_package_version_supported?(stable_version)
           return [stable_version, recommended_react_install_version_for_rsc_package(stable_version)]
@@ -5443,11 +5440,8 @@ module ReactOnRails
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
       return false if rsc_version.blank?
-      return true if rsc_stable_package_version_supported?(rsc_version)
-      return false if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.blank?
-      return false unless npm_version_tuple(rsc_version) == npm_version_tuple(RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION)
 
-      npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
+      rsc_stable_package_version_supported?(rsc_version)
     end
 
     def rsc_stable_package_version_supported?(rsc_version)
