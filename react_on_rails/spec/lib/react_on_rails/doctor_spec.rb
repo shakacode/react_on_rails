@@ -11520,8 +11520,11 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_MINIMUM_PACKAGE_VERSION).to eq(
         rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
       )
-      prerelease_match = rsc_support.match(/minimumPrereleaseVersion:\s*'(?<version>[^']+)'/)
-      expect(described_class::RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION).to eq(prerelease_match&.[](:version))
+      expect(rsc_support).not_to include("minimumPrereleaseVersion")
+      successor_lines = rsc_support.match(/prereleaseLinesWithStableSuccessor:\s*\[(?<lines>[\d\s,\[\]]+)\]/)[:lines]
+      expect(described_class::RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR).to eq(
+        successor_lines.scan(/\[\s*(\d+),\s*(\d+),\s*(\d+)\s*\]/).map { |line| line.map(&:to_i) }
+      )
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
@@ -11913,11 +11916,10 @@ RSpec.describe ReactOnRails::Doctor do
 
       describe "React 19.3 support table" do
         # Peer ranges match the published packages: 19.3.0 bundles Flight 19.2.8 and
-        # 19.3.1-rc.0 bundles Flight 19.3.0.
+        # 19.3.1 bundles Flight 19.3.0.
         published_rsc_react_peers = {
           "19.2.1" => "^19.2.7",
           "19.3.0" => "^19.2.8",
-          "19.3.1-rc.0" => "^19.3.0",
           "19.3.1" => "^19.3.0"
         }
 
@@ -11953,7 +11955,6 @@ RSpec.describe ReactOnRails::Doctor do
 
         [
           %w[19.3.0 19.2.8],
-          %w[19.3.1-rc.0 19.3.0],
           %w[19.3.1 19.3.0]
         ].each do |rsc_version, react_version|
           it "accepts react-on-rails-rsc #{rsc_version} with React #{react_version}" do
@@ -11983,12 +11984,28 @@ RSpec.describe ReactOnRails::Doctor do
           end
         end
 
-        it "rejects the 19.3.1-rc.0 soak with React 19.2.8 when the package peers would allow it" do
-          errors = rsc_errors_for(rsc_version: "19.3.1-rc.0", react_version: "19.2.8", react_peer: "^19.2.8")
+        %w[19.3.1-rc.0 19.3.1-rc.1].each do |rsc_version|
+          it "rejects the superseded #{rsc_version} soak prerelease and points the Fix at stable 19.3.1" do
+            errors = rsc_errors_for(rsc_version:, react_version: "19.3.0", react_peer: "^19.3.0")
+
+            expect(errors).to contain_exactly(
+              a_string_including(
+                "react-on-rails-rsc #{rsc_version} is not supported by React on Rails Pro 17 RSC",
+                "requires react-on-rails-rsc >= 19.2.1\non the supported",
+                "with React/React DOM 19.3.0+.",
+                "Fix: npm install react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1 --save-exact"
+              )
+            )
+            expect(errors.none? { |error| error.include?("RC soak") }).to be true
+          end
+        end
+
+        it "rejects react-on-rails-rsc 19.3.1 with React 19.2.8 when the package peers would allow it" do
+          errors = rsc_errors_for(rsc_version: "19.3.1", react_version: "19.2.8", react_peer: "^19.2.8")
 
           expect(errors).to contain_exactly(
             a_string_including(
-              "react-on-rails-rsc 19.3.1-rc.0 is installed with unsupported React 19.2.8",
+              "react-on-rails-rsc 19.3.1 is installed with unsupported React 19.2.8",
               "React/React DOM 19.3.x with patch >= 19.3.0 (stable releases only).",
               "Fix: npm install react@~19.3.0 react-dom@~19.3.0 --save-exact"
             )
@@ -11997,11 +12014,11 @@ RSpec.describe ReactOnRails::Doctor do
 
         it "rejects a prerelease React build even when the package peers would allow it" do
           canary = "19.3.0-canary-d083ec1d-20260922"
-          errors = rsc_errors_for(rsc_version: "19.3.1-rc.0", react_version: canary, react_peer: ">=19.3.0-0")
+          errors = rsc_errors_for(rsc_version: "19.3.1", react_version: canary, react_peer: ">=19.3.0-0")
 
           expect(errors).to contain_exactly(
             a_string_including(
-              "react-on-rails-rsc 19.3.1-rc.0 is installed with unsupported React #{canary}",
+              "react-on-rails-rsc 19.3.1 is installed with unsupported React #{canary}",
               "19.3.x with patch >= 19.3.0 (stable releases only)"
             )
           )
@@ -12037,7 +12054,7 @@ RSpec.describe ReactOnRails::Doctor do
           expect(errors).to be_empty
         end
 
-        %w[19.3.1-beta.0 19.3.2-rc.0 19.2.2-beta.0 19.4.0-rc.0].each do |rsc_version|
+        %w[19.3.2-rc.0 19.3.3-beta.0 19.2.2-beta.0 19.4.0-rc.0].each do |rsc_version|
           it "recommends the generator pin instead of inferring a published stable release for #{rsc_version}" do
             errors = rsc_errors_for(rsc_version:, react_version: "19.3.0", react_peer: "^19.3.0")
 
@@ -12056,7 +12073,7 @@ RSpec.describe ReactOnRails::Doctor do
           expect(errors).to contain_exactly(
             a_string_including(
               "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
-              ">= 19.2.1\n(or 19.3.1-rc.0 during the RC soak)",
+              "requires react-on-rails-rsc >= 19.2.1\non the supported",
               "with React/React DOM 19.2.8+.",
               "Fix: npm install react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0 --save-exact"
             )
@@ -12064,7 +12081,7 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
-      it "recommends React 19.3.0 when the 19.3.1-rc.0 soak is paired with React 19.2" do
+      it "recommends React 19.3.0 when react-on-rails-rsc 19.3.1 is paired with React 19.2" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
             File.write(
@@ -12073,7 +12090,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.2.7",
                   "react-dom" => "19.2.7",
-                  "react-on-rails-rsc" => "19.3.1-rc.0"
+                  "react-on-rails-rsc" => "19.3.1"
                 }
               )
             )
@@ -12081,7 +12098,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.2.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.3.1-rc.0",
+              "version" => "19.3.1",
               "peerDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" }
             )
             stub_package_root(Dir.pwd)
@@ -12092,7 +12109,7 @@ RSpec.describe ReactOnRails::Doctor do
             error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
             expect(error_msgs).to include(
               a_string_including(
-                "react-on-rails-rsc 19.3.1-rc.0 is installed with unsupported React 19.2.7",
+                "react-on-rails-rsc 19.3.1 is installed with unsupported React 19.2.7",
                 "React/React DOM 19.3.x with patch >= 19.3.0",
                 "Fix: npm install react@~19.3.0 react-dom@~19.3.0 --save-exact"
               )
