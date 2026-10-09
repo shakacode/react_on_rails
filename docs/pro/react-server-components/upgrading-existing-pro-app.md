@@ -60,7 +60,7 @@ pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 > **React 19.2.x with patch >= 19.2.7** is required for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
 
 > [!NOTE]
-> The RSC generator uses the coordinated React 19.2.7 / stable `react-on-rails-rsc@19.2.1` package set. Later stable 19.2.x packages with patch >= 19.2.1 remain on the supported package line.
+> Starting with React on Rails Pro 17.2, the RSC generator installs the coordinated React 19.3.0 / stable `react-on-rails-rsc@19.3.1` package set, and running `rails g react_on_rails:rsc` on an app that is still on React 19.2.x warns you to upgrade React first. The React 19.2.7 / `react-on-rails-rsc@19.2.1` set shown above stays supported, as do later stable 19.2.x packages with patch >= 19.2.1.
 
 > [!NOTE]
 > Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set. The RSC bundler APIs are version-coupled, so do not bump `react-on-rails-rsc` by itself.
