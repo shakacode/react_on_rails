@@ -302,7 +302,7 @@ Ensure you're using a coordinated React line in your `package.json`. New apps us
 }
 ```
 
-> Note: React on Rails Pro 17 RSC requires React/React DOM `>= 19.2.7` on the line that matches your stable `react-on-rails-rsc` package: 19.3.x for 19.3.x starting at 19.3.1, 19.2.8 or newer for 19.3.0, and 19.2.7 or newer for 19.2.x.
+> Note: React on Rails Pro 17 RSC requires React/React DOM `>= 19.2.7` on the line that matches your stable `react-on-rails-rsc` package: 19.3.x for 19.3.x starting at 19.3.1, 19.2.x at 19.2.8 or newer for 19.3.0, and 19.2.x at 19.2.7 or newer for 19.2.x.
 
 ### 2. Prepare Your React Components
 
