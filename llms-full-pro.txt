@@ -692,6 +692,30 @@ If you are upgrading from Pro 3.x and relied on default values without explicitl
 
 If your app depends on the previous defaults, set them explicitly in `config/initializers/react_on_rails_pro.rb`.
 
+##### Async props on the RSC payload endpoint
+
+The RSC payload endpoint now supports async props through two mechanisms:
+
+1. **Config registry** (recommended): Register providers in your initializer:
+
+   ```ruby
+   ReactOnRailsPro.configure do |config|
+     config.register_async_props("ComponentName", "ProviderClassName")
+   end
+   ```
+
+   The provider class must implement `.call(emit, props, controller)`. Pass the
+   class name as a string (not the class itself) so the reference survives Rails
+   class reloading in development.
+
+2. **Controller hook**: Override `rsc_payload_async_props_block_override` in your controller
+   for components that need controller context (e.g. `current_user`).
+
+If you were using the template-shadowing workaround described in
+[#5075](https://github.com/shakacode/react_on_rails/issues/5075), you can now
+replace it with either approach. The template-shadow approach continues to work but
+is no longer necessary.
+
 ##### RSC payload template overrides
 
 React on Rails Pro now renders the built-in RSC payload template with `formats: [:text]` so Rails view annotations cannot inject HTML comments into NDJSON responses.
@@ -2333,6 +2357,27 @@ The pull queue closes when the React render completes. Always allowlist prop nam
 turn a prop name into an arbitrary constant, method call, or SQL fragment.
 
 For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
+
+### RSCRoute.refetch() and async props
+
+> [!WARNING]
+> When you register a component with `registerServerComponent`, it gets wrapped in
+> `<RSCRoute>`, which provides `useCurrentRSCRoute().refetch()`. However, the RSC
+> payload endpoint (`GET /rsc_payload/:component_name`) does not run your page view's
+> emit block. Without additional configuration, calling `refetch()` on an async-props
+> page will fail with an error.
+>
+> To fix this, register an async props provider in your initializer:
+>
+> ```ruby
+> ReactOnRailsPro.configure do |config|
+>   config.register_async_props("YourComponent", "YourAsyncPropsProvider")
+> end
+> ```
+>
+> Or override `rsc_payload_async_props_block_override` in your controller. See
+> [Upgrading: async props on the RSC payload endpoint](updating.md#async-props-on-the-rsc-payload-endpoint)
+> for details.
 
 ### The discouraged alternative: direct `fetch` from the renderer
 
@@ -9239,6 +9284,12 @@ export default function DetailsPanel({ id }) {
 ```
 
 ## Manually refetching a server component
+
+> [!NOTE]
+> `refetch()` works by fetching a fresh RSC payload from the server. If your
+> component uses async props (`stream_react_component_with_async_props`), you must
+> register an async props provider so the payload endpoint knows how to resolve them.
+> See [Streaming SSR](../streaming-ssr.md#rscrouterefetch-and-async-props) for setup.
 
 Sometimes you need to refresh an `<RSCRoute>` outside of an error-recovery flow — a "Refresh" toolbar button, a websocket-driven invalidation, an inline button rendered by the server component itself. There are three APIs, designed for different positions in the tree:
 
