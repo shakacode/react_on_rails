@@ -22360,8 +22360,9 @@ packages therefore apply to this stack, and the project's response is enforced i
   CVE-2025-55182 ([PR 2175](https://github.com/shakacode/react_on_rails/pull/2175)) and
   CVE-2025-55183/55184/67779 ([PR 2233](https://github.com/shakacode/react_on_rails/pull/2233)).
 - **The patched-version requirement is checked, not just documented.** For React on Rails Pro 17 RSC, the
-  supported React floor is `19.2.7`, on the `19.2.x` or `19.3.x` line that matches a stable
-  `react-on-rails-rsc` package (19.2.x with patch >= 19.2.1, 19.3.0, or 19.3.x starting at 19.3.1):
+  supported React floor depends on the stable `react-on-rails-rsc` package: React `19.2.7` or later on
+  `19.2.x` for 19.2.x (patch >= 19.2.1), React `19.2.8` or later on `19.2.x` for 19.3.0, and React `19.3.x` for
+  19.3.x starting at 19.3.1:
   - `rake react_on_rails:doctor` warns when the installed React is below the supported patch floor and reports the
     Pro 17 RSC floor (`check_rsc_react_version` in `react_on_rails/lib/react_on_rails/doctor.rb`).
   - The RSC generator emits the same floor/coordination warning at setup time
@@ -26205,7 +26206,7 @@ Before starting any component migration, verify these items. Skipping them is th
 
 - [ ] **React 19.2.7 or newer installed** -- both `react` and `react-dom` on 19.3.x (what the RSC generator installs) or 19.2.x with patch `>= 19.2.7`, with matching versions (`yarn why react` shows no duplicates)
 - [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
-- [ ] **Stable `react-on-rails-rsc` that matches your React line** -- `19.3.1` or later with React 19.3.x, `19.3.0` with React 19.2.8 or later, or 19.2.x with patch `>= 19.2.1` and React 19.2.7 or later; check with `yarn why react-on-rails-rsc`
+- [ ] **Stable `react-on-rails-rsc` that matches your React line** -- 19.3.x starting at `19.3.1` with React 19.3.x, `19.3.0` with React 19.2.8 or later, or 19.2.x with patch `>= 19.2.1` and React 19.2.7 or later; check with `yarn why react-on-rails-rsc`
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
