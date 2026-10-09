@@ -36,18 +36,18 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 
 - React on Rails Pro
 - React 18 or 19 for progressive `stream_react_component`; React 16/17 use synchronous SSR fallback
-- React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
+- React 19.2.7 or newer (19.2.x or 19.3.x) for async props and React Server Components
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
 ### Compatibility by React Version
 
-| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                    |
-| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                         |
-| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.x with patch 19.2.7+ and compatible `react-on-rails-rsc` 19.2.x |
+| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                |
+| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                     |
+| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.7+ (19.2.x or 19.3.x) and the matching `react-on-rails-rsc` |
 
 React on Rails detects whether the installed React DOM server provides `renderToPipeableStream`. This keeps
 `stream_react_component` on the synchronous path for React 16 and 17 while selecting progressive streaming
@@ -183,7 +183,7 @@ SSR can use the same boundary pattern.
 
 This path provides progressive **HTML streaming**, but all Rails props are still loaded before React begins rendering.
 To stream Rails data as each slow query finishes, use [async props](#progressive-data-with-async-props), which require
-React/React DOM 19.2.x with patch 19.2.7 or newer and RSC.
+React/React DOM 19.2.7 or newer (19.2.x or 19.3.x) and RSC.
 
 ## Progressive Data with Async Props
 
@@ -270,18 +270,18 @@ Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `Abor
 
 > **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with all props passed at once (no `enable_rsc_support` required).
 
-### 1. Use React 19.2
+### 1. Use a supported React 19 line
 
-Ensure you're using the coordinated React 19.2.x line in your `package.json`:
+Ensure you're using a coordinated React line in your `package.json`. New apps use React 19.3:
 
 ```json
 "dependencies": {
-  "react": "19.2.7",
-  "react-dom": "19.2.7"
+  "react": "19.3.0",
+  "react-dom": "19.3.0"
 }
 ```
 
-> Note: React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7`. Keep these versions coordinated with stable `react-on-rails-rsc` 19.2.x with patch `>= 19.2.1`.
+> Note: React on Rails Pro 17 RSC requires React/React DOM `>= 19.2.7` on the line that matches your stable `react-on-rails-rsc` package: 19.3.x for 19.3.1 and later, 19.2.8 or newer for 19.3.0, and 19.2.7 or newer for 19.2.x.
 
 ### 2. Prepare Your React Components
 
