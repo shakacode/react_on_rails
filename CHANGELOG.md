@@ -35,7 +35,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   apps that installed `react-on-rails-rsc` 19.3.1-rc.0 or 19.3.1-rc.1 while testing a 17.2.0 release candidate
   must install stable 19.3.1 (React/React DOM stay on 19.3.0). The node renderer refuses those prereleases at
   startup, and both its error and Doctor's Fix name 19.3.1. Apps on stable 19.2.x or 19.3.0 need no change.
-  By [justin808](https://github.com/justin808).
+  [PR 5162](https://github.com/shakacode/react_on_rails/pull/5162) by
+  [justin808](https://github.com/justin808).
 
 ### [17.2.0.rc.1] - 2026-10-07
 
