@@ -931,7 +931,7 @@ SOURCE: docs/pro/react-on-rails-pro.md
 
 React on Rails Pro is the advanced rendering and performance tier for React on Rails. Start with the open-source integration, then add Pro when you need higher SSR throughput, React Server Components, streaming SSR, fragment caching, or dedicated Node renderer tooling.
 
-> **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.x (patch 19.2.7 or newer) with `react-on-rails-rsc` 19.2.x (patch 19.2.1 or newer).
+> **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.7 or newer on a supported line (19.2.x or 19.3.x) with the matching stable `react-on-rails-rsc` release.
 
 > [!NOTE]
 > **Summary for AI agents:** This is the canonical Pro hub after the docs IA cleanup. Use it for installation, upgrades, streaming SSR, Node renderer, fragment caching, profiling, and troubleshooting. Route RSC-specific requests to the nested [React Server Components index](./react-server-components/index.md).
@@ -2116,18 +2116,18 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 
 - React on Rails Pro
 - React 18 or 19 for progressive `stream_react_component`; React 16/17 use synchronous SSR fallback
-- React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
+- React 19.2.7 or newer (19.2.x or 19.3.x) for async props and React Server Components
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
 ### Compatibility by React Version
 
-| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                    |
-| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                         |
-| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.x with patch 19.2.7+ and compatible `react-on-rails-rsc` 19.2.x |
+| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                |
+| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                     |
+| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.7+ (19.2.x or 19.3.x) and the matching `react-on-rails-rsc` |
 
 React on Rails detects whether the installed React DOM server provides `renderToPipeableStream`. This keeps
 `stream_react_component` on the synchronous path for React 16 and 17 while selecting progressive streaming
@@ -2263,7 +2263,7 @@ SSR can use the same boundary pattern.
 
 This path provides progressive **HTML streaming**, but all Rails props are still loaded before React begins rendering.
 To stream Rails data as each slow query finishes, use [async props](#progressive-data-with-async-props), which require
-React/React DOM 19.2.x with patch 19.2.7 or newer and RSC.
+React/React DOM 19.2.7 or newer (19.2.x or 19.3.x) and RSC.
 
 ## Progressive Data with Async Props
 
@@ -2346,18 +2346,18 @@ Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `Abor
 
 > **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with all props passed at once (no `enable_rsc_support` required).
 
-### 1. Use React 19.2
+### 1. Use a supported React 19 line
 
-Ensure you're using the coordinated React 19.2.x line in your `package.json`:
+Ensure you're using a coordinated React line in your `package.json`. New apps use React 19.3:
 
 ```json
 "dependencies": {
-  "react": "19.2.7",
-  "react-dom": "19.2.7"
+  "react": "19.3.0",
+  "react-dom": "19.3.0"
 }
 ```
 
-> Note: React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7`. Keep these versions coordinated with stable `react-on-rails-rsc` 19.2.x with patch `>= 19.2.1`.
+> Note: React on Rails Pro 17 RSC requires React/React DOM `>= 19.2.7` on the line that matches your stable `react-on-rails-rsc` package: 19.3.x for 19.3.x starting at 19.3.1, 19.2.8 or newer for 19.3.0, and 19.2.7 or newer for 19.2.x.
 
 ### 2. Prepare Your React Components
 
@@ -5271,7 +5271,7 @@ SOURCE: docs/pro/react-server-components/index.md
 > **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
 > Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
 
-> **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.x (patch 19.2.7 or newer) with `react-on-rails-rsc` 19.2.x (patch 19.2.1 or newer).
+> **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.7 or newer on a supported line (19.2.x or 19.3.x) with the matching stable `react-on-rails-rsc` release.
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user explicitly wants React Server Components or an RSC migration path. It routes to the tutorial, deep dives, and migration guides. Treat RSC as a supported GA feature of React on Rails Pro 17 that runs with the Node renderer.
@@ -5347,8 +5347,16 @@ Current React on Rails Pro releases provide full RSC support with:
 ### Requirements
 
 - React on Rails Pro 17, installed at the same version as React on Rails 17
-- React and React DOM 19.2.x with patch 19.2.7 or newer
-- Stable `react-on-rails-rsc` 19.2.x with patch 19.2.1 or newer
+- React, React DOM, and a stable `react-on-rails-rsc` release from one supported set:
+
+  | `react-on-rails-rsc` | React and React DOM | Notes                                          |
+  | -------------------- | ------------------- | ---------------------------------------------- |
+  | 19.3.x, 19.3.1+      | 19.3.x              | Installed by the React on Rails 17.2 generator |
+  | 19.3.0               | 19.2.x, 19.2.8+     | Stable release for apps generated by 17.1      |
+  | 19.2.x, 19.2.1+      | 19.2.x, 19.2.7+     | Installed by the React on Rails 17.0 generator |
+
+  The node renderer startup check and `rake react_on_rails:doctor` reject mixed sets and prerelease packages. Apps generated by React on Rails 17.1.0 pin the superseded `react-on-rails-rsc` 19.3.0-rc.4 and must move to 19.3.0 with React 19.2.8 or later, or to 19.3.1 with React 19.3.x.
+
 - Node renderer — installed separately via `react-on-rails-pro-node-renderer` npm package (see [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer))
 - Shakapacker or Rspack for bundling
 
@@ -6280,8 +6288,8 @@ The useful React DOM APIs for RSC resource hints are:
 - `preloadModule(href, options)`
 
 > [!NOTE]
-> The generator currently installs the tested React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
-> line (stable `19.2.1` or later). Newer published
+> The generator currently installs the tested React 19.3.0 / `react-on-rails-rsc` 19.3.1 package
+> set. Newer published
 > `react-on-rails-rsc` releases may add automatic package-level hinting, but app-authored resource
 > hints should still use React DOM's public APIs rather than package-private helpers.
 
@@ -8099,19 +8107,19 @@ yarn add --exact react-on-rails-pro@VERSION
 bundle add react_on_rails_pro --version="= VERSION"
 ```
 
-Also, install React 19.2.x, React DOM 19.2.x, and the `react-on-rails-rsc` release currently used by the generator:
+Also, install React 19.3.x, React DOM 19.3.x, and the `react-on-rails-rsc` release currently used by the generator:
 
 ```bash
-yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
-# npm install react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
-# pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
-# bun add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
+yarn add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+# npm install react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+# pnpm add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+# bun add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
 ```
 
 > [!NOTE]
-> React on Rails Pro 17 RSC requires React 19.2.x with patch >= 19.2.7. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
+> React on Rails Pro 17 RSC requires React to match the installed `react-on-rails-rsc` line: 19.3.x starting at 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.8 or later, or 19.2.x with React 19.2.7 or later. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
-> The React on Rails Pro 17 generator pins stable `react-on-rails-rsc@19.2.1`. Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
+> Starting with React on Rails Pro 17.2, the generator pins stable `react-on-rails-rsc@19.3.1` with `react@~19.3.0` and `react-dom@~19.3.0`. The 17.0 generator pinned `react-on-rails-rsc@19.2.1` with React 19.2.7, and apps on that set keep working unchanged. The 17.1.0 generator pinned the superseded `react-on-rails-rsc@19.3.0-rc.4`; move those apps to stable 19.3.0 with React 19.2.8 or later, or to 19.3.1 with React 19.3.x. Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
@@ -8358,6 +8366,34 @@ module.exports = configureServer;
 ```
 
 > **Note:** The `react_on_rails:rsc` generator's Pro config exports `{ default: configureServer, extractLoader }` and updates its importers to destructure that shape, but this minimal manual snippet keeps the simple function export so existing `serverWebpackConfig()` consumers (such as your `ServerClientOrBoth.js`) keep working. The `rscWebpackConfig.js` snippet above already tolerates both export shapes.
+
+6. Register the Pro package's own `'use client'` components with both plugin instances.
+
+`RSCWebpackPlugin` discovers `'use client'` modules by scanning directories, and every scan — the plugin's built-in default as well as the generator's discovery build — excludes `node_modules`. The `react-on-rails-pro` package ships three `'use client'` components of its own (`RSCRoute`, `RSCProvider`, and the default RSC provider registration), so no scan can ever find them. Without explicit registration they never appear in `react-client-manifest.json`, and a server component that renders one of them (for example a nested `<RSCRoute>` used for [section-level refetching](./inside-client-components.md#refetchable-sections-inside-a-server-component)) fails the render-time manifest lookup even when the RSC bundle compiles ([issue 5079](https://github.com/shakacode/react_on_rails/issues/5079)).
+
+Configs generated by `rails g react_on_rails:rsc` register them automatically when first generated; on an app whose config carries a resolver from a previous generator version, re-running the generator warns and leaves the config unchanged — follow this step instead (or remove the generated resolver block and re-run). For the manual setup above, pass them as explicit `clientReferences` entries to **both** plugin instances (steps 4 and 5), alongside a scan of your app source:
+
+```js
+new RSCWebpackPlugin({
+  isServer: false, // `true` in serverWebpackConfig.js
+  clientReferences: [
+    // Scan the app's own 'use client' modules. Passing `clientReferences` replaces the
+    // plugin's built-in default scan, so scope the scan to your app source directory.
+    { directory: './app/javascript', recursive: true, include: /\.[cm]?[jt]sx?$/ },
+    // The Pro package's shipped 'use client' components. String entries are resolved
+    // relative to the webpack context, not as bare package specifiers, so use
+    // require.resolve to pass each component's absolute path.
+    require.resolve('react-on-rails-pro/RSCRoute'),
+    require.resolve('react-on-rails-pro/RSCProvider'),
+    require.resolve('react-on-rails-pro/registerDefaultRSCProvider/client'),
+  ],
+}),
+```
+
+If your bundler config sets `resolve.symlinks: false`, the bundle records symlink-path module ids while `require.resolve` returns realpaths, so also register the symlink-path spelling of these files (for example `node_modules/react-on-rails-pro/lib/RSCRoute.js`) as additional entries.
+
+> [!NOTE]
+> Registration puts the components in the manifest, but on currently released versions (react-on-rails-pro ≤ 17.0.x with react-on-rails-rsc ≤ 19.2.1) importing them from a server component still fails the RSC bundle build itself ([issue 5079](https://github.com/shakacode/react_on_rails/issues/5079)): the published files carry `sourceMappingURL` pointers to `.map` files that are not in the package, and the released RSC loader crashes on them. Until packages with the fixes ship, mount them from server components through a small app-level `'use client'` wrapper instead — see [Refetchable sections inside a server component](./inside-client-components.md#refetchable-sections-inside-a-server-component).
 
 ## Create a React Server Component
 
@@ -8987,6 +9023,77 @@ export default function AppRouter() {
         <Route path="settings" element={<ClientSettings />} />
       </Route>
     </Routes>
+  );
+}
+```
+
+### Refetchable sections inside a server component
+
+The nesting also works in the other direction: a **server component** page can mount one of its own
+sections through a nested `<RSCRoute>`, so that section can refetch alone. Refetching the section
+streams only that section's RSC payload — the rest of the page keeps its DOM, form state, and scroll
+position. Trigger the refetch from inside the section with
+[`useCurrentRSCRoute()`](#usecurrentrscroute-from-inside-the-rsc-subtree) or from outside it with a
+[`ref` handle](#ref-handle-on-rscroute).
+
+`RSCRoute` is itself a `'use client'` component shipped inside the `react-on-rails-pro` npm package,
+and that placement matters for how you mount it from a server component:
+
+**On current releases (react-on-rails-pro ≤ 17.0.x with react-on-rails-rsc ≤ 19.2.1), a server
+component cannot import `react-on-rails-pro/RSCRoute` directly.** Two independent problems block it
+([issue 5079](https://github.com/shakacode/react_on_rails/issues/5079)):
+
+1. The RSC bundle build crashes: the published `lib/*.js` files carry `sourceMappingURL` pointers to
+   `.map` files that are not in the package, and the released `react-on-rails-rsc/WebpackLoader`
+   fails on them (`SyntaxError: ... is not valid JSON` pointing at the file's license header).
+2. Even with a compiling bundle, client-reference discovery only scans app directories —
+   `node_modules` is excluded — so the shipped component never reaches `react-client-manifest.json`,
+   and rendering it from a server component fails the render-time manifest lookup.
+
+The supported pattern on these versions is a four-line app-level `'use client'` wrapper. It works
+because the wrapper is an app-source file: the RSC loader replaces it with a client reference before
+the import of the package's file is ever followed, and app directories are scanned for the manifest.
+
+```tsx
+// app/javascript/components/ReviewsSectionRoute.tsx
+'use client';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+export const ReviewsSectionRoute = ({ productId }: { productId: number }) => (
+  <RSCRoute componentName="ProductReviewsSection" componentProps={{ product_id: productId }} />
+);
+```
+
+```tsx
+// inside ProductPage (a server component)
+import { ReviewsSectionRoute } from './ReviewsSectionRoute';
+
+export default function ProductPage({ productId }) {
+  return (
+    <>
+      {/* ...rest of the page, rendered on the server... */}
+      <ReviewsSectionRoute productId={productId} />
+    </>
+  );
+}
+```
+
+**With the issue 5079 fixes in place** — packages published without dangling `sourceMappingURL`
+pointers, the `react-on-rails-rsc` loader serving sourcemap requests correctly, and the generated
+webpack configs registering the package's own client components as explicit `clientReferences`
+entries (see [Create a React Server Component](./create-without-ssr.md)) — the wrapper is no longer
+needed and a server component can import and render `RSCRoute` directly:
+
+```tsx
+// inside ProductPage (a server component)
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+export default function ProductPage({ productId }) {
+  return (
+    <>
+      {/* ...rest of the page, rendered on the server... */}
+      <RSCRoute componentName="ProductReviewsSection" componentProps={{ product_id: productId }} />
+    </>
   );
 }
 ```
@@ -10187,9 +10294,9 @@ Before running the generator, verify your environment:
 | React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                                                                                   |
 | React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                                                                                   |
 | React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                        |
-| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7                                                                |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.3.x (the line the generator's `react-on-rails-rsc@19.3.1` requires)                     |
 | React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                 |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.x with patch >= 19.2.1                                                                |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Not installed yet, or 19.3.x from 19.3.1                                                   |
 | Node.js                  | `node --version`                                                                                                               | Node 20+ by default (Fastify 5); >= 18.19.0 with documented Fastify 4-compatible overrides |
 | Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                |
 | Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
@@ -10223,18 +10330,18 @@ pnpm uses that map under `pnpm.overrides`:
 }
 ```
 
-If React is outside the supported 19.2.x range or below 19.2.7, upgrade it first:
+If React is not on the 19.3.x line, upgrade it first:
 
 ```bash
-pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
-# or: yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
-# or: npm install react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
+pnpm add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+# or: yarn add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+# or: npm install react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
 ```
 
-> **React 19.2.x with patch >= 19.2.7** is required for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
+> **React must match the installed `react-on-rails-rsc` line** for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
 
 > [!NOTE]
-> The RSC generator uses the coordinated React 19.2.7 / stable `react-on-rails-rsc@19.2.1` package set. Later stable 19.2.x packages with patch >= 19.2.1 remain on the supported package line.
+> Starting with React on Rails Pro 17.2, the RSC generator installs stable `react-on-rails-rsc@19.3.1`, which requires React 19.3.x, and it does not upgrade React for you. If `rails g react_on_rails:rsc` warns that React is on another line, run the install command above. Apps that already use RSC on an earlier set (`react-on-rails-rsc` 19.2.x with React 19.2.7 or later, or 19.3.0 with React 19.2.8 or later) stay supported and do not need to re-run the generator.
 
 > [!NOTE]
 > Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set. The RSC bundler APIs are version-coupled, so do not bump `react-on-rails-rsc` by itself.
@@ -10471,8 +10578,8 @@ Then run `bundle install` before retrying the generator.
 
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
-- **Missing `react-on-rails-rsc` package**: Run `npm install react-on-rails-rsc@19.2.1` / `yarn add react-on-rails-rsc@19.2.1` / `pnpm add react-on-rails-rsc@19.2.1`, or install a later stable 19.2.x package with patch >= 19.2.1.
-- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.2.x with patch >= 19.2.7 and `react-on-rails-rsc` 19.2.x with patch >= 19.2.1. Check with `npm ls react react-dom react-on-rails-rsc`, `yarn why react` / `yarn why react-dom` / `yarn why react-on-rails-rsc`, or `pnpm list react react-dom react-on-rails-rsc`
+- **Missing `react-on-rails-rsc` package**: Run `npm install react-on-rails-rsc@19.3.1` / `yarn add react-on-rails-rsc@19.3.1` / `pnpm add react-on-rails-rsc@19.3.1` with React 19.3.x. If the app stays on React 19.2.x, install `react-on-rails-rsc@19.2.1` instead.
+- **React or `react-on-rails-rsc` version mismatch**: RSC requires React to match the installed `react-on-rails-rsc` line: 19.3.x starting at 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.8 or later, or 19.2.x (patch >= 19.2.1) with React 19.2.7 or later. Check with `npm ls react react-dom react-on-rails-rsc`, `yarn why react` / `yarn why react-dom` / `yarn why react-on-rails-rsc`, or `pnpm list react react-dom react-on-rails-rsc`
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
 ### Manifest Files Not Generated
@@ -11336,13 +11443,17 @@ The RSC implementation depends on the `react-on-rails-rsc` npm package, which pr
 
 ## React and Package Version Policy
 
-Generated RSC apps on React on Rails Pro 17 use React 19.2.x: `react@~19.2.7`
-and `react-dom@~19.2.7`. React 19.0.x is no longer a supported Pro RSC runtime
-line in v17 because the generator, peer metadata, and node-renderer startup check
-now target the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
-line.
+RSC apps generated by React on Rails Pro 17.2 and later use React 19.3.x:
+`react@~19.3.0` and `react-dom@~19.3.0`. Apps generated by React on Rails Pro 17.0
+use `react@~19.2.7`, `react-dom@~19.2.7`, and `react-on-rails-rsc@19.2.1`; that
+set stays supported and needs no change. Apps generated by 17.1.0 pin the
+superseded `react-on-rails-rsc@19.3.0-rc.4` and must move to stable 19.3.0
+with React 19.2.8 or later, or to 19.3.1 with React 19.3.x. React 19.0.x is no longer a supported
+Pro RSC runtime line in v17 because the generator, peer metadata, and
+node-renderer startup check target the coordinated React 19.2 and 19.3 package
+lines.
 
-The React on Rails Pro 17 generator pins stable `react-on-rails-rsc@19.2.1`
+The React on Rails Pro 17.2 generator pins stable `react-on-rails-rsc@19.3.1`
 for both webpack and rspack projects. Keep React, React DOM, and
 `react-on-rails-rsc` upgraded as a coordinated set.
 
