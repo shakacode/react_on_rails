@@ -41,6 +41,19 @@ jest.mock('react-on-rails/reactHydrateOrRender', () => ({
   default: jest.fn(),
 }));
 
+async function compatAct(callback: () => void | Promise<void>): Promise<void> {
+  // React 19 exports act on the React object; React 18 exports it from react-dom/test-utils
+  const actFn =
+    typeof React.act === 'function'
+      ? React.act
+      : // eslint-disable-next-line @typescript-eslint/no-require-imports
+        (require('react-dom/test-utils') as { act?: typeof React.act }).act;
+  if (typeof actFn !== 'function') {
+    throw new Error('act is not available — React 18 (react-dom/test-utils) or React 19+ is required');
+  }
+  await actFn(callback);
+}
+
 describe('ClientSideRenderer', () => {
   const mockReactHydrateOrRender = jest.requireMock('react-on-rails/reactHydrateOrRender')
     .default as jest.Mock;
@@ -558,14 +571,14 @@ describe('ClientSideRenderer', () => {
       );
 
       try {
-        await React.act(async () => {
+        await compatAct(async () => {
           await renderOrHydrateComponent(componentSpec);
         });
         expect(providerFactory).not.toHaveBeenCalled();
         expect(console.error).not.toHaveBeenCalled();
         expect(document.getElementById('dom-id-123')?.innerHTML).toBe(serverHtml);
 
-        await React.act(() => {
+        await compatAct(() => {
           updateLabel?.('Client label');
         });
         const label = document.querySelector('#dom-id-123 label');
@@ -573,7 +586,7 @@ describe('ClientSideRenderer', () => {
         expect(label?.getAttribute('for')).toBe(label?.id);
         expect(label?.id).toContain('server-prefix-123');
       } finally {
-        await React.act(() => unmountAll());
+        await compatAct(() => unmountAll());
       }
     },
   );
