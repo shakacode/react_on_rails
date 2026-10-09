@@ -67,6 +67,7 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.level).toBe('error');
     expect(r.message).toContain(`>= ${minimumVersion}`);
     expect(r.message).not.toContain('during the RC soak');
+    expect(r.message).not.toContain('(stable releases only)');
     expect(r.message).not.toContain('undefined');
   });
 
@@ -163,7 +164,9 @@ describe('checkRscPeerCompatibility', () => {
       });
       expect(r.level).toBe('error');
       expect(r.message).toContain('Incompatible react-on-rails-rsc version');
-      expect(r.message).toContain(`requires react-on-rails-rsc >= 19.2.1 (found ${rscVersion})`);
+      expect(r.message).toContain(
+        `requires react-on-rails-rsc >= 19.2.1 (stable releases only) (found ${rscVersion})`,
+      );
       expect(r.message).not.toContain('RC soak');
       expect(r.message).toContain(
         'Upgrade react-on-rails-rsc to the stable 19.3.1 release, with react and react-dom 19.3.x with patch >= 19.3.0 (stable releases only).',
@@ -210,7 +213,9 @@ describe('checkRscPeerCompatibility', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.3.0-rc.4', reactVersion: '19.2.8' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('Incompatible react-on-rails-rsc version');
-    expect(r.message).toContain('requires react-on-rails-rsc >= 19.2.1 (found 19.3.0-rc.4)');
+    expect(r.message).toContain(
+      'requires react-on-rails-rsc >= 19.2.1 (stable releases only) (found 19.3.0-rc.4)',
+    );
     expect(r.message).toContain(
       'Upgrade react-on-rails-rsc to the stable 19.3.0 release, with react and react-dom 19.2.x with patch >= 19.2.8 (stable releases only).',
     );
@@ -222,7 +227,9 @@ describe('checkRscPeerCompatibility', () => {
       const r = checkRscPeerCompatibility({ rscVersion, reactVersion: '19.3.0' });
       expect(r.level).toBe('error');
       expect(r.message).not.toContain('Upgrade react-on-rails-rsc to the stable');
-      expect(r.message).toContain(`requires react-on-rails-rsc >= 19.2.1 (found ${rscVersion})`);
+      expect(r.message).toContain(
+        `requires react-on-rails-rsc >= 19.2.1 (stable releases only) (found ${rscVersion})`,
+      );
     },
   );
 

@@ -5409,11 +5409,13 @@ module ReactOnRails
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
       rsc_install, react_install = rsc_package_floor_install_versions(rsc_version)
+      # A prerelease can satisfy the numeric floor and still be rejected, so say why.
+      stable_only_note = npm_prerelease(rsc_version).present? ? " (stable releases only)" : ""
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
-        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}
+        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{stable_only_note}
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{react_install}+.
 

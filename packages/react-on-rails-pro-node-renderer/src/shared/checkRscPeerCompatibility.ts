@@ -106,7 +106,11 @@ const supportedRscRange = (
   return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
 };
 
-const rscFloorRange = ({ minimumVersion }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc) => `>= ${minimumVersion}`;
+// A prerelease can satisfy the numeric floor and still be rejected, so say why.
+const rscFloorRange = (
+  { minimumVersion }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
+  { prerelease }: ParsedVersion,
+) => (prerelease ? `>= ${minimumVersion} (stable releases only)` : `>= ${minimumVersion}`);
 
 type ReactSupportRange = (typeof RSC_PEER_SUPPORT.react.supportedRanges)[number];
 
@@ -203,7 +207,7 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
       message: errorMessage(
         'react-on-rails-rsc',
         rscVersion,
-        rscFloorRange(reactOnRailsRsc),
+        rscFloorRange(reactOnRailsRsc, rscParsedVersion),
         proVersion,
         stableReleaseAdvice(rscParsedVersion, reactOnRailsRsc, react),
       ),
