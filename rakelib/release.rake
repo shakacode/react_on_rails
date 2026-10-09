@@ -42,7 +42,8 @@ GITHUB_RELEASE_BODY_MAX_LENGTH = 125_000
 # reads are bypassed: the 17.2.0.rc.2 release saw react-on-rails-pro stay
 # invisible past the former two-minute window and appear within six minutes.
 # Keep the recovery bounded while allowing that eventual-consistency window to settle.
-NPM_PUBLISH_VERIFY_ATTEMPTS = 60
+# The first lookup is immediate, so 61 attempts leave 60 ten-second waits.
+NPM_PUBLISH_VERIFY_ATTEMPTS = 61
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 10
 NPM_PUBLISH_MAX_BACKOFF_SECONDS = 30
 NPM_PUBLISH_HARD_FAILURE_CATEGORIES = %i[

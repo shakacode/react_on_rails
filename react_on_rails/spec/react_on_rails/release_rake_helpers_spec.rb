@@ -8221,7 +8221,7 @@ RSpec.describe "release.rake helper methods" do
 
   describe "#verify_npm_package_published!" do
     it "waits at least ten minutes by default for npm to serve a just-published version" do
-      expect(NPM_PUBLISH_VERIFY_ATTEMPTS * NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS).to be >= 600
+      expect((NPM_PUBLISH_VERIFY_ATTEMPTS - 1) * NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS).to be >= 600
     end
 
     it "retries transient npm metadata lookup failures before accepting the published package" do
