@@ -447,7 +447,7 @@ React on Rails Pro 17 RSC release set. Key constraints:
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
-- Use the React line that matches your `react-on-rails-rsc` package (19.3.x for 19.3.1 and later, 19.2.8 or
+- Use the React line that matches your `react-on-rails-rsc` package (19.3.x for 19.3.x starting at 19.3.1, 19.2.8 or
   newer for 19.3.0, 19.2.7 or newer for 19.2.x) and React DOM on the same version. React 19.0.x is no longer a
   supported Pro RSC runtime line in v17.
 

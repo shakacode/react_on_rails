@@ -220,7 +220,7 @@ These mistakes account for the majority of setup failures:
 
 - React and React DOM 19.2.7 or newer on a supported line (19.2.x or 19.3.x)
 - [React on Rails Pro 17](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails 17
-- Stable `react-on-rails-rsc` 19.3.1 or newer with React 19.3.x (what the 17.2 generator installs), 19.3.0 with React 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.7 or newer
+- Stable `react-on-rails-rsc` 19.3.x starting at 19.3.1 with React 19.3.x (what the 17.2 generator installs), 19.3.0 with React 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.7 or newer
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+
