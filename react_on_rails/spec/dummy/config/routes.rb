@@ -52,6 +52,8 @@ Rails.application.routes.draw do
   get "async_component_shared_store_island" => "pages#async_component_shared_store_island"
   get "root_error_callbacks" => "pages#root_error_callbacks"
   get "hydration_scheduling" => "pages#hydration_scheduling"
+  # Streaming hydration demo (issue #4385): independent section hydration with hydrate_on scheduling.
+  get "streaming_hydration_demo" => "pages#streaming_hydration_demo"
 
   # EXPERIMENTAL View Transitions demo (issue #3888). Inert by default: the
   # route only exists when the dummy app is booted with VIEW_TRANSITIONS_DEMO=true.
