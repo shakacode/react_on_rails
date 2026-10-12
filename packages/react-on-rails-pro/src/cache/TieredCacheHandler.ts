@@ -47,6 +47,39 @@ export class TieredCacheHandler implements CacheHandler {
     // indefinite entry's revalidate: 0 to Infinity, which a custom
     // TTL-on-write L1 handler could reject as an invalid backend TTL.
     this.l1MaxTtlSeconds = opts.l1MaxTtlSeconds === Infinity ? undefined : opts.l1MaxTtlSeconds;
+
+    // Tag invalidation forwards to whichever layers support it. When NEITHER
+    // layer does, this composite must not LOOK like it supports invalidation —
+    // unstable_cache's capability warning feature-detects revalidateTag, and a
+    // prototype method here would silence that warning while invalidations
+    // silently record nothing. An undefined instance property shadows the
+    // prototype method, so typeof stays 'undefined' for such compositions.
+    if (typeof l1.revalidateTag !== 'function' && typeof l2.revalidateTag !== 'function') {
+      (this as { revalidateTag?: TieredCacheHandler['revalidateTag'] }).revalidateTag = undefined;
+    }
+  }
+
+  // Forwards to each layer that implements it (skipping the other silently,
+  // matching the fanout's own behavior for handlers without the method).
+  // Best-effort per layer: one layer rejecting or throwing synchronously never
+  // stops the other, and this method itself never throws.
+  async revalidateTag(tag: string, invalidatedAt?: number): Promise<void> {
+    const forward = (layer: CacheHandler, name: string): Promise<void> => {
+      const { revalidateTag } = layer;
+      if (typeof revalidateTag !== 'function') return Promise.resolve();
+      return Promise.resolve()
+        .then(() => revalidateTag.call(layer, tag, invalidatedAt))
+        .catch((err: unknown) => {
+          // Error class/code only — never the message: connection-error
+          // messages can carry host:port or credentials, and console output
+          // may be replayed to the browser during RSC renders (same policy as
+          // revalidation.ts and RedisCacheHandler.revalidateTag).
+          const label =
+            (err as NodeJS.ErrnoException)?.code ?? (err instanceof Error ? err.name : String(err));
+          console.error(`TieredCacheHandler: ${name} revalidateTag failed:`, label);
+        });
+    };
+    await Promise.all([forward(this.l1, 'L1'), forward(this.l2, 'L2')]);
   }
 
   async get(key: string): Promise<CacheEntry | null> {
@@ -64,7 +97,16 @@ export class TieredCacheHandler implements CacheHandler {
     }
 
     if (l2Entry) {
-      const promoted = this.applyL1TtlForPromotion(l2Entry);
+      // TAGGED entries are never promoted into L1. Promotion re-stamps
+      // timestamp to `now` (see applyL1TtlForPromotion), which would erase the
+      // render-start evidence the tag mark-stale check compares against: an L1
+      // whose stamp map receives a delayed invalidation (stamped between the
+      // entry's real render start and its promotion) would then wrongly accept
+      // the stale copy. L2 vetted the entry against ITS stamps just now, but
+      // L1's stamps arrive independently. Skipping promotion costs tagged
+      // entries the L1 read-through warm-up only — fresh renders still write
+      // both layers via set(), which preserves the original timestamp.
+      const promoted = l2Entry.tags?.length ? null : this.applyL1TtlForPromotion(l2Entry);
       if (promoted) {
         void this.l1.set(key, promoted).catch((err: unknown) => {
           console.error('TieredCacheHandler: L1 promotion failed', err);
@@ -77,11 +119,29 @@ export class TieredCacheHandler implements CacheHandler {
   }
 
   async set(key: string, entry: CacheEntry): Promise<void> {
-    const l2Write = this.l2.set(key, entry).catch((err: unknown) => {
-      console.error('TieredCacheHandler: L2 set failed', err);
-    });
+    // Mixed-capability composition: when exactly one layer implements
+    // revalidateTag, a TAGGED entry must never be stored in the layer that
+    // cannot refuse it — that layer would keep serving the stale copy after an
+    // invalidation, forever for revalidate: 0, while this composite claims
+    // invalidation support (so the write-side capability warning never fires).
+    // Same philosophy as the no-promotion rule in get(). When NEITHER layer
+    // supports invalidation the composite doesn't claim to (see constructor),
+    // the write-side warning fires, and both layers store the entry as before.
+    const tagged = !!entry.tags?.length;
+    const l1Sees = typeof this.l1.revalidateTag === 'function';
+    const l2Sees = typeof this.l2.revalidateTag === 'function';
+    const skipBlindLayers = tagged && l1Sees !== l2Sees;
+    if (skipBlindLayers) this.warnTaggedBlindLayerOnce(l1Sees ? 'L2' : 'L1');
 
-    if (this.l1Disabled()) {
+    const skipL2 = skipBlindLayers && !l2Sees;
+    const l2Write = skipL2
+      ? Promise.resolve()
+      : this.l2.set(key, entry).catch((err: unknown) => {
+          console.error('TieredCacheHandler: L2 set failed', err);
+        });
+
+    const skipL1 = this.l1Disabled() || (skipBlindLayers && !l1Sees);
+    if (skipL1) {
       await l2Write;
       return;
     }
@@ -91,6 +151,19 @@ export class TieredCacheHandler implements CacheHandler {
       console.error('TieredCacheHandler: L1 set failed', err);
     });
     await Promise.all([l2Write, l1Write]);
+  }
+
+  private warnedTaggedBlindLayer = false;
+
+  private warnTaggedBlindLayerOnce(blindLayer: 'L1' | 'L2'): void {
+    if (this.warnedTaggedBlindLayer) return;
+    this.warnedTaggedBlindLayer = true;
+    console.warn(
+      `TieredCacheHandler: ${blindLayer} has no revalidateTag, so tagged entries are not stored in it ` +
+        '(a layer that cannot refuse an invalidated entry must never hold one). Tagged entries are ' +
+        'cached only in the layer that supports invalidation; implement revalidateTag on both layers ' +
+        'to cache them in both.',
+    );
   }
 
   // A cap of 0, negative, or NaN cannot be expressed as a revalidate value —

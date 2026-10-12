@@ -35,3 +35,19 @@ export function getCacheHandler(kind: string): CacheHandler {
   }
   return handler;
 }
+
+/**
+ * Snapshot of distinct registered handlers (deduped by identity), for
+ * operations that fan out (tag invalidation). A copy: mutating it cannot
+ * touch the registry, and registrations during iteration are not observed.
+ * Internal — not exported from the package index.
+ */
+export function getUniqueCacheHandlersSnapshot(): CacheHandler[] {
+  return [...new Set(handlers.values())];
+}
+
+/** Test-only: restore the registry to its initial state ('default' → fresh in-memory). */
+export function resetCacheHandlersForTesting(): void {
+  handlers.clear();
+  handlers.set('default', new InMemoryLRUCacheHandler());
+}
