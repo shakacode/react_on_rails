@@ -17438,6 +17438,22 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "publishes no gem and records no completion when npm verification fails" do
+      allow(task_receiver).to receive(:verify_npm_package_published!) do |name, _version|
+        abort "simulated npm verification failure" if name == "react-on-rails-pro"
+      end
+
+      failure = invoke_accelerated_release_task(release_task)
+
+      aggregate_failures do
+        expect(failure&.message).to eq("simulated npm verification failure")
+        expect(events.map(&:first)).to eq(%i[npm npm npm npm])
+        expect(task_receiver).not_to have_received(:publish_gem_with_retry)
+        expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
+        expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
+      end
+    end
+
     it "does not record publication completion when the final gem publication fails" do
       allow(task_receiver).to receive(:publish_gem_with_retry) do |_dir, package, **_options|
         events << [:gem, package]
