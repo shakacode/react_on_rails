@@ -511,7 +511,7 @@ describe('createApp', () => {
 
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       path.join(appPath, '.gitignore'),
-      '# rendered gitignore\n/tmp/*\n',
+      '# rendered gitignore\n/tmp/*\n\n# Ignore key files for decrypting credentials and more.\n/config/*.key\n/config/credentials/*.key\n',
       'utf8',
     );
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(

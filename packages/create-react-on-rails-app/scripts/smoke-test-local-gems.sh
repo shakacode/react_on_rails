@@ -142,6 +142,13 @@ expect_git_history() {
     echo "node_modules/ should not be tracked in $app_dir" >&2
     return 1
   fi
+  local committed_key_files
+  committed_key_files="$(git -C "$app_dir" log --format= --name-only -- 'config/*.key' 'config/credentials/*.key')"
+  if [[ -n "$committed_key_files" ]]; then
+    echo "Credential key files must not be in any generated commit in $app_dir:" >&2
+    printf '%s\n' "$committed_key_files" | sort -u >&2
+    return 1
+  fi
 }
 
 verify_rails_route() {
