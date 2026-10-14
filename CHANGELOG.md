@@ -41,6 +41,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **A failed load of `react-dom/client` is reported instead of swallowed**: With React 18 or later, when
+  `react-dom/client` exists but one of its own dependencies fails to load, React on Rails now rethrows that
+  error when the bundle loads. Previously it was discarded and surfaced later as
+  `reactDomClient.hydrateRoot is not a function`, or not at all in a server bundle. React 16 and 17 apps are
+  unaffected: a missing `react-dom/client` still falls back to `react-dom` with the same webpack warning.
+  Fixes [Issue 5180](https://github.com/shakacode/react_on_rails/issues/5180).
+  [PR 5181](https://github.com/shakacode/react_on_rails/pull/5181) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Streamed `useId` hydration**: Client components now hydrate with the server's `useId` prefix even when
   they are not wrapped by the default RSC provider. This prevents hydration mismatches and keeps
   generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).
