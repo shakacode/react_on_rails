@@ -8,7 +8,7 @@ This guide is for Rails apps that currently use [Inertia Rails](https://inertia-
 
 For the "why" comparison (architecture, SSR, streaming, RSC tradeoffs), see [Comparing React on Rails to Alternatives](../getting-started/comparing-react-on-rails-to-alternatives.md#react-on-rails-vs-inertia-rails). This page is the "how."
 
-> **Scope note:** This is the v1 of the migration guide. A full step-by-step playbook (forms, shared state, SSR cutover, removing Inertia) is tracked in [#3899](https://github.com/shakacode/react_on_rails/issues/3899). Publishing a standalone worked-example repo for that playbook is tracked in [reactonrails.com#140](https://github.com/shakacode/reactonrails.com/issues/140). One mapping-table parity feature, the first-class `useForm`-style helper ([#3872](https://github.com/shakacode/react_on_rails/issues/3872)), **has shipped** as [`useRailsForm`](../building-features/forms.md). The opinionated routing/prefetch starter ([#3873](https://github.com/shakacode/react_on_rails/issues/3873)) is **not shipped yet** — check that issue for current status. The table gives you the current answer for each.
+> **Scope note:** This is the v1 of the migration guide. The full step-by-step playbook (forms, shared state, SSR cutover, removing Inertia) has not been written yet; it and a standalone worked-example repo are tracked in [reactonrails.com#140](https://github.com/shakacode/reactonrails.com/issues/140). One mapping-table parity feature, the first-class `useForm`-style helper ([#3872](https://github.com/shakacode/react_on_rails/issues/3872)), **has shipped** as [`useRailsForm`](../building-features/forms.md). The opinionated routing/prefetch starter ([#3873](https://github.com/shakacode/react_on_rails/issues/3873)) is **not shipped yet** — check that issue for current status. The table gives you the current answer for each.
 
 ## Concept mapping
 
@@ -36,7 +36,7 @@ The migration-enabling claim is that `inertia_rails` and `react_on_rails` can li
 | Ruby / Rails                                | 3.4.6 / 8.1.3                             |
 | `react_on_rails` gem / `react-on-rails` npm | 16.6.0 / 16.6.0                           |
 | `inertia_rails` gem                         | 3.21.2                                    |
-| `@inertiajs/react` npm                      | 2.3.26 (see version-pairing gotcha below) |
+| `@inertiajs/react` npm                      | 2.3.26 (see the Inertia 3.x gotcha below) |
 | `shakapacker` gem / npm                     | 9.7.0 / 9.7.0                             |
 | React / ReactDOM                            | 19.2.7                                    |
 
@@ -58,7 +58,20 @@ The migration-enabling claim is that `inertia_rails` and `react_on_rails` can li
 
 **Gotchas found during verification:**
 
-- **Pin `@inertiajs/react` to the major version your `inertia_rails` gem supports.** With `inertia_rails` 3.21.2, `@inertiajs/react` 3.4.0 failed to boot (`TypeError: Cannot read properties of null (reading 'component')` inside `createInertiaApp`); pinning to `@inertiajs/react` ^2 (2.3.26) worked. If your existing app already runs, keep its existing client version during the migration.
+- **Inertia 3.x clients need the `inertia_rails` v3 settings.** In the scratch app, `@inertiajs/react` 3.4.0 failed to boot against `inertia_rails` 3.21.2 with `TypeError: Cannot read properties of null (reading 'component')` inside `createInertiaApp`, while 2.3.26 worked. Pinning to 2.x hid the real cause. By default, `inertia_rails` emits the initial page object as a `data-page` attribute on the root element. Inertia 2.x clients read that attribute; 3.x clients read the page only from a `script[data-page][type="application/json"]` element, so they find no page. Keep the 3.x client and add the settings the `inertia_rails` [upgrade guide](https://inertia-rails.dev/guide/upgrade-guide) lists for v3 clients (gem `~> 3.19`):
+
+  ```ruby
+  # config/initializers/inertia_rails.rb
+  InertiaRails.configure do |config|
+    config.use_script_element_for_initial_page = true # fixes the boot error
+    config.use_data_inertia_head_attribute = true
+    config.always_include_errors_hash = true
+  end
+  ```
+
+  All three are off by default. The gem's `inertia:install` generator writes them, but that generator only supports Vite, so a Shakapacker app needs them added by hand. We confirmed this on 2026-10-12 in a generated React on Rails Pro 17.1.0 app (Shakapacker 10.3.2, Rspack 2.2.9) with `inertia_rails` 3.22.0 and `@inertiajs/react` 3.9.1 built as an ordinary pack. With `use_script_element_for_initial_page` off, the page stayed blank with that error; with it on, the page mounted. That was not a rerun of the scratch app, so the table above still shows the 2.x client. If your existing app already runs, keep its client version and settings during the migration.
+
+- **Inertia 3.x builds need `axios` installed or aliased away.** `@inertiajs/core` 3.x keeps an optional `import("axios")` for its Axios adapter, and webpack and Rspack resolve that import at build time. Without `axios` installed, the client build fails with `Can't resolve 'axios'`. Either install `axios`, or, if the app never uses Inertia's `axiosAdapter()`, set `resolve: { alias: { axios: false } }` in the client bundler config. The Inertia maintainers recommend that alias in [inertiajs/inertia#3123](https://github.com/inertiajs/inertia/issues/3123). We saw the failure with Rspack 2.2.9 in the app above, and on 2026-10-13 reproduced it and confirmed the alias fix with webpack 5.111.1 and `@inertiajs/core` 3.9.1.
 - This was verified with full-page (`<a>`) navigation across the boundary. Inertia's `<Link>` SPA visits only work between Inertia pages; links that leave the Inertia section of the app should be regular anchors.
 - The scratch app used webpack-bundled Inertia via Shakapacker. If your Inertia app uses Vite, you can run Vite and Shakapacker side by side during the migration, but that combination was **not** part of this verification.
 
