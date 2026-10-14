@@ -27,16 +27,21 @@ export const supportsReact19RootErrorCallbacks = reactMajorVersion >= 19;
 // import ReactDOM from 'react-dom/client';
 let reactDomClient: typeof import('react-dom/client');
 if (supportsRootApi) {
-  // This will never throw an exception, but it's the way to tell Webpack the dependency is optional
+  // The try is how we tell Webpack the dependency is optional
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
   // Unfortunately, it only converts the error to a warning. React 16/17 consumers can suppress
   // the warning by passing `reactDomClientWarning` from 'react-on-rails/webpackHelpers' to their
   // webpack `ignoreWarnings` config. See #3137.
   try {
     reactDomClient = require('react-dom/client') as typeof import('react-dom/client');
-  } catch (_e) {
-    // We should never get here, but if we do, we'll just use the default ReactDOM
-    // and live with the warning.
+  } catch (error) {
+    // The fallback exists only for react-dom/client itself being absent. Any other failure, such as
+    // one of its own dependencies failing to load, is a real error and must not be hidden (#5180).
+    const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
+    const clientIsMissing = code === 'MODULE_NOT_FOUND' && String(message).includes("'react-dom/client'");
+    if (!clientIsMissing) {
+      throw error;
+    }
     reactDomClient = ReactDOM as unknown as typeof import('react-dom/client');
   }
 }
