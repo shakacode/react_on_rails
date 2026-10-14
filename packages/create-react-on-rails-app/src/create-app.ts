@@ -89,9 +89,14 @@ const RAILS_GITIGNORE_FALLBACK = `# See https://help.github.com/articles/ignorin
 !/tmp/storage/.keep
 
 /public/assets
-
+`;
+// Rails adds its own key-file rule while rails new creates config/master.key, but only when
+// .gitignore already exists, and --skip-git skips .gitignore. Append the rules to whichever
+// scaffold is used so the first educational commit cannot stage a key file.
+const CREDENTIAL_KEY_GITIGNORE = `
 # Ignore key files for decrypting credentials and more.
 /config/*.key
+/config/credentials/*.key
 `;
 const RAILS_GITATTRIBUTES_FALLBACK = `# See https://git-scm.com/docs/gitattributes for more about git attribute files.
 
@@ -266,7 +271,7 @@ function railsGitScaffold(appPath: string): { gitignore: string; gitattributes: 
   const renderedGitignore = readInstalledRailsGitTemplate(appPath, 'gitignore.tt');
   const renderedGitattributes = readInstalledRailsGitTemplate(appPath, 'gitattributes.tt');
   return {
-    gitignore: renderedGitignore ?? RAILS_GITIGNORE_FALLBACK,
+    gitignore: `${renderedGitignore ?? RAILS_GITIGNORE_FALLBACK}${CREDENTIAL_KEY_GITIGNORE}`,
     gitattributes: renderedGitattributes ?? RAILS_GITATTRIBUTES_FALLBACK,
   };
 }
