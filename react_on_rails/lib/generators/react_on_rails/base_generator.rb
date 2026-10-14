@@ -344,6 +344,8 @@ module ReactOnRails
         additions << "**/generated/**" unless gitignore_content.include?("**/generated/**")
         additions << "ssr-generated" unless gitignore_content.include?("ssr-generated")
         additions << ".env" unless gitignore_content.match?(/^\.env$/)
+        # The Pro Node renderer (renderer/node-renderer.js) caches uploaded server bundles here.
+        additions << ".node-renderer-bundles" if use_pro? && !gitignore_content.include?(".node-renderer-bundles")
 
         return if additions.empty?
 
