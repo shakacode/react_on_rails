@@ -70,7 +70,7 @@ The Rails tier, recorded on 2026-09-04, covers the first three gaps in that list
 | Files in the declared config surface |                       7 |                    3 |
 | Nonblank, non-comment lines          |                     197 |                   30 |
 
-Read these verdicts as recorded too. Vite was ahead on startup: its starter reached browser-ready React about 2 seconds sooner, a gap outside the run's noise band. Fast Refresh is **ambiguous**: the medians are 77.6 ms and 77.4 ms, but both stacks had samples above 175 ms. Both stacks preserved typed React state through every Fast Refresh sample. Vite also had the smaller generated config surface, 3 files and 30 lines against 7 files and 197 lines. Those counts describe generated files only; they are not a usability score.
+Read these verdicts as recorded too. Vite was ahead on startup: its starter reached browser-ready React about 2 seconds sooner, a gap outside the run's noise band. Fast Refresh is **ambiguous**: the medians are 77.4 ms for Vite and 77.6 ms for Rspack, but both stacks had samples above 175 ms. Both stacks preserved typed React state through every Fast Refresh sample. Vite also had the smaller generated config surface, 3 files and 30 lines against 7 files and 197 lines. Those counts describe generated files only; they are not a usability score.
 
 **What these numbers do not show.** This is one recorded run on one machine with two generated starters. The startup timing includes Rails boot, asset startup, and React rendering, so it does not isolate bundler cost. The run does not measure production builds, onboarding, runtime-error overlays, or click-to-editor. Results can vary with hardware, caches, and dependency versions, so treat them as evidence about these two starters, not as a universal "faster" or "parity" claim for either stack.
 
@@ -86,7 +86,7 @@ An honest positioning page has to say this part out loud:
 
 - **The dev-server model.** Vite's native-ESM dev server with on-demand transforms is a genuinely elegant architecture, and it is a large part of why Vite's dev loop has the reputation it does.
 - **Ecosystem and defaults.** A large share of the frontend ecosystem — templates, component libraries, meta-frameworks, tutorials — assumes Vite first. Being the default has real compounding value: more examples, more Stack Overflow answers, more plugins built against Vite's plugin API.
-- **Config minimalism.** Vite needed less configuration in both of our benchmarks: 2 explicit config lines to Rspack's 12 in the control tier, and 3 files and 30 lines against 7 files and 197 lines in the generated Rails starters. That difference is measured, ours, and worth copying; [#4697](https://github.com/shakacode/react_on_rails/issues/4697) tracks driving the generated Rspack config surface down.
+- **Config minimalism.** Vite needed less configuration in both of our benchmarks: 2 explicit config lines to Rspack's 12 in the control tier, and 3 files and 30 lines against Rspack's 7 files and 197 lines in the generated Rails starters. That difference is measured, ours, and worth copying; [#4697](https://github.com/shakacode/react_on_rails/issues/4697) tracks driving the generated Rspack config surface down.
 - **Generated-starter startup.** In our Rails-tier run, the Inertia Rails + Vite starter reached browser-ready React in 3001.5 ms (median) against 5008.8 ms for React on Rails + Rspack. That timing includes Rails boot and asset startup, so it does not isolate the bundler.
 
 ## What Would Change Our Minds
