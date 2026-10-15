@@ -192,7 +192,7 @@ exclude = [
   # ============================================================================
   # PRIVATE REPOSITORIES
   # ============================================================================
-  '^https://github\.com/shakacode/react_on_rails_pro/',  # Requires authentication
+  '^https://(github\.com|raw\.githubusercontent\.com)/shakacode/react_on_rails_pro/',  # Requires authentication; raw.githubusercontent.com is the remapped form of its blob links
 ]
 
 # Exclude paths (regex patterns)
