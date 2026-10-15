@@ -19,7 +19,6 @@
 
 import * as React from 'react';
 import {
-  Component,
   createContext,
   forwardRef,
   useCallback,
@@ -33,45 +32,11 @@ import {
   type ReactNode,
 } from 'react';
 import { useRSC } from './RSCProvider.tsx';
-import RefetchRenderBoundary from './RSCRefetchRenderBoundary.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from './RSCRouteSuccessfulVersion.ts';
 import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
-import { isServerComponentFetchError, ServerComponentFetchError } from './ServerComponentFetchError.ts';
+import { toServerComponentFetchError, ServerComponentFetchError } from './ServerComponentFetchError.ts';
+import RSCRouteErrorBoundary from './RSCRouteErrorBoundary.tsx';
 import { createRSCPayloadKey } from './utils.ts';
-
-/**
- * Error boundary component for RSCRoute that adds server component name and props to the error
- * So, the parent ErrorBoundary can refetch the server component
- */
-class RSCRouteErrorBoundary extends Component<
-  { children: ReactNode; componentName: string; componentProps: unknown },
-  { error: Error | null }
-> {
-  constructor(props: { children: ReactNode; componentName: string; componentProps: unknown }) {
-    super(props);
-    this.state = { error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    const { error } = this.state;
-    const { componentName, componentProps, children } = this.props;
-    if (error) {
-      // A nested RSCRoute's boundary may have already wrapped the failure with
-      // its own (more specific) component context; pass it through instead of
-      // re-wrapping.
-      if (isServerComponentFetchError(error)) {
-        throw error;
-      }
-      throw new ServerComponentFetchError(error.message, componentName, componentProps, error);
-    }
-
-    return children;
-  }
-}
 
 /**
  * Imperative handle exposed by `<RSCRoute>` via `ref`.
@@ -155,19 +120,6 @@ const rejectErrorPayload = (promise: Promise<ReactNode>): Promise<ReactNode> =>
     return payload;
   });
 
-const toServerComponentFetchError = (
-  error: unknown,
-  componentName: string,
-  componentProps: unknown,
-): ServerComponentFetchError => {
-  if (isServerComponentFetchError(error)) {
-    return error;
-  }
-
-  const originalError = error instanceof Error ? error : new Error(String(error));
-  return new ServerComponentFetchError(originalError.message, componentName, componentProps, originalError);
-};
-
 type RefetchErrorState = [string, ServerComponentFetchError];
 type RSCContextValue = ReturnType<typeof useRSC>;
 type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue };
@@ -194,9 +146,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
     // captured the handle at an earlier render.
     const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
     const onRefetchErrorRef = useRef(onRefetchError);
-    const latestRefetchRequestRef = useRef(0);
-    const latestRefetchVersionRef = useRef<[key: string, version: number] | null>(null);
-    const reportedRefetchRequestRef = useRef(0);
+    const latestRefetchRef = useRef<((error: unknown) => ServerComponentFetchError) | null>(null);
     // Version 0 means "evicted or not yet seen"; it lets a later monotonic
     // success token clear a stale refetch error after the key reloads.
     const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
@@ -223,42 +173,34 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
       }
     }, [currentRouteKey, successfulVersion]);
 
-    const recordRefetchError = useCallback(
-      (key: string, requestId: number, error: ServerComponentFetchError) => {
-        if (reportedRefetchRequestRef.current === requestId) return;
-        reportedRefetchRequestRef.current = requestId;
-        setRefetchErrorState([key, error]);
-      },
-      [],
-    );
-
     const refetch = useCallback((): Promise<ReactNode> => {
       const [n, p] = latestPropsRef.current;
       const requestKey = createRSCPayloadKey(n, p);
-      // eslint-disable-next-line no-multi-assign
-      const requestId = (latestRefetchRequestRef.current += 1);
       const recoverOnError = process.env.NODE_ENV === 'production';
       // refetchComponent swaps the cache promise and bumps the provider's
       // version inside startTransition. That re-renders every <RSCRoute>
       // (including this one) as a transition commit, so old content stays
       // visible while the new promise streams in.
       let sharedRefetchVersion = 0;
+      let reported = false;
       const reportFailure = (error: unknown) => {
         const serverComponentFetchError = toServerComponentFetchError(error, n, p);
         if (
           recoverOnError &&
           isMountedRef.current &&
-          latestRefetchRequestRef.current === requestId &&
+          !reported &&
+          latestRefetchRef.current === reportFailure &&
           getRefetchVersion(n, p) === sharedRefetchVersion &&
           createRSCPayloadKey(...latestPropsRef.current) === requestKey
         ) {
-          recordRefetchError(requestKey, requestId, serverComponentFetchError);
+          reported = true;
+          setRefetchErrorState([requestKey, serverComponentFetchError]);
         }
         return serverComponentFetchError;
       };
       const refetchPromise = refetchComponent(n, p, recoverOnError, reportFailure);
       sharedRefetchVersion = getRefetchVersion(n, p);
-      latestRefetchVersionRef.current = [requestKey, sharedRefetchVersion];
+      latestRefetchRef.current = reportFailure;
       const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
         const serverComponentFetchError = reportFailure(error);
         throw serverComponentFetchError;
@@ -267,7 +209,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
         void handledRefetchPromise.catch(() => undefined);
       }
       return handledRefetchPromise;
-    }, [getRefetchVersion, recordRefetchError, refetchComponent]);
+    }, [getRefetchVersion, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {
       if (isMountedRef.current) {
@@ -287,34 +229,13 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
     }, [refetchError]);
 
     const componentPromise = getComponent(componentName, componentProps);
-    const recoverRenderError = useCallback(
-      (error: Error, refetchVersion: number) => {
-        // componentDidCatch precedes this route's layout effects. Publish the
-        // error afterward so the decoded root's success token cannot clear it.
-        queueMicrotask(() => {
-          if (
-            isMountedRef.current &&
-            latestRefetchVersionRef.current?.[0] === currentRouteKey &&
-            latestRefetchVersionRef.current[1] === refetchVersion &&
-            getRefetchVersion(componentName, componentProps) === refetchVersion &&
-            createRSCPayloadKey(...latestPropsRef.current) === currentRouteKey
-          ) {
-            recordRefetchError(
-              currentRouteKey,
-              latestRefetchRequestRef.current,
-              toServerComponentFetchError(error, componentName, componentProps),
-            );
-          }
-        });
-      },
-      [componentName, componentProps, currentRouteKey, getRefetchVersion, recordRefetchError],
-    );
     return (
       <CurrentRSCRouteContext.Provider value={handle}>
-        <RefetchRenderBoundary
+        <RSCRouteErrorBoundary
+          componentName={componentName}
+          componentProps={componentProps}
           promise={componentPromise}
           recovery={getRenderRecovery(componentPromise)}
-          onRecover={recoverRenderError}
         />
       </CurrentRSCRouteContext.Provider>
     );

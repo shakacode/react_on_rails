@@ -25,7 +25,7 @@ import {
   RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
 } from './rscDiagnostics.ts';
 import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
-import { getRSCStreamState, trackRSCStreamCompletion, type RSCStreamState } from './RSCStreamCompletion.ts';
+import { trackRSCStreamCompletion, type RSCStreamState } from './RSCStreamCompletion.ts';
 
 declare global {
   interface Window {
@@ -102,10 +102,8 @@ const createFromFetch = (
     completion: new Promise<boolean>((resolve) => {
       finishStream = resolve;
     }),
-    hasErrors: false,
   };
-  const decode = async () => {
-    const response = await fetchPromise;
+  const request = fetchPromise.then((response) => {
     if (!response.ok) {
       const statusDescription = response.statusText
         ? `${response.status} ${response.statusText}`
@@ -125,61 +123,47 @@ const createFromFetch = (
     const parser = new LengthPrefixedStreamParser();
     let rscDiagnosticError: Error | undefined;
     const diagnosticContext = { componentName, source: sourceDescription };
-    const transformedStream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const reader = body.getReader();
-        const handleContent = (content: Uint8Array, metadata: Record<string, unknown>) => {
-          rscDiagnosticError ??= buildRSCStreamDiagnosticError(metadata, diagnosticContext);
-          streamState.hasErrors = !!rscDiagnosticError;
-          streamState.error = rscDiagnosticError;
-          controller.enqueue(content);
-          const consoleScript = (metadata.consoleReplayScript as string) ?? '';
-          if (replayConsoleScripts && consoleScript) {
-            replayConsole(consoleScript, nonce);
-          }
-        };
-        try {
-          for (;;) {
-            // eslint-disable-next-line no-await-in-loop
-            const { done, value } = await reader.read();
-            if (value) parser.feed(value, handleContent);
-            if (done) break;
-          }
-          if (!parser.flush()) throw new Error('Incomplete RSC stream');
-          controller.close();
-        } catch (error) {
-          // Application logging can throw; it must not turn this failure into success.
-          streamState.hasErrors = true;
-          streamState.error = error instanceof Error ? error : new Error('RSC stream failed');
-
-          controller.error(error);
-          console.error('[ReactOnRails] Error parsing RSC stream:', error);
-        }
-      },
-    });
-
-    // Parser EOF can precede React reading the last Flight error. Avoid read-ahead
-    // here: completion certifies that the decoder requested EOF after consuming
-    // every record, rather than merely that the transport finished enqueueing it.
-    const reader = transformedStream.getReader();
+    const reader = body.getReader();
+    // Pull only when the decoder is ready. With no read-ahead, observing EOF
+    // certifies that React consumed every queued Flight record first.
     const decoderStream = new ReadableStream<Uint8Array>(
       {
         async pull(controller) {
+          let hasContent = false;
+          const handleContent = (content: Uint8Array, metadata: Record<string, unknown>) => {
+            rscDiagnosticError ??= buildRSCStreamDiagnosticError(metadata, diagnosticContext);
+            streamState.error = rscDiagnosticError;
+            hasContent = true;
+            controller.enqueue(content);
+            const consoleScript = metadata.consoleReplayScript as string;
+            if (replayConsoleScripts && consoleScript) {
+              replayConsole(consoleScript, nonce);
+            }
+          };
           try {
-            const { done, value } = await reader.read();
-            if (done) {
-              finishStream(!streamState.hasErrors);
-              controller.close();
-            } else {
-              controller.enqueue(value);
+            // A response read may contain only part of a record. Keep reading
+            // until this decoder pull can deliver content or a terminal state.
+            while (!hasContent) {
+              // eslint-disable-next-line no-await-in-loop
+              const { done, value } = await reader.read();
+              if (value) parser.feed(value, handleContent);
+              if (done) {
+                if (!parser.flush()) throw new Error('Incomplete RSC stream');
+                finishStream(!streamState.error);
+                controller.close();
+                return;
+              }
             }
           } catch (error) {
+            // Logging can throw; settle completion before calling application code.
+            streamState.error = error instanceof Error ? error : new Error('RSC stream failed');
             finishStream(false);
             controller.error(error);
+            console.error('[ReactOnRails] Error parsing RSC stream:', error);
           }
         },
         cancel(reason) {
-          streamState.hasErrors = true;
+          streamState.error = new Error('RSC stream failed');
           finishStream(false);
           return reader.cancel(reason);
         },
@@ -188,15 +172,15 @@ const createFromFetch = (
     );
     const renderPromise = createFromReadableStream<React.ReactNode>(decoderStream);
     // `rscDiagnosticError` is set before the matching chunk is enqueued: the parser callback
-    // records it first, then enqueues the content in the ReadableStream `start` callback above.
+    // records it first, then enqueues the content in the ReadableStream `pull` callback above.
     // React can only read a chunk after it has been enqueued, so by the time `renderPromise`
     // rejects the diagnostic — if the stream carried one — is already set; it is never undefined
     // purely because of timing.
     return wrapInNewPromise(renderPromise).catch((error: unknown) => {
       throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
     });
-  };
-  return trackRSCStreamCompletion(decode(), streamState);
+  });
+  return [request, streamState] as const;
 };
 
 // Duck type instead of `instanceof DOMException`: cross-realm AbortErrors
@@ -289,7 +273,7 @@ export const fetchRSC = ({
       }
     })();
 
-    const request = createFromFetch(fetchPromise, {
+    const [request, streamState] = createFromFetch(fetchPromise, {
       componentName,
       cspNonce,
       replayConsoleScripts,
@@ -312,8 +296,7 @@ export const fetchRSC = ({
       }
       throw wrapper;
     });
-    const streamState = getRSCStreamState(request);
-    return streamState ? trackRSCStreamCompletion(handledRequest, streamState) : handledRequest;
+    return trackRSCStreamCompletion(handledRequest, streamState);
   } catch (error: unknown) {
     // JSON.stringify errors and other synchronous preparation failures become
     // rejections so callers stay on the Promise error path (#4372).

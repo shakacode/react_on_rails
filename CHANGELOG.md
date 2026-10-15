@@ -52,6 +52,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
   [Justin Gordon](https://github.com/justin808).
 
+- **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
+  `serverWebpackConfig.js` removed client-only plugins by webpack class names only, so Rspack apps kept
+  `rspack-manifest-plugin` and `CssExtractRspackPlugin` in the server compilation and in the RSC compilations
+  derived from it. Each of those builds wrote its own `ssr-generated/manifest.json`, which ended up listing only
+  the bundle that finished last. The generated config now removes both Rspack plugins. Existing Rspack apps can
+  apply the same change to the plugin filter in `config/rspack/serverWebpackConfig.js`. Fixes
+  [Issue 5184](https://github.com/shakacode/react_on_rails/issues/5184).
+  [PR 5185](https://github.com/shakacode/react_on_rails/pull/5185) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Streamed `useId` hydration**: Client components now hydrate with the server's `useId` prefix even when
   they are not wrapped by the default RSC provider. This prevents hydration mismatches and keeps
   generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).

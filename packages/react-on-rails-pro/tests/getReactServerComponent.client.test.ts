@@ -121,6 +121,47 @@ describe('fetchRSC HTTP responses', () => {
     },
   );
 
+  it('decodes a healthy record split across response reads', async () => {
+    const record = toLengthPrefixedRecord('fragmented payload');
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const character of record) controller.enqueue(encoder.encode(character));
+        controller.close();
+      },
+    });
+    const { fetchRSC } = await loadClientModule(jest.fn(readStreamText));
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+    const request = fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    await expect(request).resolves.toBe('fragmented payload');
+    await expect(getRSCStreamState(request)?.completion).resolves.toBe(true);
+  });
+
+  it('records decoder cancellation as a failed completion', async () => {
+    let decoderReader!: ReadableStreamDefaultReader<Uint8Array>;
+    const { fetchRSC } = await loadClientModule(
+      jest.fn((stream: ReadableStream<Uint8Array>) => {
+        decoderReader = stream.getReader();
+        return Promise.resolve('root');
+      }),
+    );
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('root')));
+    const request = fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    await request;
+    await decoderReader.cancel();
+    await expect(getRSCStreamState(request)?.completion).resolves.toBe(false);
+    expect(getRSCStreamState(request)?.error).toBeInstanceOf(Error);
+  });
+
   it('does not certify completion before the decoder drains the final records', async () => {
     let bodyController!: ReadableStreamDefaultController<Uint8Array>;
     let decoderReader!: ReadableStreamDefaultReader<Uint8Array>;
@@ -192,7 +233,7 @@ describe('fetchRSC HTTP responses', () => {
       controller.enqueue(encoder.encode(tail));
       controller.close();
       await expect(getRSCStreamState(request)?.completion).resolves.toBe(false);
-      expect(getRSCStreamState(request)?.hasErrors).toBe(true);
+      expect(Boolean(getRSCStreamState(request)?.error)).toBe(true);
     },
   );
 
@@ -243,7 +284,7 @@ describe('fetchRSC HTTP responses', () => {
         controller.close();
       }
       await expect(completion).resolves.toBe(successful);
-      expect(getRSCStreamState(request)?.hasErrors).toBe(!successful);
+      expect(Boolean(getRSCStreamState(request)?.error)).toBe(!successful);
     },
   );
 
@@ -271,14 +312,14 @@ describe('fetchRSC HTTP responses', () => {
     });
     await request;
     const state = getRSCStreamState(request)!;
-    expect(state.hasErrors).toBe(false);
+    expect(state.error).toBeUndefined();
     const logging = jest.spyOn(console, 'error').mockImplementation(() => {
       throw new Error('logging failed');
     });
     try {
       controller.error(new Error('late transport failure'));
       await expect(state.completion).resolves.toBe(false);
-      expect(state.hasErrors).toBe(true);
+      expect(state.error).toBeInstanceOf(Error);
       await expect(decodedStream).rejects.toThrow('late transport failure');
     } finally {
       logging.mockRestore();

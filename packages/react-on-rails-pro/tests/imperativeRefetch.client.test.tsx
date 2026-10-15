@@ -15,6 +15,7 @@
 
 /* eslint-disable react/prop-types, no-underscore-dangle */
 import * as React from 'react';
+import type { RSCStreamState } from '../src/RSCStreamCompletion.ts';
 import { Suspense } from 'react';
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -658,7 +659,6 @@ class CapturingErrorBoundary extends React.Component<
       const requests = Array.from({ length: 3 }, () =>
         trackRSCStreamCompletion(Promise.resolve(root), {
           completion: Promise.resolve(true),
-          hasErrors: false,
         }),
       );
       setupSequencedFetcher(requests);
@@ -684,17 +684,15 @@ class CapturingErrorBoundary extends React.Component<
     process.env.NODE_ENV = 'production';
     let finishOld!: (successful: boolean) => void;
     let finishNew!: (successful: boolean) => void;
-    const oldState = {
+    const oldState: RSCStreamState = {
       completion: new Promise<boolean>((resolve) => {
         finishOld = resolve;
       }),
-      hasErrors: false,
     };
-    const newState = {
+    const newState: RSCStreamState = {
       completion: new Promise<boolean>((resolve) => {
         finishNew = resolve;
       }),
-      hasErrors: false,
     };
     setupSequencedFetcher([
       'Initial content',
@@ -716,7 +714,7 @@ class CapturingErrorBoundary extends React.Component<
       await ref.current!.refetch();
     });
     await act(async () => {
-      oldState.hasErrors = true;
+      oldState.error = new Error('RSC stream failed');
       finishOld(false);
       finishNew(true);
     });
@@ -734,11 +732,10 @@ class CapturingErrorBoundary extends React.Component<
     async (scalar) => {
       process.env.NODE_ENV = 'production';
       let finish!: (successful: boolean) => void;
-      const streamState = {
+      const streamState: RSCStreamState = {
         completion: new Promise<boolean>((resolve) => {
           finish = resolve;
         }),
-        hasErrors: false,
       };
       const ClientCard = ({ label }: { label: string }) => {
         const [broken, setBroken] = React.useState(false);
@@ -767,7 +764,7 @@ class CapturingErrorBoundary extends React.Component<
       });
       expect(screen.getByText('Failed candidate')).toBeInTheDocument();
       await act(async () => {
-        streamState.hasErrors = true;
+        streamState.error = new Error('RSC stream failed');
         finish(false);
       });
       expect(screen.queryByText('Failed candidate')).not.toBeInTheDocument();
@@ -792,11 +789,10 @@ class CapturingErrorBoundary extends React.Component<
       return <span>Candidate shell</span>;
     });
     let finish!: (successful: boolean) => void;
-    const streamState = {
+    const streamState: RSCStreamState = {
       completion: new Promise<boolean>((resolve) => {
         finish = resolve;
       }),
-      hasErrors: false,
     };
     setupSequencedFetcher(['Old card', trackRSCStreamCompletion(Promise.resolve(<Boundary />), streamState)]);
     const ref = React.createRef<RSCRouteHandle>();
@@ -812,7 +808,7 @@ class CapturingErrorBoundary extends React.Component<
     expect(screen.getByText('Candidate shell')).toBeInTheDocument();
     await act(async () => {
       failed = true;
-      streamState.hasErrors = true;
+      streamState.error = new Error('RSC stream failed');
       finish(false);
     });
     expect(screen.getByText('Old card')).toBeInTheDocument();
@@ -823,11 +819,10 @@ class CapturingErrorBoundary extends React.Component<
   it('does not swallow an unrelated client error after failed stream completion', async () => {
     process.env.NODE_ENV = 'production';
     let finish!: (successful: boolean) => void;
-    const streamState = {
+    const streamState: RSCStreamState = {
       completion: new Promise<boolean>((resolve) => {
         finish = resolve;
       }),
-      hasErrors: false,
     };
     const ClientCard = () => {
       const [broken, setBroken] = React.useState(false);
@@ -851,7 +846,7 @@ class CapturingErrorBoundary extends React.Component<
       await ref.current!.refetch();
     });
     await act(async () => {
-      streamState.hasErrors = true;
+      streamState.error = new Error('RSC stream failed');
       finish(false);
     });
     await act(async () => {
@@ -877,9 +872,7 @@ class CapturingErrorBoundary extends React.Component<
       const candidate = <ClientCard />;
       setupSequencedFetcher([
         <span>Old card</span>,
-        stream !== 'none'
-          ? trackRSCStreamCompletion(Promise.resolve(candidate), { completion, hasErrors: false })
-          : candidate,
+        stream !== 'none' ? trackRSCStreamCompletion(Promise.resolve(candidate), { completion }) : candidate,
       ]);
       const ref = React.createRef<RSCRouteHandle>();
       const onError = jest.fn();
@@ -1021,7 +1014,7 @@ class CapturingErrorBoundary extends React.Component<
       });
       const candidate = trackRSCStreamCompletion(
         Promise.resolve(primitive ? 'Streamed candidate' : <span>Streamed candidate</span>),
-        { completion, hasErrors: false },
+        { completion },
       );
       const BrokenBoundary = (): React.ReactNode => {
         throw new Error('later render failure');
@@ -1057,7 +1050,6 @@ class CapturingErrorBoundary extends React.Component<
     const completion = state === 'pending' ? new Promise<boolean>(() => {}) : Promise.resolve(false);
     const initial = trackRSCStreamCompletion(Promise.resolve(<span>Initial content</span>), {
       completion,
-      hasErrors: false,
     });
     const error = new Error('HTTP failure');
     setupSequencedFetcher([initial, rejectWith(error), rejectWith(error), <span>Recovered content</span>]);

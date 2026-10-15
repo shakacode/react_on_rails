@@ -39,8 +39,7 @@ import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type RSCRefetchRecovery = {
   fallback: Promise<ReactNode>;
-  refetchVersion: number;
-  recover: () => void;
+  recover: (error: Error) => void;
   canRecover: () => boolean;
   hasFailed: () => boolean;
   commit: () => void;
@@ -511,11 +510,10 @@ export const createRSCProvider = ({
           return rejectWithError<ReactNode>(error);
         }
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
-        const refetchVersion = refetchVersionsRef.current[key];
         // A Flight root can resolve before a descendant boundary fails. Keep
         // the pre-request payload, not the root that decoding just accepted.
         const previousSuccessfulPromise = lastSuccessfulRSCPromisesRef.current[key];
-        if (previousSuccessfulPromise !== undefined) {
+        if (previousSuccessfulPromise != null) {
           // Do not retain a chain of earlier recovery snapshots across refetches.
           renderRecoveries.delete(previousSuccessfulPromise);
         }
@@ -523,17 +521,13 @@ export const createRSCProvider = ({
         let streamState: ReturnType<typeof getRSCStreamState>;
         let request: Promise<ReactNode>;
         let active = true;
-        let streamCompleted: boolean | undefined;
-        const retireRecovery = () => {
-          active = false;
-          renderRecoveries.delete(promise);
-        };
+        let streamCompleted = false;
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromises.get(key, false) !== promise) {
             return;
           }
 
-          if (previousSuccessfulPromise !== undefined) {
+          if (previousSuccessfulPromise != null) {
             lastSuccessfulRSCPromisesRef.current[key] = previousSuccessfulPromise;
             // Keep the restored last-successful payload protected until the
             // caller's rejection handler has observed the still-current refetch
@@ -598,7 +592,7 @@ export const createRSCProvider = ({
                   // Preserve the snapshot across overlapping streamed refetches.
                   void streamState.completion.then((successful) => {
                     markSuccessful(successful);
-                    streamCompleted = successful;
+                    streamCompleted = true;
                     if (!successful && recoverOnError && fetchRSCPromises.get(key, false) === promise) {
                       // Let React render the completed Flight tree first. Its
                       // boundary error carries details (including digest) that
@@ -630,28 +624,28 @@ export const createRSCProvider = ({
         // path were added — and prevents the refetch's new promise from being
         // the eviction victim when the cache is already full of pinned keys.
         fetchRSCPromises.setPinned(key, promise);
-        if (recoverOnError && previousSuccessfulPromise !== undefined) {
-          let renderCommitted = false;
+        if (recoverOnError && previousSuccessfulPromise != null) {
           const recovery: RSCRefetchRecovery = {
             fallback: previousSuccessfulPromise,
-            refetchVersion,
-            recover: restoreLastSuccessfulPromise,
+            recover: (error) => {
+              restoreLastSuccessfulPromise();
+              // Report after route layout effects, including when a sibling
+              // boundary restores this shared request before its initiating route.
+              queueMicrotask(() => onStreamError?.(error));
+            },
             // An interactive client can fail while a healthy Flight stream is
             // still pending. Only its server/transport failure arms recovery.
-            canRecover: () => active && streamState?.hasErrors !== false,
-            hasFailed: () => streamCompleted === false,
+            canRecover: () => active && (!streamState || streamState.error != null),
+            hasFailed: () => streamCompleted && streamState?.error != null,
             // Root fulfillment alone cannot certify a rendered Flight payload.
             // Wait for a successful commit and, for HTTP Flight, its error-free
             // stream completion before treating later client errors as unrelated.
             commit: () => {
-              if (renderCommitted || (streamState && streamCompleted === undefined)) return;
-              renderCommitted = true;
+              if (!active || (streamState && !streamCompleted)) return;
               if (fetchRSCPromises.get(key, false) !== promise) return;
-              retireRecovery();
-              if (streamCompleted === false) {
-                restoreLastSuccessfulPromise();
-                onStreamError?.(streamState?.error ?? new Error('RSC stream failed before completion'));
-              }
+              active = false;
+              renderRecoveries.delete(promise);
+              if (streamState?.error) recovery.recover(streamState.error);
             },
           };
           renderRecoveries.set(promise, recovery);

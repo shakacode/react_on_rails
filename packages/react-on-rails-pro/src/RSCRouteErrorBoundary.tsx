@@ -20,6 +20,7 @@
 import * as React from 'react';
 import { Component, use, type ReactNode } from 'react';
 import type { RSCRefetchRecovery } from './RSCProvider.tsx';
+import { toServerComponentFetchError } from './ServerComponentFetchError.ts';
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   const payload = use(promise);
@@ -27,24 +28,26 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return payload;
 };
 
-type RefetchRenderBoundaryProps = {
-  promise: Promise<ReactNode>;
-  recovery: RSCRefetchRecovery | undefined;
-  onRecover: (error: Error, refetchVersion: number) => void;
+type RouteBoundaryProps = {
+  componentName: string;
+  componentProps: unknown;
+  children?: ReactNode;
+  promise?: Promise<ReactNode>;
+  recovery?: RSCRefetchRecovery;
 };
 
-// Below the route handle/context, so retained content can still observe errors
-// and Retry instead of unmounting the route's controls.
-export default class RefetchRenderBoundary extends Component<
-  RefetchRenderBoundaryProps,
-  { promise: Promise<ReactNode>; error: Error | null }
+// The outer instance contextualizes synchronous route-read failures. The inner
+// instance can also restore refetch content without unmounting route controls.
+export default class RSCRouteErrorBoundary extends Component<
+  RouteBoundaryProps,
+  { promise: Promise<ReactNode> | undefined; error: Error | null }
 > {
-  constructor(props: RefetchRenderBoundaryProps) {
+  constructor(props: RouteBoundaryProps) {
     super(props);
     this.state = { promise: props.promise, error: null };
   }
 
-  static getDerivedStateFromProps(props: RefetchRenderBoundaryProps, state: { promise: Promise<ReactNode> }) {
+  static getDerivedStateFromProps(props: RouteBoundaryProps, state: { promise?: Promise<ReactNode> }) {
     return props.promise !== state.promise ? { promise: props.promise, error: null } : null;
   }
 
@@ -61,27 +64,25 @@ export default class RefetchRenderBoundary extends Component<
   }
 
   componentDidCatch(error: Error) {
-    const { recovery, onRecover } = this.props;
-    if (recovery?.canRecover()) {
-      recovery.recover();
-      // A sibling may have restored this shared entry first. Still notify the
-      // initiating handle; its version guards exclude unrelated/stale routes.
-      onRecover(error, recovery.refetchVersion);
-    }
+    const { recovery } = this.props;
+    if (recovery?.canRecover()) recovery.recover(error);
   }
 
   render() {
-    const { promise, recovery } = this.props;
+    const { promise, recovery, componentName, componentProps, children } = this.props;
     const { error } = this.state;
-    if (error && !recovery?.canRecover()) throw error;
-    // A fulfilled Flight element can otherwise bail out without rereading its
-    // failed descendants. Remount once at failed completion so their original
-    // error wins over the completion-only fallback during this commit.
-    return (
+    if (error && !recovery?.canRecover()) {
+      throw toServerComponentFetchError(error, componentName, componentProps);
+    }
+    // Remount once at failed completion to reread memoized Flight descendants,
+    // preserving the original error before a completion-only fallback commits.
+    return promise != null ? (
       <PromiseWrapper
-        key={recovery?.hasFailed() ? 'failed-completion' : 'streaming'}
+        key={recovery?.hasFailed() ? 1 : 0}
         promise={error && recovery ? recovery.fallback : promise}
       />
+    ) : (
+      children
     );
   }
 }

@@ -44,3 +44,16 @@ export class ServerComponentFetchError extends Error {
 export function isServerComponentFetchError(error: unknown): error is ServerComponentFetchError {
   return error instanceof ServerComponentFetchError;
 }
+
+export const toServerComponentFetchError = (
+  error: unknown,
+  componentName: string,
+  componentProps: unknown,
+): ServerComponentFetchError => {
+  if (isServerComponentFetchError(error)) {
+    return error;
+  }
+
+  const originalError = error instanceof Error ? error : new Error(String(error));
+  return new ServerComponentFetchError(originalError.message, componentName, componentProps, originalError);
+};

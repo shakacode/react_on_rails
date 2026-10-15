@@ -17,7 +17,8 @@ import type { ReactNode } from 'react';
 
 // Flight resolves its root before the stream completes. Key bookkeeping by
 // request promise so even equal scalar roots retain independent stream health.
-export type RSCStreamState = { completion: Promise<boolean>; hasErrors: boolean; error?: Error };
+// A failed completion always retains its cause; error-free completion resolves true.
+export type RSCStreamState = { completion: Promise<boolean>; error?: Error };
 const completions = new WeakMap<Promise<ReactNode>, RSCStreamState>();
 
 export const trackRSCStreamCompletion = <T extends Promise<ReactNode>>(
