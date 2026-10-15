@@ -13,13 +13,13 @@ overrides:
   react_on_rails>react-dom: ^19.2.0
   react-on-rails-pro-node-renderer>react: 19.3.0
   react-on-rails-pro-node-renderer>react-dom: 19.3.0
-  react-on-rails-pro-node-renderer>react-on-rails-rsc: 19.3.1-rc.0
+  react-on-rails-pro-node-renderer>react-on-rails-rsc: 19.3.1
   react-on-rails-pro>react: 19.3.0
   react-on-rails-pro>react-dom: 19.3.0
-  react-on-rails-pro>react-on-rails-rsc: 19.3.1-rc.0
+  react-on-rails-pro>react-on-rails-rsc: 19.3.1
   react_on_rails_pro_dummy>react: 19.3.0
   react_on_rails_pro_dummy>react-dom: 19.3.0
-  react_on_rails_pro_dummy>react-on-rails-rsc: 19.3.1-rc.0
+  react_on_rails_pro_dummy>react-on-rails-rsc: 19.3.1
   react_on_rails_pro_dummy>react-server-dom-webpack: 19.3.0
   sentry-testkit>body-parser: npm:empty-npm-package@1.0.0
   sentry-testkit>express: npm:empty-npm-package@1.0.0
@@ -288,8 +288,8 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
       react-on-rails-rsc:
-        specifier: 19.3.1-rc.0
-        version: 19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.3.1
+        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -303,8 +303,8 @@ importers:
         specifier: '>=5.0.0'
         version: 7.120.4
       fastify:
-        specifier: ^5.12.1
-        version: 5.12.1
+        specifier: ^5.12.5
+        version: 5.12.7
       fs-extra:
         specifier: ^11.2.0
         version: 11.3.2
@@ -403,8 +403,8 @@ importers:
         specifier: workspace:*
         version: link:../react-on-rails
       react-on-rails-rsc:
-        specifier: 19.3.1-rc.0
-        version: 19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.3.1
+        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
       redis:
         specifier: ^5.0.1
         version: 5.10.0
@@ -608,8 +608,8 @@ importers:
   react_on_rails_pro/scripts/load:
     devDependencies:
       fastify:
-        specifier: ^5.12.1
-        version: 5.12.1
+        specifier: ^5.12.5
+        version: 5.12.7
 
   react_on_rails_pro/spec/dummy:
     dependencies:
@@ -770,8 +770,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: 19.3.1-rc.0
-        version: 19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1)
+        specifier: 19.3.1
+        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
@@ -2008,8 +2008,8 @@ packages:
   '@fastify/ajv-compiler@4.0.6':
     resolution: {integrity: sha512-NtuzM0SfaMJbGlnjr9LWQUN5LzgSrbB8tf/wRZNas+4E1O/Nmzl53e7ruT61HDZyRCJGC6FxIogmNZO1c5ETBA==}
 
-  '@fastify/busboy@3.2.0':
-    resolution: {integrity: sha512-m9FVDXU3GT2ITSe0UaMA5rU3QkfC/UXtCU8y0gSN/GugTqtVldOBWIB5V6V3sbmenVZUIpU6f+mPEO2+m5iTaA==}
+  '@fastify/busboy@3.2.2':
+    resolution: {integrity: sha512-yXSS27qPExaXeuLvMRMXOLtpipzfQYNjG3FkunDWKGfMYjKuhFXko9CVzqxm8jcF+lmtS9Fd89QNdh9XDjnbNg==}
 
   '@fastify/deepmerge@3.1.0':
     resolution: {integrity: sha512-lCVONBQINyNhM6LLezB6+2afusgEYR4G8xenMsfe+AT+iZ7Ca6upM5Ha8UkZuYSnuMw3GWl/BiPXnLMi/gSxuQ==}
@@ -5941,8 +5941,8 @@ packages:
   fastify-plugin@5.1.0:
     resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
 
-  fastify@5.12.1:
-    resolution: {integrity: sha512-FWi+tQvwxR/PeRX7Z2mhfEF5ozJ3jn9asiiclzKXNSzJRHAYcU924aIOKAdHFJ+YIKieh3cqr1IwCOvTr41B3Q==}
+  fastify@5.12.7:
+    resolution: {integrity: sha512-v4pEPsTRPuqlDIYiQFB+BHjVN4SdHX9u0ABk0ZDUKbbdY1vsNryUd1j4Z+jQEZajvYIVk047Kimva9/AJ79GYw==}
 
   fastq@1.19.1:
     resolution: {integrity: sha512-GwLTyxkCXjXbxqIhTsMI2Nui8huMPtnxg7krajPJAjnEG/iiOS7i+zCtWGZR9G0NBKbXKh6X9m9UIsYX/N6vvQ==}
@@ -7137,8 +7137,8 @@ packages:
     resolution: {integrity: sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw==}
     engines: {node: '>= 0.6.3'}
 
-  legacy-javascript@0.0.1:
-    resolution: {integrity: sha512-lPyntS4/aS7jpuvOlitZDFifBCb4W8L/3QU0PLbUTUj+zYah8rfVjYic88yG7ZKTxhS5h9iz7duT8oUXKszLhg==}
+  legacy-javascript@0.0.3:
+    resolution: {integrity: sha512-1r6MT4dVaJyXt4G07Cm2cQ0AUaLJdefiEp4SmIAylA++gnEQ82YvmzE58RkM5EP0fk5hROLCslUPGnwIYdZQVA==}
 
   leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
@@ -8614,8 +8614,8 @@ packages:
       react-dom: ~19.0.4
       webpack: ^5.59.0
 
-  react-on-rails-rsc@19.3.1-rc.0:
-    resolution: {integrity: sha512-BMx8mVHoln+leS0tMqaLNq/KQ6Yc1zZAPiR6bMK91IdYDbO4bC0G9NXhD4cLSKVMntSMm35yh6Mzx0kcoxD6mA==}
+  react-on-rails-rsc@19.3.1:
+    resolution: {integrity: sha512-pQlYW6PvaBBY2Q57H5TpQZ04DOQmrZMnVnHakcPIqcMGogLJ0JiC6hVsVxMofFBcwG326UA/VjLCuj16mEXx6A==}
     peerDependencies:
       '@rspack/core': ^1.0.0 || ^2.0.0
       react: ~19.0.4
@@ -11731,7 +11731,7 @@ snapshots:
       ajv-formats: 3.0.1(ajv@8.20.0)
       fast-uri: 4.2.1
 
-  '@fastify/busboy@3.2.0': {}
+  '@fastify/busboy@3.2.2': {}
 
   '@fastify/deepmerge@3.1.0': {}
 
@@ -11754,7 +11754,7 @@ snapshots:
 
   '@fastify/multipart@9.3.0':
     dependencies:
-      '@fastify/busboy': 3.2.0
+      '@fastify/busboy': 3.2.2
       '@fastify/deepmerge': 3.1.0
       '@fastify/error': 4.2.0
       fastify-plugin: 5.1.0
@@ -12848,7 +12848,7 @@ snapshots:
 
   '@paulirish/trace_engine@0.0.61':
     dependencies:
-      legacy-javascript: 0.0.1
+      legacy-javascript: 0.0.3
       third-party-web: 0.30.0
 
   '@peculiar/asn1-cms@2.8.0':
@@ -16306,7 +16306,7 @@ snapshots:
 
   fastify-plugin@5.1.0: {}
 
-  fastify@5.12.1:
+  fastify@5.12.7:
     dependencies:
       '@fastify/ajv-compiler': 4.0.6
       '@fastify/error': 4.2.0
@@ -17889,7 +17889,7 @@ snapshots:
     dependencies:
       readable-stream: 2.3.8
 
-  legacy-javascript@0.0.1: {}
+  legacy-javascript@0.0.3: {}
 
   leven@3.1.0: {}
 
@@ -19433,7 +19433,7 @@ snapshots:
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1):
+  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2
@@ -19446,7 +19446,7 @@ snapshots:
     optionalDependencies:
       '@rspack/core': 2.2.1
 
-  react-on-rails-rsc@19.3.1-rc.0(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2

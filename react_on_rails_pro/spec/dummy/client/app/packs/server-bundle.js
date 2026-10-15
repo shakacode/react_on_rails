@@ -17,6 +17,7 @@ import '../generated/server-bundle-generated';
 
 // Shows the mapping from the exported object to the name used by the server rendering.
 import ReactOnRails from 'react-on-rails-pro';
+import StreamedUseId from '../components/StreamedUseId';
 
 // SelectiveHydrationDemo is registered as a server component via generated/SelectiveHydrationDemo.js
 // Do NOT register it here - it would conflict with RSC registration
@@ -32,6 +33,7 @@ if (process.env.NODE_ENV === 'test') {
 }
 
 ReactOnRails.register({
+  StreamedUseId,
   HelloString,
 });
 
