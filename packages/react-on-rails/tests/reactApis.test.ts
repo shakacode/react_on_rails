@@ -11,6 +11,7 @@ const moduleNotFound = (specifier: string): Error =>
 describe('reactApis loading react-dom/client', () => {
   beforeEach(() => {
     jest.resetModules();
+    jest.dontMock('react');
     jest.doMock('react-dom', () => ({ version: '19.0.0' }));
   });
 
@@ -35,11 +36,28 @@ describe('reactApis loading react-dom/client', () => {
   });
 
   it('falls back to react-dom when react-dom/client itself is missing', () => {
+    const hydrateRoot = jest.fn();
+    jest.doMock('react-dom', () => ({ version: '19.0.0', hydrateRoot }));
     jest.doMock('react-dom/client', () => {
       throw moduleNotFound('react-dom/client');
     });
 
+    const domNode = document.createElement('div');
+
+    loadReactApis().reactHydrate(domNode, null as never);
+
+    expect(hydrateRoot).toHaveBeenCalledWith(domNode, null, undefined);
+  });
+
+  it('does not load client-only APIs in React Server Components', () => {
+    jest.doMock('react', () => ({ use: jest.fn() }));
+    const loadClient = jest.fn(() => {
+      throw new Error('react-dom/client is not supported in React Server Components.');
+    });
+    jest.doMock('react-dom/client', loadClient);
+
     expect(loadReactApis).not.toThrow();
+    expect(loadClient).not.toHaveBeenCalled();
   });
 
   it('uses react-dom/client when it loads', () => {

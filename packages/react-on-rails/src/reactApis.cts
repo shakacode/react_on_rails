@@ -23,10 +23,10 @@ export const supportsHydrate = supportsRootApi || 'hydrate' in ReactDOM;
 // supports `identifierPrefix` and `onRecoverableError`.
 export const supportsReact19RootErrorCallbacks = reactMajorVersion >= 19;
 
-// TODO: once React dependency is updated to >= 18, we can remove this and just
-// import ReactDOM from 'react-dom/client';
+// React's react-server entry omits client hooks and intentionally rejects react-dom/client.
+// RSC bundles share this module but must not load the client-only APIs.
 let reactDomClient: typeof import('react-dom/client');
-if (supportsRootApi) {
+if (supportsRootApi && typeof React.useState === 'function') {
   // The try is how we tell Webpack the dependency is optional
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
   // Unfortunately, it only converts the error to a warning. React 16/17 consumers can suppress

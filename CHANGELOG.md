@@ -46,6 +46,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   error when the bundle loads. Previously it was discarded and surfaced later as
   `reactDomClient.hydrateRoot is not a function`, or not at all in a server bundle. React 16 and 17 apps are
   unaffected: a missing `react-dom/client` still falls back to `react-dom` with the same webpack warning.
+  RSC bundles avoid the client-only import. **Action required for upgraders:** if a server bundle now
+  fails to load, restore or bundle the missing dependency named in the original error.
   Fixes [Issue 5180](https://github.com/shakacode/react_on_rails/issues/5180).
   [PR 5181](https://github.com/shakacode/react_on_rails/pull/5181) by [justin808](https://github.com/justin808).
 
