@@ -42,7 +42,8 @@ export type RSCRefetchRecovery = {
   refetchVersion: number;
   recover: () => void;
   canRecover: () => boolean;
-  commit: () => Promise<void>;
+  hasFailed: () => boolean;
+  commit: () => void;
 };
 
 type RSCContextType = {
@@ -52,6 +53,7 @@ type RSCContextType = {
     componentName: string,
     componentProps: unknown,
     recoverOnError?: boolean,
+    onStreamError?: (error: Error) => void,
   ) => Promise<ReactNode>;
 
   getRefetchVersion: (componentName: string, componentProps: unknown) => number;
@@ -496,7 +498,12 @@ export const createRSCProvider = ({
     );
 
     const refetchComponent = useCallback(
-      (componentName: string, componentProps: unknown, recoverOnError?: boolean) => {
+      (
+        componentName: string,
+        componentProps: unknown,
+        recoverOnError?: boolean,
+        onStreamError?: (error: Error) => void,
+      ) => {
         let key: string;
         try {
           key = createRSCPayloadKey(componentName, componentProps);
@@ -514,6 +521,13 @@ export const createRSCProvider = ({
         }
         let promise!: Promise<ReactNode>;
         let streamState: ReturnType<typeof getRSCStreamState>;
+        let request: Promise<ReactNode>;
+        let active = true;
+        let streamCompleted: boolean | undefined;
+        const retireRecovery = () => {
+          active = false;
+          renderRecoveries.delete(promise);
+        };
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromises.get(key, false) !== promise) {
             return;
@@ -556,16 +570,17 @@ export const createRSCProvider = ({
         };
 
         promise = Promise.resolve()
-          .then(() =>
-            getServerComponent({
+          .then(() => {
+            request = getServerComponent({
               componentName,
               componentProps,
               enforceRefetch: true,
-            }),
-          )
+            });
+            return request;
+          })
           .then(
             (payload) => {
-              streamState = getRSCStreamState(payload);
+              streamState = getRSCStreamState(request);
               if (payload instanceof Error) {
                 if (recoverOnError) {
                   restoreLastSuccessfulPromise();
@@ -581,7 +596,18 @@ export const createRSCProvider = ({
                 if (streamState) {
                   // A decoded Flight root is not yet a successful payload.
                   // Preserve the snapshot across overlapping streamed refetches.
-                  void streamState.completion.then(markSuccessful);
+                  void streamState.completion.then((successful) => {
+                    markSuccessful(successful);
+                    streamCompleted = successful;
+                    if (!successful && recoverOnError && fetchRSCPromises.get(key, false) === promise) {
+                      // Let React render the completed Flight tree first. Its
+                      // boundary error carries details (including digest) that
+                      // completion metadata alone cannot supply.
+                      startTransition(() => {
+                        setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+                      });
+                    }
+                  });
                 } else {
                   markSuccessful(true);
                 }
@@ -605,7 +631,6 @@ export const createRSCProvider = ({
         // the eviction victim when the cache is already full of pinned keys.
         fetchRSCPromises.setPinned(key, promise);
         if (recoverOnError && previousSuccessfulPromise !== undefined) {
-          let active = true;
           let renderCommitted = false;
           const recovery: RSCRefetchRecovery = {
             fallback: previousSuccessfulPromise,
@@ -614,16 +639,18 @@ export const createRSCProvider = ({
             // An interactive client can fail while a healthy Flight stream is
             // still pending. Only its server/transport failure arms recovery.
             canRecover: () => active && streamState?.hasErrors !== false,
+            hasFailed: () => streamCompleted === false,
             // Root fulfillment alone cannot certify a rendered Flight payload.
             // Wait for a successful commit and, for HTTP Flight, its error-free
             // stream completion before treating later client errors as unrelated.
-            commit: async () => {
-              if (renderCommitted) return;
+            commit: () => {
+              if (renderCommitted || (streamState && streamCompleted === undefined)) return;
               renderCommitted = true;
-              // A successful render has already read this fulfilled payload.
-              if ((await streamState?.completion) !== false && fetchRSCPromises.get(key, false) === promise) {
-                active = false;
-                renderRecoveries.delete(promise);
+              if (fetchRSCPromises.get(key, false) !== promise) return;
+              retireRecovery();
+              if (streamCompleted === false) {
+                restoreLastSuccessfulPromise();
+                onStreamError?.(streamState?.error ?? new Error('RSC stream failed before completion'));
               }
             },
           };

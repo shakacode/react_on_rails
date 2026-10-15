@@ -14,7 +14,9 @@
  */
 
 import http from 'http';
-import { createReadStream } from 'fs-extra';
+import path from 'path';
+import { createReadStream, readFile } from 'fs-extra';
+import FormData from 'form-data';
 import packageJson from '../src/shared/packageJson';
 import worker from '../src/worker';
 import formAutoContent from './formAutoContent';
@@ -109,3 +111,68 @@ test('fastifyServerOptions selects HTTP/1.1 for probes and render requests', asy
     await resetForTest(testName);
   }
 }, 30000);
+
+test.each([true, false])(
+  'HTTP/1.1 uploads preserve files after a large asset (Content-Length: %s)',
+  async (withContentLength) => {
+    await resetForTest(testName);
+    const cachePath = serverBundleCachePath(testName);
+    const app = worker({
+      fastifyServerOptions: { http2: false },
+      password,
+      serverBundleCachePath: cachePath,
+      stubTimers: false,
+      supportModules: true,
+    });
+
+    try {
+      await app.listen({ host: '127.0.0.1', port: 0 });
+      const address = app.server.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected the renderer to listen on a TCP port');
+      }
+
+      const assets = [
+        { filename: 'loadable-stats.json', content: Buffer.alloc(800 * 1024, 97) },
+        { filename: 'react-client-manifest.json', content: Buffer.from('{"a":1}') },
+        { filename: 'react-server-client-manifest.json', content: Buffer.from('{"b":2}') },
+      ];
+      const form = new FormData();
+      form.append('password', password);
+      form.append('gemVersion', packageJson.version);
+      form.append('protocolVersion', packageJson.protocolVersion);
+      form.append('railsEnv', 'test');
+      form.append('targetBundles[]', String(BUNDLE_TIMESTAMP));
+      form.append(`bundle_${BUNDLE_TIMESTAMP}`, Buffer.from('// bundle'), { filename: 'bundle.js' });
+      assets.forEach(({ filename, content }, index) => {
+        form.append(`assetsToCopy${index}`, content, { filename });
+      });
+      const payload = form.getBuffer();
+      const request = http.request({
+        headers: {
+          ...form.getHeaders(),
+          ...(withContentLength
+            ? { 'content-length': String(payload.length) }
+            : { 'transfer-encoding': 'chunked' }),
+        },
+        host: '127.0.0.1',
+        method: 'POST',
+        path: '/upload-assets',
+        port: address.port,
+      });
+      const responsePromise = collectResponse(request);
+      request.end(payload);
+      const response = await responsePromise;
+
+      expect(response.statusCode).toBe(200);
+      const contents = await Promise.all(
+        assets.map(({ filename }) => readFile(path.join(cachePath, String(BUNDLE_TIMESTAMP), filename))),
+      );
+      expect(contents).toEqual(assets.map(({ content }) => content));
+    } finally {
+      await app.close();
+      await resetForTest(testName);
+    }
+  },
+  30000,
+);

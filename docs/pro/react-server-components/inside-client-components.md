@@ -635,7 +635,7 @@ In production, failed client-control refetches are recoverable: the last success
 
 An HTTP 200 Flight response can contain errors in individual streamed boundaries. Its root promise may resolve before a descendant throws, so a `.catch(...)` alone cannot observe every failure. Use `refetchError` or `onRefetchError` for late render errors as well. Production recovery restores the previous content and leaves Retry available, but can remount descendant client components and reset their local state.
 
-Scalar HTTP roots (strings, numbers, booleans, `null` or `undefined`) are normalized into one-item `ReactNode` arrays. Their rendered output is unchanged; the array keeps stream-completion metadata isolated per request. A clean EOF inside a length-prefixed record is a failed response, not a successful completion.
+HTTP and embedded hydration preserve scalar roots (strings, numbers, booleans, `null` or `undefined`) as returned values. Stream health is tracked by request promise, independently of equal scalar values. A clean EOF inside a length-prefixed record is a failed response. In production, failed completion restores the previous content and reports the refetch error even when the rendered root never throws.
 
 A streamed refetch becomes the recovery snapshot only after its stream completes without errors. Until then, a failed overlapping refetch restores the earlier completed snapshot. A successful Retry clears `refetchError` at that completion point, not merely when its root resolves. Unrelated client errors reach the normal boundary while an otherwise healthy stream is still pending. After a successful render and error-free completion, later client errors also reach that boundary rather than restoring stale route content.
 

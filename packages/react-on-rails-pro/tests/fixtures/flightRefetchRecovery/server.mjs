@@ -13,13 +13,15 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { Writable } from 'node:stream';
 import { loadReactServerRuntime } from '../../../scripts/check-react-server-resolution.mjs';
-const { React } = loadReactServerRuntime(import.meta.url);
-const { buildServerRenderer } = await import('react-on-rails-rsc/server.node');
-const { registerClientReference } = await import('react-on-rails-rsc/server');
+const fixtureRequire = createRequire(process.env.FLIGHT_RECOVERY_RUNTIME_PACKAGE ?? import.meta.url);
+const { React } = loadReactServerRuntime(process.env.FLIGHT_RECOVERY_RUNTIME_PACKAGE ?? import.meta.url);
+const { buildServerRenderer } = await import(fixtureRequire.resolve('react-on-rails-rsc/server.node'));
+const { registerClientReference } = await import(fixtureRequire.resolve('react-on-rails-rsc/server'));
 const reference = 'file:///flight-refetch-recovery/Controls.js';
 const Controls = registerClientReference(
   () => {
@@ -53,6 +55,10 @@ const server = createServer(async (request, response) => {
       await new Promise((resolve) => {
         releaseBoundary = resolve;
       });
+      if (process.argv.includes('--completion-failure')) {
+        hasErrors = true;
+        return null;
+      }
       throw new Error('DETERMINISTIC_BOUNDARY_ERROR');
     };
     const tree = React.createElement(

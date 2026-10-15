@@ -24,14 +24,27 @@ import { once } from 'node:events';
 import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('../../../../../', import.meta.url));
-const packageRequire = createRequire(new URL('../../../package.json', import.meta.url));
+const packageRequire = createRequire(
+  process.env.FLIGHT_RECOVERY_RUNTIME_PACKAGE ?? new URL('../../../package.json', import.meta.url),
+);
 const dummyRequire = createRequire(join(root, 'react_on_rails_pro/spec/dummy/package.json'));
 const { chromium, expect } = dummyRequire('@playwright/test');
 const artifacts = await mkdtemp(join(tmpdir(), 'ror-flight-recovery-'));
 const bundle = join(artifacts, 'bundle.js');
 const baseline = process.argv.includes('--baseline');
+const baselineRef = execFileSync(
+  'git',
+  [
+    'rev-parse',
+    '--verify',
+    '--end-of-options',
+    `${process.env.FLIGHT_RECOVERY_BASE_REF ?? 'origin/main'}^{commit}`,
+  ],
+  { cwd: root, encoding: 'utf8' },
+).trim();
 const httpFailure = process.argv.includes('--http-failure');
 const clientFailure = process.argv.includes('--client-failure');
+const completionFailure = process.argv.includes('--completion-failure');
 const truncatedRecord = process.argv.includes('--truncate-boundary');
 await build({
   entryPoints: [fileURLToPath(new URL('./browser.tsx', import.meta.url))],
@@ -50,7 +63,10 @@ await build({
             name: 'unfixed-negative-control',
             setup(builder) {
               builder.onResolve(
-                { filter: /(?:^|\/)(?:RSCRoute|RSCProvider|getReactServerComponent\.client)\.tsx?$/ },
+                {
+                  filter:
+                    /(?:^|\/)(?:RSCRoute|RSCProvider|getReactServerComponent\.client|parseLengthPrefixedStream|RSCRefetchRenderBoundary|RSCStreamCompletion)\.tsx?$/,
+                },
                 ({ path }) => ({
                   path: path.split('/').at(-1),
                   namespace: 'unfixed',
@@ -59,10 +75,7 @@ await build({
               builder.onLoad({ filter: /.*/, namespace: 'unfixed' }, ({ path }) => ({
                 contents: execFileSync(
                   'git',
-                  [
-                    'show',
-                    `324fc0aa56951d25cd55167e13a6c8294d28e3dd:packages/react-on-rails-pro/src/${path}`,
-                  ],
+                  ['show', `${baselineRef}:packages/react-on-rails-pro/src/${path}`],
                   { cwd: root, encoding: 'utf8' },
                 ),
                 loader: 'tsx',
@@ -75,7 +88,7 @@ await build({
     {
       name: 'single-react-runtime',
       setup(builder) {
-        builder.onResolve({ filter: /^react(?:-dom)?(?:\/.*)?$/ }, ({ path }) => ({
+        builder.onResolve({ filter: /^(?:react(?:-dom)?|react-on-rails-rsc)(?:\/.*)?$/ }, ({ path }) => ({
           path: packageRequire.resolve(path),
         }));
       },
@@ -95,6 +108,7 @@ const server = spawn(
     'react-server',
     fileURLToPath(new URL('./server.mjs', import.meta.url)),
     bundle,
+    ...(completionFailure ? ['--completion-failure'] : []),
     ...(httpFailure ? ['--http-failure'] : []),
     ...(clientFailure ? ['--client-failure'] : []),
     ...(process.argv.includes('--diagnostic-only') ? ['--diagnostic-only'] : []),
@@ -155,7 +169,7 @@ try {
     await page.screenshot({ path: join(artifacts, 'unrelated-client-error.png') });
   } else {
     const bytes = await response.body();
-    if (!httpFailure) {
+    if (!httpFailure && !completionFailure) {
       expect(bytes.toString()).toMatch(/:E\{/);
       expect(bytes.toString()).toContain('DETERMINISTIC_BOUNDARY_DIGEST');
     }
@@ -166,7 +180,9 @@ try {
       name: 'ServerComponentFetchError',
       componentName: 'UserCard',
       componentProps: { id: 1 },
-      ...(!httpFailure && !truncatedRecord ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' } : {}),
+      ...(!httpFailure && !truncatedRecord && !completionFailure
+        ? { digest: 'DETERMINISTIC_BOUNDARY_DIGEST' }
+        : {}),
     });
     await page.waitForTimeout(700);
     await page.screenshot({ path: join(artifacts, 'retained-error-desktop.png') });
@@ -184,9 +200,14 @@ try {
   process.stdout.write(
     JSON.stringify({
       result: 'PASS',
+      baseline,
+      baselineRef,
       production: true,
+      reactVersion: packageRequire('react/package.json').version,
+      rscVersion: packageRequire('react-on-rails-rsc/package.json').version,
       failedHTTPStatus: response.status(),
-      boundaryErrorRow: !httpFailure && !clientFailure,
+      boundaryErrorRow: !httpFailure && !clientFailure && !completionFailure,
+      completionFailure,
       unrelatedClientError: clientFailure,
       truncatedRecord,
       bundleBytes,

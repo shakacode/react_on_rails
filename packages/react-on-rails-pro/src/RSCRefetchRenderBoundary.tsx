@@ -53,7 +53,7 @@ export default class RefetchRenderBoundary extends Component<
   }
 
   componentDidMount() {
-    if (!this.state.error) void this.props.recovery?.commit();
+    if (!this.state.error) this.props.recovery?.commit();
   }
 
   componentDidUpdate() {
@@ -74,6 +74,14 @@ export default class RefetchRenderBoundary extends Component<
     const { promise, recovery } = this.props;
     const { error } = this.state;
     if (error && !recovery?.canRecover()) throw error;
-    return <PromiseWrapper promise={error && recovery ? recovery.fallback : promise} />;
+    // A fulfilled Flight element can otherwise bail out without rereading its
+    // failed descendants. Remount once at failed completion so their original
+    // error wins over the completion-only fallback during this commit.
+    return (
+      <PromiseWrapper
+        key={recovery?.hasFailed() ? 'failed-completion' : 'streaming'}
+        promise={error && recovery ? recovery.fallback : promise}
+      />
+    );
   }
 }

@@ -242,10 +242,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
       // version inside startTransition. That re-renders every <RSCRoute>
       // (including this one) as a transition commit, so old content stays
       // visible while the new promise streams in.
-      const refetchPromise = refetchComponent(n, p, recoverOnError);
-      const sharedRefetchVersion = getRefetchVersion(n, p);
-      latestRefetchVersionRef.current = [requestKey, sharedRefetchVersion];
-      const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+      let sharedRefetchVersion = 0;
+      const reportFailure = (error: unknown) => {
         const serverComponentFetchError = toServerComponentFetchError(error, n, p);
         if (
           recoverOnError &&
@@ -256,6 +254,13 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
         ) {
           recordRefetchError(requestKey, requestId, serverComponentFetchError);
         }
+        return serverComponentFetchError;
+      };
+      const refetchPromise = refetchComponent(n, p, recoverOnError, reportFailure);
+      sharedRefetchVersion = getRefetchVersion(n, p);
+      latestRefetchVersionRef.current = [requestKey, sharedRefetchVersion];
+      const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+        const serverComponentFetchError = reportFailure(error);
         throw serverComponentFetchError;
       });
       if (recoverOnError) {
