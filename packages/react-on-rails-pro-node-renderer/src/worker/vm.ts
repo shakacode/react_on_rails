@@ -66,6 +66,14 @@ const readFileAsync = promisify(fs.readFile);
 // MIRROR VALUES OF: packages/react-on-rails-pro/src/injectRSCPayload.ts
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 // MIRROR VALUES END
+// Injected into each VM context so the RSC runtime can derive BUILD_ID from the
+// executing bundle's own identity, without waiting for a Rails-supplied parameter.
+// See: packages/react-on-rails-pro/src/cache/buildIdProvider.ts (issue #5076).
+// MIRROR VALUE OF: packages/react-on-rails-pro/src/cache/buildIdProvider.ts
+const BUNDLE_ID_CONTEXT_KEY = '__reactOnRailsProBundleId';
+// MIRROR VALUE OF: packages/react-on-rails-pro/src/cache/buildIdProvider.ts
+const BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY = '__reactOnRailsProReportBuildIdMismatch';
+// MIRROR VALUES END
 // This is process-scoped diagnostic state, not request data: every VM context
 // shares the same host callback and only the first missing-stats event logs.
 let hasReportedMissingLoadableStats = false;
@@ -76,6 +84,20 @@ function reportMissingLoadableStats(loadableStatsPath: unknown) {
   hasReportedMissingLoadableStats = true;
   log.info(
     `React on Rails Pro could not find ${loadableStatsPath}; RSC stylesheet inference is falling back to streamed preload tags and will retry. Verify that loadable-stats.json is emitted to the server bundle directory.`,
+  );
+}
+
+// Per-VM mismatch reporting. Each VM's bundled buildIdProvider calls this host
+// callback when setBuildId receives a value that disagrees with the VM-injected
+// bundle identity. The warning reaches the host logger (pino) at warn level,
+// bypassing the VM's console-replay mechanism so it is not sent to the browser.
+function reportBuildIdMismatch(explicitId: unknown, vmBundleId: unknown) {
+  if (typeof explicitId !== 'string' || typeof vmBundleId !== 'string') return;
+
+  log.warn(
+    `BUILD_ID mismatch: setBuildId received "${explicitId}" but the VM-injected bundle identity ` +
+      `is "${vmBundleId}". Cache keys may diverge across workers. This usually means the Rails ` +
+      `rscBundleHash and the renderer bundle file path encode different identities.`,
   );
 }
 
@@ -689,6 +711,24 @@ async function buildVM(filePath: string): Promise<VMContext> {
         configurable: false,
         enumerable: false,
         value: reportMissingLoadableStats,
+        writable: false,
+      });
+      // Expose the bundle's identity hash so the RSC runtime can derive BUILD_ID
+      // from the executing bundle itself, independent of any Rails-supplied parameter.
+      // This is a per-bundle constant (same value for all requests using this VM),
+      // so it satisfies the rsc-guardrails invariant 2 carve-out for build-config
+      // caches keyed by a build artifact. Uses bundleIdentityPath (not the raw
+      // request path) for stability across trusted aliases. (issue #5076)
+      Object.defineProperty(contextObject, BUNDLE_ID_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: path.basename(filePath, '.js'),
+        writable: false,
+      });
+      Object.defineProperty(contextObject, BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: reportBuildIdMismatch,
         writable: false,
       });
       const context = vm.createContext(contextObject);
