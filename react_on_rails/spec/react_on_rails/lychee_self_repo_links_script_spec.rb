@@ -21,6 +21,7 @@ RSpec.describe "bin/lychee-self-repo-links" do
         <#{self_repo}/blob/main/CONTRIBUTING.md>
         [master](#{self_repo}/blob/master/react_on_rails/spec/dummy/spec/rails_helper.rb#L36..38)
         [ref]: #{self_repo}/blob/main/internal/adr/0001-rspack-answers-vite.md
+        [repo]: #{self_repo}/tree/main
       MARKDOWN
 
       expect(output).to eq(<<~MARKDOWN)
@@ -32,6 +33,7 @@ RSpec.describe "bin/lychee-self-repo-links" do
         <file://#{checkout}/CONTRIBUTING.md>
         [master](file://#{checkout}/react_on_rails/spec/dummy/spec/rails_helper.rb#L36..38)
         [ref]: file://#{checkout}/internal/adr/0001-rspack-answers-vite.md
+        [repo]: file://#{checkout}
       MARKDOWN
     end
   end
@@ -41,6 +43,7 @@ RSpec.describe "bin/lychee-self-repo-links" do
       [tag](#{self_repo}/tree/15.0.0/docs)
       [commit](#{self_repo}/blob/b3d30a15c/docs/oss/deployment/capistrano-deployment.md)
       [similar branch](#{self_repo}/blob/main-2/README.md)
+      [plus branch](#{self_repo}/blob/main+fix/README.md)
       [prefix branch](#{self_repo}/tree/maintenance/docs)
       [master prefix branch](#{self_repo}/tree/master-2/docs)
       [pull request](#{self_repo}/pull/5185)

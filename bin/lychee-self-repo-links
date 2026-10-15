@@ -31,9 +31,10 @@ my $repo_root = dirname(dirname(abs_path(__FILE__)));
 
 open(my $input, '<', $path) or die "$0: cannot read $path: $!\n";
 while (my $line = <$input>) {
-  # The lookahead leaves other refs that only start with main or master, such as
-  # main-2, on GitHub.
-  $line =~ s{https://github\.com/shakacode/react_on_rails/(?:blob|tree)/(?:main|master)(?![A-Za-z0-9_.~%-])}{file://$repo_root_url}g;
+  # Rewrite only when a path separator or the end of the URL follows main or
+  # master, so other refs that start with them, such as main-2 or main+fix, stay
+  # on GitHub.
+  $line =~ s{https://github\.com/shakacode/react_on_rails/(?:blob|tree)/(?:main|master)(?=[/?#\s)\]>"'`<]|$)}{file://$repo_root_url}g;
   print $line;
 }
 close($input) or die "$0: cannot read $path: $!\n";
