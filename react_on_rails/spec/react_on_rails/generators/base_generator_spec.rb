@@ -2,9 +2,57 @@
 
 require "ripper"
 require "open3"
+require "tmpdir"
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
+  describe "#update_gitignore_for_auto_registration" do
+    let(:gitignore_destination) { Dir.mktmpdir("renderer-cache-ignore") }
+
+    before do
+      _stdout, stderr, status = Open3.capture3("git", "init", "--quiet", gitignore_destination)
+      raise stderr unless status.success?
+    end
+
+    after { FileUtils.remove_entry(gitignore_destination) }
+
+    def update_cache_gitignore(content, options)
+      File.write(File.join(gitignore_destination, ".gitignore"), content)
+      generator = described_class.new([], options, { destination_root: gitignore_destination })
+      generator.send(:update_gitignore_for_auto_registration)
+      generator.send(:update_gitignore_for_auto_registration)
+      File.read(File.join(gitignore_destination, ".gitignore"))
+    end
+
+    cache_mentions = ["# .node-renderer-bundles", "/.node-renderer-bundles.stale-*/", "!.node-renderer-bundles"]
+    %i[pro rsc].each do |mode|
+      context "with --#{mode}" do
+        cache_mentions.each do |entry|
+          it "ignores the real cache when the existing entry is #{entry.inspect}" do
+            content = update_cache_gitignore("#{entry}\n", { mode => true })
+            expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(1)
+
+            _stdout, _stderr, status = Open3.capture3(
+              "git", "-C", gitignore_destination, "check-ignore", "--no-index",
+              ".node-renderer-bundles/hash/server-bundle.js"
+            )
+            expect(status.exitstatus).to eq(0)
+          end
+        end
+
+        it "does not duplicate an existing active cache entry" do
+          content = update_cache_gitignore(".node-renderer-bundles\n", { mode => true })
+          expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(1)
+        end
+      end
+    end
+
+    it "does not add the cache entry for an OSS install" do
+      content = update_cache_gitignore("# .node-renderer-bundles\n", {})
+      expect(content.lines.map(&:chomp)).not_to include(".node-renderer-bundles")
+    end
+  end
+
   describe "OSS home page Pro guidance" do
     it "explains that the optional key only sets attribution status" do
       note = described_class.new.send(:home_page_pro_note_for_oss_app)
