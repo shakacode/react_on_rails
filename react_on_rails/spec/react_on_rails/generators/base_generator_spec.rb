@@ -24,13 +24,20 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       File.read(File.join(gitignore_destination, ".gitignore"))
     end
 
-    cache_mentions = ["# .node-renderer-bundles", "/.node-renderer-bundles.stale-*/", "!.node-renderer-bundles"]
+    cache_mentions = {
+      "# .node-renderer-bundles" => 1,
+      "/.node-renderer-bundles.stale-*/" => 1,
+      "!.node-renderer-bundles" => 1,
+      ".node-renderer-bundles\n!.node-renderer-bundles" => 2,
+      "!.node-renderer-bundles\n.node-renderer-bundles" => 1,
+      ".node-renderer-bundles\n!.node-renderer-bundles/" => 2,
+      ".node-renderer-bundles\n!*" => 2
+    }
     %i[pro rsc].each do |mode|
       context "with --#{mode}" do
-        cache_mentions.each do |entry|
+        cache_mentions.each do |entry, expected_cache_entries|
           it "ignores the real cache and preseed siblings when the existing entry is #{entry.inspect}" do
             content = update_cache_gitignore("#{entry}\n", { mode => true })
-            expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(1)
 
             stdout, _stderr, status = Open3.capture3(
               "git", "-C", gitignore_destination, "check-ignore", "--no-index",
@@ -44,6 +51,7 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
               ".node-renderer-bundles.preseed.lock",
               ".node-renderer-bundles.artifact-snapshots/hash/server-bundle.js"
             )
+            expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(expected_cache_entries)
           end
         end
 

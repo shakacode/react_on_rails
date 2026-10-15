@@ -383,12 +383,15 @@ module ReactOnRails
       def renderer_cache_gitignore_additions(content)
         return [] unless use_pro?
 
+        lines = content.lines.map(&:chomp)
+        last_negation = lines.rindex { |line| line.start_with?("!") } || -1
+
         # Ignore both the renderer cache and the sibling files created during preseeding.
         %w[
           .node-renderer-bundles
           .node-renderer-bundles.preseed.lock
           .node-renderer-bundles.artifact-snapshots
-        ].reject { |entry| content.match?(/^#{Regexp.escape(entry)}$/) }
+        ].reject { |entry| (lines.rindex(entry) || -1) > last_negation }
       end
 
       # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
