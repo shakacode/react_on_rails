@@ -25,12 +25,20 @@
 // matching React line, so React must match the Flight line, not just the package minor:
 // - 19.2.x ships Flight 19.2 and pairs with React 19.2.7+.
 // - Published 19.3.0 ships Flight 19.2.8 and pairs with React 19.2.8+ (React on Rails 17.1.0).
-// - 19.3.1+ (starting with the 19.3.1-rc.0 soak) ships Flight 19.3.0 and pairs with React 19.3.
-// `minimumPrereleaseVersion` admits the 19.3.1-rc.x soak. Remove it once 19.3.1 ships stable.
+// - 19.3.1+ ships Flight 19.3.0 and pairs with React 19.3.
+// Only stable react-on-rails-rsc releases are supported. The 19.3.1-rc.x soak prereleases that
+// React on Rails 17.2.0.rc.0 and rc.1 admitted are superseded by stable 19.3.1 and are rejected.
+// `prereleaseLinesWithStableSuccessor` lists the rejected prerelease lines whose stable release is
+// known to be published, so the error can name it: the 19.3.0-rc.4 pin that React on Rails 17.1.0
+// generated, and the 19.3.1-rc.x soak. Compatibility alone does not establish publication for
+// other rejected prereleases.
 export const RSC_PEER_SUPPORT = {
   reactOnRailsRsc: {
     minimumVersion: '19.2.1',
-    minimumPrereleaseVersion: '19.3.1-rc.0',
+    prereleaseLinesWithStableSuccessor: [
+      [19, 3, 0],
+      [19, 3, 1],
+    ],
     supportedMajor: 19,
   },
   react: {

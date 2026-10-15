@@ -24,7 +24,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **Reserved `httpResponse` render-result key**: Non-streaming SSR now validates this top-level key as HTTP response metadata. **Action required for upgraders:** Rename any unrelated metadata currently stored under `httpResponse`.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
+
 #### Added
+
+- **Rails HTTP responses from render functions**: Non-streaming render functions can return `httpResponse` to set status and `Location`. Applying a non-default response after headers are committed raises `ReactOnRails::Error`.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
 
 - **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
   check and `react_on_rails:doctor` now accept `react-on-rails-rsc` 19.3.1-rc.0 (npm `next`) and later
@@ -41,18 +51,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **[Pro]** **Payload-only RSC requests initialize the cache build ID on every renderer worker**:
-  The payload endpoint now supplies its captured RSC artifact ID without requiring an earlier full-page
-  render on that worker. Cached server components can therefore render on fresh workers after a restart
-  or when requests are distributed across workers. Fixes
-  [Issue 5076](https://github.com/shakacode/react_on_rails/issues/5076).
-  [PR 5134](https://github.com/shakacode/react_on_rails/pull/5134) by
-  [Justin Gordon](https://github.com/justin808).
-
-- Render functions can return `httpResponse` to set Rails status and `Location` during non-streaming SSR. **[Pro]** TanStack Router async SSR now preserves redirect status and `Location`, including canonical URL redirects, and returns real 404 and 500 responses. Unknown-route markup also retains its not-found state during browser hydration. Server errors bypass component and prerender cache writes.
-  **Action required for upgraders:** The top-level render-result key `httpResponse` is reserved for this status and Location contract; move unrelated metadata into `clientProps`. Include the route and search in cached router component keys. Custom render functions calling `serverRenderTanStackAppAsync` must forward `httpResponse`. Render these HTTP outcomes before response headers are committed.
+- **[Pro]** **TanStack Router HTTP outcomes**: Async non-streaming SSR now preserves redirect status and exact `Location`, including canonical URL redirects, and returns real 404 and 500 responses. Unknown-route markup retains its not-found state during hydration. For these non-streaming responses, ordinary and async component caches replay HTTP metadata; component and prerender caches skip 5xx writes. Streaming SSR and RSC are outside this contract.
+  **Action required for upgraders:** Include the route and search in cached router component keys. Custom render functions calling `serverRenderTanStackAppAsync` must forward `httpResponse`. Await these HTTP outcomes before response headers are committed.
   [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
   [Justin Gordon](https://github.com/justin808).
+
+- **[Pro]** **Streamed `useId` hydration**: Client components now hydrate with the server's `useId` prefix even when
+  they are not wrapped by the default RSC provider. This prevents hydration mismatches and keeps
+  generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).
+  [PR 5148](https://github.com/shakacode/react_on_rails/pull/5148) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
   Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC

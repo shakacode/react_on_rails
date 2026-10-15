@@ -126,6 +126,7 @@ describe "TanStack Router HTTP responses" do
       begin
         Capybara.app_host = nil
         Capybara.run_server = true
+        WebMock.allow_net_connect!
         Capybara.using_session(:tanstack_http_cache) { example.run }
       ensure
         Capybara.app_host = app_host
