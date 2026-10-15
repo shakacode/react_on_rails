@@ -28,28 +28,48 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
     %i[pro rsc].each do |mode|
       context "with --#{mode}" do
         cache_mentions.each do |entry|
-          it "ignores the real cache when the existing entry is #{entry.inspect}" do
+          it "ignores the real cache and preseed siblings when the existing entry is #{entry.inspect}" do
             content = update_cache_gitignore("#{entry}\n", { mode => true })
             expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(1)
 
-            _stdout, _stderr, status = Open3.capture3(
+            stdout, _stderr, status = Open3.capture3(
               "git", "-C", gitignore_destination, "check-ignore", "--no-index",
-              ".node-renderer-bundles/hash/server-bundle.js"
+              ".node-renderer-bundles/hash/server-bundle.js",
+              ".node-renderer-bundles.preseed.lock",
+              ".node-renderer-bundles.artifact-snapshots/hash/server-bundle.js"
             )
             expect(status.exitstatus).to eq(0)
+            expect(stdout.lines.map(&:chomp)).to contain_exactly(
+              ".node-renderer-bundles/hash/server-bundle.js",
+              ".node-renderer-bundles.preseed.lock",
+              ".node-renderer-bundles.artifact-snapshots/hash/server-bundle.js"
+            )
           end
         end
 
-        it "does not duplicate an existing active cache entry" do
+        it "adds missing siblings without duplicating an existing active cache entry" do
           content = update_cache_gitignore(".node-renderer-bundles\n", { mode => true })
           expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(1)
+          expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles.preseed.lock" }).to eq(1)
+          expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles.artifact-snapshots" }).to eq(1)
+        end
+
+        it "keeps similarly named source paths available to Git" do
+          update_cache_gitignore("", { mode => true })
+          _stdout, _stderr, status = Open3.capture3(
+            "git", "-C", gitignore_destination, "check-ignore", "--no-index",
+            ".node-renderer-bundles-custom-source/server-bundle.js"
+          )
+          expect(status.exitstatus).to eq(1)
         end
       end
     end
 
-    it "does not add the cache entry for an OSS install" do
+    it "does not add the cache entries for an OSS install" do
       content = update_cache_gitignore("# .node-renderer-bundles\n", {})
-      expect(content.lines.map(&:chomp)).not_to include(".node-renderer-bundles")
+      expect(content.lines.map(&:chomp)).not_to include(
+        ".node-renderer-bundles", ".node-renderer-bundles.preseed.lock", ".node-renderer-bundles.artifact-snapshots"
+      )
     end
   end
 

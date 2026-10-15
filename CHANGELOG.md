@@ -45,7 +45,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5182](https://github.com/shakacode/react_on_rails/pull/5182) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Generated Pro apps ignore the Node renderer bundle cache**: `react_on_rails:install --pro` and `--rsc`,
-  including the default Pro and `--rsc` setups of `create-react-on-rails-app`, now add `.node-renderer-bundles` to
+  including the default Pro and `--rsc` setups of `create-react-on-rails-app`, now add `.node-renderer-bundles` and its preseed lock/snapshot siblings to
   `.gitignore`, so the server bundles that the generated `renderer/node-renderer.js` caches there stay out of commits.
   [PR 5182](https://github.com/shakacode/react_on_rails/pull/5182) by [justin808](https://github.com/justin808).
 
