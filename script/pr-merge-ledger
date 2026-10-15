@@ -13,6 +13,7 @@ require "time"
 Encoding.default_external = Encoding::UTF_8
 
 require_relative "pr_merge_ledger/closing_keyword_scanner"
+require_relative "pr_merge_ledger/screened_comments"
 
 # rubocop:disable Metrics/ClassLength
 class PrMergeLedger
@@ -22,6 +23,7 @@ class PrMergeLedger
   UNKNOWN = "UNKNOWN"
   # Keep the schema URI on main until a versioned schema hosting policy exists.
   SCHEMA_URI = "https://raw.githubusercontent.com/shakacode/react_on_rails/main/script/pr-merge-ledger.schema.json"
+  CHECKOUT_ROOT = File.realpath(File.expand_path("..", __dir__))
   SCHEMA_PATH = File.expand_path("pr-merge-ledger.schema.json", __dir__)
   CHANGELOG_CLASSIFICATIONS = %w[
     changelog_present
@@ -824,10 +826,33 @@ class PrMergeLedger
             "--changelog-classification applies to one PR at a time; run multi-PR ledgers separately"
     end
 
+    validate_screened_reader_options
+
     return unless @options[:strict] && @argv.length > 1
 
     raise Error, "--strict with multiple PRs requires separate per-PR runs with explicit " \
                  "--changelog-classification"
+  end
+
+  def validate_screened_reader_options
+    return unless @options[:shaka_reader] || @options[:trusted_ref]
+
+    reader = screened_reader_path(@options[:shaka_reader].to_s)
+    valid_ref = @options[:trusted_ref].to_s.match?(/\A[0-9a-f]{40}\z/)
+    unless reader && valid_ref && !@options[:fixture]
+      raise Error, "--shaka-reader requires an absolute executable, --trusted-ref FULL_SHA, and live PR collection"
+    end
+
+    @options[:shaka_reader] = reader
+  end
+
+  def screened_reader_path(reader)
+    return unless reader.start_with?("/") && File.file?(reader) && File.executable?(reader)
+
+    resolved = File.realpath(reader)
+    return if resolved.start_with?("#{CHECKOUT_ROOT}/")
+
+    resolved
   end
 
   def build_option_parser
@@ -839,6 +864,7 @@ class PrMergeLedger
       opts.on("--fixture PATH", "Read one normalized fixture instead of live GitHub state.") do |path|
         @options[:fixture] = path
       end
+      add_screened_reader_options(opts)
       opts.on("--schema", "Print the fixed JSON schema and exit.") do
         @options[:schema] = true
       end
@@ -854,6 +880,16 @@ class PrMergeLedger
         @options[:changelog_classification_provided] = true
       end
       add_help_option(opts)
+    end
+  end
+
+  def add_screened_reader_options(opts)
+    opts.on("--shaka-reader PATH",
+            "Read live comment prose only through this trusted external Shaka executable.") do |path|
+      @options[:shaka_reader] = path
+    end
+    opts.on("--trusted-ref SHA", "Full trusted default-branch SHA used by the Shaka reader.") do |sha|
+      @options[:trusted_ref] = sha
     end
   end
 
@@ -908,8 +944,9 @@ class PrMergeLedger
       raise Error, "repo must look like OWNER/REPO: #{repo.inspect}"
     end
 
-    collector = GitHubCollector.new(owner, name)
-    @argv.map do |pr_number|
+    collector = GitHubCollector.new(owner, name, shaka_reader: @options[:shaka_reader],
+                                                 trusted_ref: @options[:trusted_ref])
+    datasets = @argv.map do |pr_number|
       begin
         pr_int = Integer(pr_number, 10)
         raise ArgumentError unless pr_int.positive?
@@ -919,6 +956,8 @@ class PrMergeLedger
 
       collector.fetch(pr_int).merge("repository" => repo)
     end
+    @screened_collections = collector.screened_collections
+    datasets
   end
 
   def detect_repo
@@ -953,7 +992,9 @@ class PrMergeLedger
     if @options[:fixture]
       { "mode" => "fixture", "path" => fixture_source_path(@options[:fixture]) }
     else
-      { "mode" => "live_github", "repo" => @options[:repo], "prs" => @argv.map(&:to_i) }
+      source = { "mode" => "live_github", "repo" => @options[:repo], "prs" => @argv.map(&:to_i) }
+      source["screened_comments"] = @screened_collections if @options[:shaka_reader]
+      source
     end
   end
 
@@ -2300,9 +2341,14 @@ class PrMergeLedger
   end
 
   class GitHubCollector
-    def initialize(owner, name)
+    attr_reader :screened_collections
+
+    def initialize(owner, name, shaka_reader: nil, trusted_ref: nil)
       @owner = owner
       @name = name
+      @shaka_reader = shaka_reader
+      @trusted_ref = trusted_ref
+      @screened_collections = []
     end
 
     def fetch(pr_number)
@@ -2314,9 +2360,18 @@ class PrMergeLedger
       hosted_ci_requested = hosted_ci_requested?(metadata)
       expected_hosted_workflows = expected_hosted_workflows(metadata)
       allow_pull_request_hosted_ci = PrMergeLedger.allow_pull_request_hosted_ci?(metadata)
+      screened = fetch_screened_comments(pr_number, metadata.fetch("headRefOid")) if @shaka_reader
       review_threads = fetch_review_threads(pr_number)
       reviews = fetch_reviews(pr_number)
       comments = fetch_comments(pr_number)
+      if screened
+        screened.apply!(reviews, "review_summaries")
+        screened.apply!(comments, "issue_comments")
+        review_threads.each { |thread| screened.apply!(thread.fetch("comments").fetch("nodes"), "inline_comments") }
+        screened.verify_complete!
+        verify_screened_head!(pr_number, metadata.fetch("headRefOid"))
+        @screened_collections << screened.provenance.merge("pr" => pr_number, "reader" => "shaka")
+      end
       {
         "pull_request" => metadata,
         "files" => files,
@@ -2364,17 +2419,42 @@ class PrMergeLedger
     end
 
     def fetch_review_threads(pr_number)
-      fetch_paginated_connection(pr_number, review_threads_query, "reviewThreads").map do |thread|
+      fetch_paginated_connection(pr_number, comment_query(review_threads_query), "reviewThreads").map do |thread|
         complete_review_thread_comments(thread)
       end
     end
 
     def fetch_reviews(pr_number)
-      fetch_paginated_connection(pr_number, reviews_query, "reviews")
+      fetch_paginated_connection(pr_number, comment_query(reviews_query), "reviews")
     end
 
     def fetch_comments(pr_number)
-      fetch_paginated_connection(pr_number, comments_query, "comments")
+      fetch_paginated_connection(pr_number, comment_query(comments_query), "comments")
+    end
+
+    def comment_query(query)
+      @shaka_reader ? query.gsub(/^\s*body\s*$/, "") : query
+    end
+
+    def fetch_screened_comments(pr_number, head)
+      args = [@shaka_reader, "comments", "#{@owner}/#{@name}", pr_number.to_s,
+              "--head", head, "--root", PrMergeLedger::CHECKOUT_ROOT, "--ref", @trusted_ref]
+      stdout, _stderr, status = PrMergeLedger.capture_command_with_timeout(
+        args, timeout: 120, timeout_message: "Shaka screened comment reader timed out"
+      )
+      raise Error, "Shaka screened comment reader failed" unless status.success?
+
+      ShakaScreenedComments.new(JSON.parse(stdout), head)
+    end
+
+    def verify_screened_head!(pr_number, expected)
+      query = <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!) {
+          repository(owner:$owner, name:$name) { pullRequest(number:$pr) { headRefOid } }
+        }
+      GRAPHQL
+      actual = graphql(query, pr: pr_number).dig("data", "repository", "pullRequest", "headRefOid")
+      raise Error, "PR head changed during screened collection" unless actual == expected
     end
 
     def fetch_labels(pr_number)
@@ -2473,7 +2553,10 @@ class PrMergeLedger
     def head_committed_at(metadata)
       commit = Array(metadata.dig("commits", "nodes")).first&.fetch("commit", nil)
       head_sha = metadata.fetch("headRefOid")
-      raise Error, "current-head commit metadata did not match #{head_sha}" unless commit && commit["oid"] == head_sha
+      unless commit && commit["oid"] == head_sha
+        raise Error,
+              "current-head commit metadata did not match #{head_sha}"
+      end
 
       commit.fetch("committedDate")
     end
@@ -2517,7 +2600,10 @@ class PrMergeLedger
 
       loop do
         page_count += 1
-        raise Error, "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for checkSuites" if page_count > MAX_GRAPHQL_PAGES
+        if page_count > MAX_GRAPHQL_PAGES
+          raise Error,
+                "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for checkSuites"
+        end
 
         response = graphql(hosted_check_suites_query, headSha: head_sha, endCursor: cursor)
         commit = response.dig("data", "repository", "object")
@@ -2717,7 +2803,7 @@ class PrMergeLedger
           raise Error, "pagination exceeded #{MAX_GRAPHQL_PAGES} pages for reviewThread.comments"
         end
 
-        response = graphql(review_thread_comments_query, threadId: thread_id, commentsCursor: cursor)
+        response = graphql(comment_query(review_thread_comments_query), threadId: thread_id, commentsCursor: cursor)
         fetched_thread = response.dig("data", "node")
         raise Error, "review thread #{thread_id} was not found" unless fetched_thread
 
@@ -2810,7 +2896,7 @@ class PrMergeLedger
               mergedAt
               reviewDecision
               body
-              author { login }
+              author { login __typename }
               isCrossRepository
               commits(last:1) {
                 nodes {
@@ -2898,7 +2984,7 @@ class PrMergeLedger
                       id
                       databaseId
                       body
-                      author { login }
+                      author { login __typename }
                       authorAssociation
                       url
                       path
@@ -2912,7 +2998,7 @@ class PrMergeLedger
                         state
                         submittedAt
                         commit { oid }
-                        author { login }
+                        author { login __typename }
                       }
                     }
                     pageInfo { hasNextPage endCursor }
@@ -2936,7 +3022,7 @@ class PrMergeLedger
                   id
                   databaseId
                   body
-                  author { login }
+                  author { login __typename }
                   authorAssociation
                   url
                   path
@@ -2950,7 +3036,7 @@ class PrMergeLedger
                     state
                     submittedAt
                     commit { oid }
-                    author { login }
+                    author { login __typename }
                   }
                 }
                 pageInfo { hasNextPage endCursor }
@@ -2971,7 +3057,7 @@ class PrMergeLedger
                   id
                   state
                   submittedAt
-                  author { login }
+                  author { login __typename }
                   commit { oid }
                   url
                   body
@@ -2993,7 +3079,7 @@ class PrMergeLedger
                 nodes {
                   id
                   body
-                  author { login }
+                  author { login __typename }
                   authorAssociation
                   url
                   createdAt
