@@ -344,8 +344,7 @@ module ReactOnRails
         additions << "**/generated/**" unless gitignore_content.include?("**/generated/**")
         additions << "ssr-generated" unless gitignore_content.include?("ssr-generated")
         additions << ".env" unless gitignore_content.match?(/^\.env$/)
-        # The Pro Node renderer (renderer/node-renderer.js) caches uploaded server bundles here.
-        additions << ".node-renderer-bundles" if use_pro? && !gitignore_content.match?(/^\.node-renderer-bundles$/)
+        additions.concat(renderer_cache_gitignore_additions(gitignore_content))
 
         return if additions.empty?
 
@@ -380,6 +379,17 @@ module ReactOnRails
       STR
 
       private
+
+      def renderer_cache_gitignore_additions(content)
+        return [] unless use_pro?
+
+        # Ignore both the renderer cache and the sibling files created during preseeding.
+        %w[
+          .node-renderer-bundles
+          .node-renderer-bundles.preseed.lock
+          .node-renderer-bundles.artifact-snapshots
+        ].reject { |entry| content.match?(/^#{Regexp.escape(entry)}$/) }
+      end
 
       # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
       # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
