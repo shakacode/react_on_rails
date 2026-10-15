@@ -1,0 +1,40 @@
+#!/usr/bin/env perl
+#
+# Lychee preprocessor for links to this repository's own files on main.
+#
+# `preprocess` in .lychee.toml runs this once per Markdown input as
+# `bin/lychee-self-repo-links PATH`; lychee then checks the links in its output
+# instead of the file.
+#
+# It rewrites https://github.com/shakacode/react_on_rails/blob/main/<path> and
+# tree/main/<path> links into file:// URLs inside this checkout, so lychee checks
+# that <path> exists on the current branch instead of fetching the page from
+# GitHub, which intermittently answers 5xx in CI. A missing <path> still fails
+# the check. Lychee never caches file:// results, so each run sees the checkout
+# as it is. The same applies to master, which GitHub redirects to main. Other
+# refs (tags, commit SHAs) still go to GitHub.
+#
+# Perl rather than Ruby because lychee starts one process per Markdown file.
+
+use strict;
+use warnings;
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+
+@ARGV == 1 or die "usage: $0 MARKDOWN_FILE\n";
+my $path = $ARGV[0];
+
+my $repo_root = dirname(dirname(abs_path(__FILE__)));
+# Percent-encode the checkout path so a space or URL delimiter in it cannot end
+# the rewritten link early.
+(my $repo_root_url = $repo_root) =~ s{([^A-Za-z0-9/._~-])}{sprintf('%%%02X', ord($1))}ge;
+
+open(my $input, '<', $path) or die "$0: cannot read $path: $!\n";
+while (my $line = <$input>) {
+  # The lookahead leaves other refs that only start with main or master, such as
+  # main-2, on GitHub.
+  $line =~ s{https://github\.com/shakacode/react_on_rails/(?:blob|tree)/(?:main|master)(?![A-Za-z0-9_.~%-])}{file://$repo_root_url}g;
+  print $line;
+}
+close($input) or die "$0: cannot read $path: $!\n";
+close(STDOUT) or die "$0: cannot write output for $path: $!\n";

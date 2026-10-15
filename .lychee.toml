@@ -21,6 +21,17 @@ timeout = 20
 # anti-bot systems fingerprint the UA version and may flag a stale one.
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
 
+# Check links to this repository's own files on main against the checkout, not
+# GitHub. bin/lychee-self-repo-links rewrites
+# https://github.com/shakacode/react_on_rails/blob/main/<path> and tree/main/<path>
+# (and master, which GitHub redirects to main) into file:// URLs, so GitHub's
+# intermittent 5xx responses cannot fail the run but a link to a <path> missing
+# on this branch still does. Such failures report the file:// path, not the
+# github.com URL. lychee runs the command relative to its working directory, so
+# run lychee from the repository root, as CI, bin/check-links, and the lefthook
+# hook do.
+preprocess = { command = "bin/lychee-self-repo-links" }
+
 # Exclude patterns (migrated from markdown-link-check-config.json)
 exclude = [
   # ============================================================================
@@ -150,7 +161,6 @@ exclude = [
   '^https://github\.com/npm/cli/issues/6253$',  # Intermittent 502 from GitHub issue pages in CI
   '^https://github\.com/search\?q=gem\+react_on_rails&ref=advsearch&type=repositories&utf8=%E2%9C%93$',  # Intermittent 502 from GitHub search in CI
   '^https://github\.com/shakacode/react_on_rails/issues/1457(#.*)?$',  # Intermittent 500 from GitHub issue pages in CI
-  '^https://github\.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/app/components/Loadable/routes/Routes\.imports-hmr\.jsx(#.*)?$',  # Intermittent 500 from GitHub blob pages in CI
 
   # ============================================================================
   # EXTERNAL DOC PAGES WITH CI CONNECTIVITY FAILURES
