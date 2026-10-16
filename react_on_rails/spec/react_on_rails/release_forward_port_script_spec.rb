@@ -1273,6 +1273,42 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "binds a final changelog whose provenance sentence the merge queue wrapped" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Final release fix. (PR #101)\n"
+      )
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Final release fix. (PR #101)\n"
+      )
+      git(repo, "add", "CHANGELOG.md")
+      record_final = lambda do |provenance, *amend|
+        git(repo, "commit", "--no-gpg-sign", *amend, "-m",
+            "Record the final React on Rails 1.0.1 changelog (#999)", "-m", provenance)
+      end
+
+      record_final.call("Not yet: The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`.")
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      expect(status.exitstatus).to eq(1), stderr
+
+      record_final.call("The final changelog records source CHANGELOG.md commit\n`#{source_changelog_sha}`.", "--amend")
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+    end
+  end
+
   it "rejects authoritative final changelog state when a later RC section is reintroduced" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
