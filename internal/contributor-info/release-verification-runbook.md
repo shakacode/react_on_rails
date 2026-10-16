@@ -118,6 +118,8 @@ review-app gate rather than silently treating it as passed.
 These review-app gates apply before Auto merge to both hard_gate and soft_track upgrade PRs;
 standing-health report_only or not_required settings do not waive them. Missing credentials,
 configuration, or skipped deployment steps are blockers, even when the workflow is green.
+Only an explicit maintainer exception naming this task, failed gate, and accepted consequence
+can clear such a blocker; record that decision and the verification gap on the PR.
 Verify provider rollout completion and the ready serving image's association with the tested
 head; a healthy old replica does not prove the new deployment passed.
 
@@ -130,6 +132,9 @@ without broadening access. Verify resource absence and retained staging access. 
 merge commit, staging run/image, tested URL, smoke results, and cleanup proof in the PR.
 If staging deployment is unavailable or fails, retain an owned blocker and next action;
 do not report completion or substitute a manual production deployment.
+An explicit task-scoped maintainer exception must name any unavailable staging gate and its
+accepted consequence. If no review app or temporary resources were created, record cleanup
+as not applicable with evidence; preserve all shared resources.
 
 For this stable-upgrade task, the user's Merge Auto choice grants
 auto_merge_when_gates_pass for both hard_gate and soft_track upgrade PRs, overriding a
@@ -139,8 +144,9 @@ size/risk limits. Report any resulting approval handoff. Keep GitHub delayed aut
 queue settings unchanged; Shaka owns merge submission and terminal outcome verification.
 
 Retain each created chat ID and PR URL. Wait for terminal outcomes with the host's chat
-coordination tools and report every manifest member as merged, awaiting approval, blocked,
-already current, or skipped with a reason. Soft-track failures do not gate the fleet release
+coordination tools and report every manifest member as complete, merged with post-merge work
+pending/blocked, awaiting approval, blocked, already current, or skipped with a reason.
+Soft-track failures do not gate the fleet release
 unless a maintainer promotes them; they still block readiness and merge of that repo's PR.
 Verify merged changes reached the default branch, staging rollout and smoke passed, and
 review-app cleanup was verified. Report remaining work explicitly; merge alone is not completion.
