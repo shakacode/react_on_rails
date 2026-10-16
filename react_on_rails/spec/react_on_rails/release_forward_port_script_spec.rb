@@ -1306,6 +1306,12 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+
+      own_line = "Fixes #123.\nThe final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+      record_final.call(own_line, "--amend")
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      expect(status).to be_success, stderr
     end
   end
 
