@@ -126,7 +126,8 @@ head; a healthy old replica does not prove the new deployment passed.
 After merge, verify the automatic staging deployment for the resulting merge commit.
 Wait until provider metadata confirms rollout completion and ready replicas serving that
 commit's image, then repeat the basic hosted smoke checks against staging. Keep the review
-app until staging verification passes. Then delete the owned review app and disposable
+app until staging verification passes or a maintainer explicitly authorizes cleanup as part
+of the task-scoped staging exception below. Then delete the owned review app and disposable
 volumes, secrets, policies, and preview images; remove its temporary credential-policy targets
 without broadening access. Verify resource absence and retained staging access. Record the
 merge commit, staging run/image, tested URL, smoke results, and cleanup proof in the PR.
