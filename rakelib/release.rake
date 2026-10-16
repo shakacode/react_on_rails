@@ -9013,7 +9013,7 @@ def report_non_release_branch_next_steps(version:, branch:)
 end
 
 def post_release_sha_lookup_note(source)
-  "\n         Replace <SHA> with the output of: git log -1 --format=%H #{source} -- CHANGELOG.md"
+  "\n       Replace <SHA> with the output of: git log -1 --format=%H #{source} -- CHANGELOG.md"
 end
 
 def latest_changelog_commit_sha(monorepo_root)
