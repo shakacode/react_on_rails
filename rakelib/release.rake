@@ -8978,7 +8978,9 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
     return
   end
 
-  provenance_sha = changelog_source_sha || "$(git log -1 --format=%H #{source} -- CHANGELOG.md)"
+  # Never print a shell substitution here: the checker matches this sentence with the resolved SHA.
+  provenance_sha = changelog_source_sha || "<SHA>"
+  sha_note = changelog_source_sha ? "" : post_release_sha_lookup_note(source)
   puts <<~STEPS
     main does not have the #{version} changelog yet. The release is not closed out until it does.
 
@@ -8990,7 +8992,7 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
        - Remove the entries that shipped in #{version} from [Unreleased]; keep main-only entries.
        - Point the [unreleased] compare link at v#{version} and add the [#{version}] link.
        - Put this line in the PR body and keep it in the squash commit:
-           The final changelog records source CHANGELOG.md commit `#{provenance_sha}`.
+           The final changelog records source CHANGELOG.md commit `#{provenance_sha}`.#{sha_note}
     3. After that PR merges, confirm both checks pass from an up-to-date main:
          #{forward_port_check} --check
          #{forward_port_check} --changelog --check
@@ -8999,6 +9001,10 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
 
     See #{runbook} (step 5).
   STEPS
+end
+
+def post_release_sha_lookup_note(source)
+  "\n         Replace <SHA> with the output of: git log -1 --format=%H #{source} -- CHANGELOG.md"
 end
 
 def latest_changelog_commit_sha(monorepo_root)

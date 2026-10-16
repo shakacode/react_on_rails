@@ -823,7 +823,11 @@ RSpec.describe "release.rake helper methods" do
         report_post_release_next_steps(version: "17.2.0", branch: "release/17.2.0", changelog_source_sha: nil)
       end
 
-      expect(output).to include("git log -1 --format=%H origin/release/17.2.0 -- CHANGELOG.md")
+      expect(output).to include(
+        "The final changelog records source CHANGELOG.md commit `<SHA>`.",
+        "Replace <SHA> with the output of: git log -1 --format=%H origin/release/17.2.0 -- CHANGELOG.md"
+      )
+      expect(output).not_to include("$(")
     end
 
     it "keeps an RC's changelog on the release branch and checks fix forward-ports" do
