@@ -8946,6 +8946,67 @@ def report_release_dry_run_follow_up(version:)
   GUIDANCE
 end
 
+# Prints what the maintainer must do after a live publish. A stable release cut from
+# release/X.Y.Z leaves main without its changelog stamp until a dedicated PR records it,
+# so name that PR's exact title and provenance line, which the close-out checks match.
+def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
+  runbook = "internal/contributor-info/release-train-runbook.md"
+  puts "\n#{'=' * 80}"
+  puts "POST-RELEASE NEXT STEPS"
+  puts "=" * 80
+
+  unless branch.start_with?("release/")
+    puts <<~STEPS
+      Published from #{branch}. CHANGELOG.md on #{branch} already has the #{version} section,
+      so nothing needs forward-porting. Confirm the GitHub release for v#{version} looks right.
+    STEPS
+    return
+  end
+
+  source = "origin/#{branch}"
+  forward_port_check = "script/release-forward-port --source #{source} --target main"
+
+  if release_prerelease_version?(version)
+    puts <<~STEPS
+      1. Forward-port every fix merged into #{branch} to main, one PR each. This must pass:
+           #{forward_port_check} --check
+      2. The #{version} changelog stays on #{branch} until the final release.
+         Do not copy RC sections to main.
+
+      See #{runbook} (step 3).
+    STEPS
+    return
+  end
+
+  provenance_sha = changelog_source_sha || "$(git log -1 --format=%H #{source} -- CHANGELOG.md)"
+  puts <<~STEPS
+    main does not have the #{version} changelog yet. The release is not closed out until it does.
+
+    1. Forward-port any release-only fixes to main, one PR each. This must pass:
+         #{forward_port_check} --check
+    2. Open a CHANGELOG.md-only PR against main titled exactly:
+         Record the final React on Rails #{version} changelog
+       - Copy the [#{version}] section from #{branch} unchanged.
+       - Remove the entries that shipped in #{version} from [Unreleased]; keep main-only entries.
+       - Point the [unreleased] compare link at v#{version} and add the [#{version}] link.
+       - Put this line in the PR body and keep it in the squash commit:
+           The final changelog records source CHANGELOG.md commit `#{provenance_sha}`.
+    3. After that PR merges, confirm both checks pass from an up-to-date main:
+         #{forward_port_check} --check
+         #{forward_port_check} --changelog --check
+    4. Preview closing the release line (deletes #{branch} only in normal mode):
+         script/release-finish close-out #{version} --dry-run
+
+    See #{runbook} (step 5).
+  STEPS
+end
+
+def latest_changelog_commit_sha(monorepo_root)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "log", "-1", "--format=%H", "--", "CHANGELOG.md")
+  sha = output.strip
+  status.success? && sha.match?(/\A\h{40}\z/) ? sha : nil
+end
+
 def report_github_release_notes_preflight!(version:, changelog_notes:)
   return unless changelog_notes
 
@@ -10769,6 +10830,12 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       puts "    1. Ensure CHANGELOG.md entries are complete"
       puts "    2. Push any follow-up changelog fixes if needed"
     end
+
+    report_post_release_next_steps(
+      version: released_gem_version,
+      branch: current_branch,
+      changelog_source_sha: latest_changelog_commit_sha(monorepo_root)
+    )
     puts ""
   end
 end

@@ -798,6 +798,57 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#report_post_release_next_steps" do
+    let(:changelog_sha) { "73da43d49472ac91bf1f7a2e0baf2d97c9608591" }
+
+    it "tells a stable release-branch publish to record the final changelog on main and close out" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.2.0", branch: "release/17.2.0", changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include(
+        "POST-RELEASE NEXT STEPS",
+        "main does not have the 17.2.0 changelog yet",
+        "Record the final React on Rails 17.2.0 changelog",
+        "The final changelog records source CHANGELOG.md commit `#{changelog_sha}`.",
+        "script/release-forward-port --source origin/release/17.2.0 --target main --check",
+        "script/release-forward-port --source origin/release/17.2.0 --target main --changelog --check",
+        "script/release-finish close-out 17.2.0 --dry-run",
+        "release-train-runbook.md"
+      )
+    end
+
+    it "names the source changelog lookup when the commit SHA is unknown" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.2.0", branch: "release/17.2.0", changelog_source_sha: nil)
+      end
+
+      expect(output).to include("git log -1 --format=%H origin/release/17.2.0 -- CHANGELOG.md")
+    end
+
+    it "keeps an RC's changelog on the release branch and checks fix forward-ports" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.1", branch: "release/17.3.0",
+                                       changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include(
+        "script/release-forward-port --source origin/release/17.3.0 --target main --check",
+        "stays on release/17.3.0 until the final release"
+      )
+      expect(output).not_to include("Record the final React on Rails")
+    end
+
+    it "says nothing needs forward-porting for a release published from main" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0", branch: "main", changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include("Published from main", "CHANGELOG.md on main already has the 17.3.0 section")
+      expect(output).not_to include("release-forward-port")
+    end
+  end
+
   describe "fenced compound release guidance" do
     let(:release_runbook) { "internal/contributor-info/release-train-runbook.md" }
 
