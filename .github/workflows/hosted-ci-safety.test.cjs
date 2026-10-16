@@ -187,7 +187,7 @@ assertMatches(
 );
 assertPinnedCheckout('ci-required pinned Shaka checkout', shakaCheckoutStep, {
   repository: 'shakacode/shaka',
-  ref: '67c1d8f70f5c4eaa05f58f796be53a6866148139',
+  ref: 'da95d68fd8215ae9f789a03a8c9588fb6ccf15c9',
   path: '.shaka-source',
 });
 assertMatches(
