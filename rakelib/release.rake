@@ -8949,13 +8949,15 @@ end
 # Prints what the maintainer must do after a live publish. A stable release cut from
 # release/X.Y.Z leaves main without its changelog stamp until a dedicated PR records it,
 # so name that PR's exact title and provenance line, which the close-out checks match.
-def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
+def report_post_release_next_steps(version:, branch:, changelog_source_sha:, changelog_section: true)
   runbook = "internal/contributor-info/release-train-runbook.md"
   puts "\n#{'=' * 80}"
   puts "POST-RELEASE NEXT STEPS"
   puts "=" * 80
 
-  return report_non_release_branch_next_steps(version:, branch:) unless branch.start_with?("release/")
+  unless branch.start_with?("release/")
+    return report_non_release_branch_next_steps(version:, branch:, changelog_section:)
+  end
 
   source = "origin/#{branch}"
   forward_port_check = "script/release-forward-port --source #{source} --target main"
@@ -8997,17 +8999,21 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
   STEPS
 end
 
-def report_non_release_branch_next_steps(version:, branch:)
+def report_non_release_branch_next_steps(version:, branch:, changelog_section:)
+  github_release_step =
+    if changelog_section
+      "Confirm the GitHub release for v#{version} looks right."
+    else
+      "No GitHub release was created: CHANGELOG.md has no #{version} section. Add it as described above."
+    end
+
   if branch == "main"
-    puts <<~STEPS
-      Published from main. CHANGELOG.md on main already has the #{version} section,
-      so nothing needs forward-porting. Confirm the GitHub release for v#{version} looks right.
-    STEPS
+    puts "Published from main, so nothing needs forward-porting.\n#{github_release_step}"
   else
     puts <<~STEPS
       Published from #{branch}, which is neither main nor a release branch.
       Any fix this release carries that main lacks must reach main through its own PR.
-      Confirm the GitHub release for v#{version} looks right.
+      #{github_release_step}
     STEPS
   end
 end
@@ -10849,7 +10855,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     report_post_release_next_steps(
       version: released_gem_version,
       branch: current_branch,
-      changelog_source_sha: latest_changelog_commit_sha(monorepo_root)
+      changelog_source_sha: latest_changelog_commit_sha(monorepo_root),
+      changelog_section: !has_changelog_section.nil?
     )
     puts ""
   end
