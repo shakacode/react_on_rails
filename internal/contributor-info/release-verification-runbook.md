@@ -114,7 +114,7 @@ keep private URLs and captures in their authorized private destination. Refresh 
 and smoke evidence for every new PR head. Failed, pending, or unknown deployment
 or smoke evidence blocks readiness. For a repo without a review-app pipeline, record
 that limitation and local smoke evidence; obtain a maintainer disposition for a required
-review-app gate rather than silently treating it as passed.
+review-app gate using the explicit task-scoped exception defined below.
 These review-app gates apply before Auto merge to both hard_gate and soft_track upgrade PRs;
 standing-health report_only or not_required settings do not waive them. Missing credentials,
 configuration, or skipped deployment steps are blockers, even when the workflow is green.
@@ -134,7 +134,10 @@ merge commit, staging run/image, tested URL, smoke results, and cleanup proof in
 If staging deployment is unavailable or fails, retain an owned blocker and next action;
 do not report completion or substitute a manual production deployment.
 An explicit task-scoped maintainer exception must name any unavailable staging gate and its
-accepted consequence. If no review app or temporary resources were created, record cleanup
+accepted consequence. After authorized cleanup is verified, report complete with accepted
+exceptions, naming each unverified gate and its decision; never report those gates as passed.
+This is the terminal exception path for the reporting and per-repo checklist below.
+If no review app or temporary resources were created, record cleanup
 as not applicable with evidence; preserve all shared resources.
 
 For this stable-upgrade task, the user's Merge Auto choice grants
@@ -145,12 +148,14 @@ size/risk limits. Report any resulting approval handoff. Keep GitHub delayed aut
 queue settings unchanged; Shaka owns merge submission and terminal outcome verification.
 
 Retain each created chat ID and PR URL. Wait for terminal outcomes with the host's chat
-coordination tools and report every manifest member as complete, merged with post-merge work
+coordination tools and report every manifest member as complete, complete with accepted
+exceptions, merged with post-merge work
 pending/blocked, awaiting approval, blocked, already current, or skipped with a reason.
 Soft-track failures do not gate the fleet release
 unless a maintainer promotes them; they still block readiness and merge of that repo's PR.
-Verify merged changes reached the default branch, staging rollout and smoke passed, and
-review-app cleanup was verified. Report remaining work explicitly; merge alone is not completion.
+Verify merged changes reached the default branch and review-app cleanup was verified.
+Staging rollout and smoke must pass or follow the explicit exception path above.
+Report remaining work explicitly; merge alone is not completion.
 
 Before declaring fleet adoption complete, verify demo-fleet.yml's
 standing_health.stable_release and standing_health.rsc_version match the resolved snapshot.
@@ -341,7 +346,7 @@ For each repo:
    keeping private evidence private. Refresh evidence after each new head. A successful
    build or skipped deployment does not prove the review app works; missing or failed
    required evidence blocks that PR. If no pipeline exists, document local smoke and the
-   limitation, and obtain a maintainer disposition for any required review-app gate.
+   limitation, and follow the launcher's explicit task-scoped exception requirements.
    Apply this readiness gate before Auto merge for both tiers, regardless of standing-health
    report_only/not_required settings. Confirm provider rollout completion and a ready image
    tied to the tested head; a green job serving an old replica is insufficient.
@@ -351,7 +356,8 @@ For each repo:
     verify the automatic staging rollout of the merge commit and repeat hosted smoke before
     deleting the review app. Verify disposable-resource absence and removal of temporary access
     targets, retaining staging access. Publish public-safe proof and any owned blocker; keep
-    the task open until staging verification and cleanup are complete.
+    the task open until cleanup is verified and staging verification passes or its explicit
+    exception path above is complete. Distinguish complete with accepted exceptions from passed.
 
 Tracking and issues:
 - Find or create the release tracker: `{{TRACKING_ISSUE}}`.
