@@ -851,6 +851,16 @@ RSpec.describe "release.rake helper methods" do
       expect(output).to include("Published from main", "CHANGELOG.md on main already has the 17.3.0 section")
       expect(output).not_to include("release-forward-port")
     end
+
+    it "tells a prerelease from a feature branch to bring its fixes to main" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.0", branch: "jg/rc-spike",
+                                       changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include("Published from jg/rc-spike", "must reach main through its own PR")
+      expect(output).not_to include("nothing needs forward-porting")
+    end
   end
 
   describe "fenced compound release guidance" do

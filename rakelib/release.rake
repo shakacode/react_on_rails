@@ -8955,13 +8955,7 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
   puts "POST-RELEASE NEXT STEPS"
   puts "=" * 80
 
-  unless branch.start_with?("release/")
-    puts <<~STEPS
-      Published from #{branch}. CHANGELOG.md on #{branch} already has the #{version} section,
-      so nothing needs forward-porting. Confirm the GitHub release for v#{version} looks right.
-    STEPS
-    return
-  end
+  return report_non_release_branch_next_steps(version:, branch:) unless branch.start_with?("release/")
 
   source = "origin/#{branch}"
   forward_port_check = "script/release-forward-port --source #{source} --target main"
@@ -9001,6 +8995,21 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
 
     See #{runbook} (step 5).
   STEPS
+end
+
+def report_non_release_branch_next_steps(version:, branch:)
+  if branch == "main"
+    puts <<~STEPS
+      Published from main. CHANGELOG.md on main already has the #{version} section,
+      so nothing needs forward-porting. Confirm the GitHub release for v#{version} looks right.
+    STEPS
+  else
+    puts <<~STEPS
+      Published from #{branch}, which is neither main nor a release branch.
+      Any fix this release carries that main lacks must reach main through its own PR.
+      Confirm the GitHub release for v#{version} looks right.
+    STEPS
+  end
 end
 
 def post_release_sha_lookup_note(source)
