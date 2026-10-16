@@ -823,7 +823,11 @@ RSpec.describe "release.rake helper methods" do
         report_post_release_next_steps(version: "17.2.0", branch: "release/17.2.0", changelog_source_sha: nil)
       end
 
-      expect(output).to include("git log -1 --format=%H origin/release/17.2.0 -- CHANGELOG.md")
+      expect(output).to include(
+        "The final changelog records source CHANGELOG.md commit `<SHA>`.",
+        "Replace <SHA> with the output of: git log -1 --format=%H origin/release/17.2.0 -- CHANGELOG.md"
+      )
+      expect(output).not_to include("$(")
     end
 
     it "keeps an RC's changelog on the release branch and checks fix forward-ports" do
@@ -844,8 +848,29 @@ RSpec.describe "release.rake helper methods" do
         report_post_release_next_steps(version: "17.3.0", branch: "main", changelog_source_sha: changelog_sha)
       end
 
-      expect(output).to include("Published from main", "CHANGELOG.md on main already has the 17.3.0 section")
+      expect(output).to include("Published from main, so nothing needs forward-porting",
+                                "Confirm the GitHub release for v17.3.0")
       expect(output).not_to include("release-forward-port")
+    end
+
+    it "does not ask to confirm a GitHub release that was skipped for a missing changelog section" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.0", branch: "main", changelog_source_sha: changelog_sha,
+                                       changelog_section: false)
+      end
+
+      expect(output).to include("No GitHub release was created: CHANGELOG.md has no 17.3.0.rc.0 section")
+      expect(output).not_to include("Confirm the GitHub release")
+    end
+
+    it "tells a prerelease from a feature branch to bring its fixes to main" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.0", branch: "jg/rc-spike",
+                                       changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include("Published from jg/rc-spike", "must reach main through its own PR")
+      expect(output).not_to include("nothing needs forward-porting")
     end
   end
 

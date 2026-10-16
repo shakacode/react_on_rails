@@ -8949,18 +8949,14 @@ end
 # Prints what the maintainer must do after a live publish. A stable release cut from
 # release/X.Y.Z leaves main without its changelog stamp until a dedicated PR records it,
 # so name that PR's exact title and provenance line, which the close-out checks match.
-def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
+def report_post_release_next_steps(version:, branch:, changelog_source_sha:, changelog_section: true)
   runbook = "internal/contributor-info/release-train-runbook.md"
   puts "\n#{'=' * 80}"
   puts "POST-RELEASE NEXT STEPS"
   puts "=" * 80
 
   unless branch.start_with?("release/")
-    puts <<~STEPS
-      Published from #{branch}. CHANGELOG.md on #{branch} already has the #{version} section,
-      so nothing needs forward-porting. Confirm the GitHub release for v#{version} looks right.
-    STEPS
-    return
+    return report_non_release_branch_next_steps(version:, branch:, changelog_section:)
   end
 
   source = "origin/#{branch}"
@@ -8978,7 +8974,9 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
     return
   end
 
-  provenance_sha = changelog_source_sha || "$(git log -1 --format=%H #{source} -- CHANGELOG.md)"
+  # Never print a shell substitution here: the checker matches this sentence with the resolved SHA.
+  provenance_sha = changelog_source_sha || "<SHA>"
+  sha_note = changelog_source_sha ? "" : post_release_sha_lookup_note(source)
   puts <<~STEPS
     main does not have the #{version} changelog yet. The release is not closed out until it does.
 
@@ -8990,7 +8988,7 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
        - Remove the entries that shipped in #{version} from [Unreleased]; keep main-only entries.
        - Point the [unreleased] compare link at v#{version} and add the [#{version}] link.
        - Put this line in the PR body and keep it in the squash commit:
-           The final changelog records source CHANGELOG.md commit `#{provenance_sha}`.
+           The final changelog records source CHANGELOG.md commit `#{provenance_sha}`.#{sha_note}
     3. After that PR merges, confirm both checks pass from an up-to-date main:
          #{forward_port_check} --check
          #{forward_port_check} --changelog --check
@@ -8999,6 +8997,29 @@ def report_post_release_next_steps(version:, branch:, changelog_source_sha:)
 
     See #{runbook} (step 5).
   STEPS
+end
+
+def report_non_release_branch_next_steps(version:, branch:, changelog_section:)
+  github_release_step =
+    if changelog_section
+      "Confirm the GitHub release for v#{version} looks right."
+    else
+      "No GitHub release was created: CHANGELOG.md has no #{version} section. Add it as described above."
+    end
+
+  if branch == "main"
+    puts "Published from main, so nothing needs forward-porting.\n#{github_release_step}"
+  else
+    puts <<~STEPS
+      Published from #{branch}, which is neither main nor a release branch.
+      Any fix this release carries that main lacks must reach main through its own PR.
+      #{github_release_step}
+    STEPS
+  end
+end
+
+def post_release_sha_lookup_note(source)
+  "\n       Replace <SHA> with the output of: git log -1 --format=%H #{source} -- CHANGELOG.md"
 end
 
 def latest_changelog_commit_sha(monorepo_root)
@@ -10834,7 +10855,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     report_post_release_next_steps(
       version: released_gem_version,
       branch: current_branch,
-      changelog_source_sha: latest_changelog_commit_sha(monorepo_root)
+      changelog_source_sha: latest_changelog_commit_sha(monorepo_root),
+      changelog_section: !has_changelog_section.nil?
     )
     puts ""
   end
