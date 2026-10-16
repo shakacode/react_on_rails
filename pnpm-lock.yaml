@@ -671,7 +671,7 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0(react@19.3.0)
       '@tanstack/react-router':
-        specifier: ^1.139.0
+        specifier: '>=1.139.0 <1.170.19'
         version: 1.163.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       autoprefixer:
         specifier: ^10.4.14

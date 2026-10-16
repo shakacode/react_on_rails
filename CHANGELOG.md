@@ -52,7 +52,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **[Pro]** **TanStack Router HTTP outcomes**: Async non-streaming SSR now preserves redirect status and exact `Location`, including canonical URL redirects, and returns real 404 and 500 responses. Unknown-route markup retains its not-found state during hydration. For these non-streaming responses, ordinary and async component caches replay HTTP metadata; component and prerender caches skip 5xx writes. Streaming SSR and RSC are outside this contract.
-  **Action required for upgraders:** Include the route and search in cached router component keys. Custom render functions calling `serverRenderTanStackAppAsync` must forward `httpResponse`. Await these HTTP outcomes before response headers are committed.
+  **Action required for upgraders:** Include the route and search in cached router component keys. Custom render functions calling `serverRenderTanStackAppAsync` must forward `httpResponse`. Use `@tanstack/react-router >=1.139.0 <1.170.19`; newer router versions removed the SSR response and hydration internals used by this integration. Await these HTTP outcomes before response headers are committed.
   [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
   [Justin Gordon](https://github.com/justin808).
 - **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated

@@ -22,7 +22,7 @@
     "@rspack/cli": "2.2.1",
     "@rspack/core": "2.2.1",
     "@sentry/node": "^7.120.0",
-    "@tanstack/react-router": "^1.139.0",
+    "@tanstack/react-router": ">=1.139.0 <1.170.19",
     "@shakacode/use-ssr-computation.macro": "^1.2.4",
     "@shakacode/use-ssr-computation.runtime": "^2.0.0",
     "autoprefixer": "^10.4.14",

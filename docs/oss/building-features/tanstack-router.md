@@ -31,7 +31,7 @@ The Pro-only async path keeps the integration on TanStack Router's public `route
 ## Install
 
 ```bash
-pnpm add @tanstack/react-router
+pnpm add "@tanstack/react-router@>=1.139.0 <1.170.19"
 ```
 
 ## Register a TanStack Router App
@@ -107,8 +107,8 @@ end
 
 ## Compatibility
 
-- Supported `@tanstack/react-router` versions: `>=1.139.0 <2.0.0`
-- Keep `react-on-rails-pro` up to date when upgrading `@tanstack/react-router`.
+- Supported `@tanstack/react-router` versions: `>=1.139.0 <1.170.19`
+- TanStack Router 1.170.19 removed the SSR response state and hydration internals used by this integration. Versions 1.170.19 and newer are not supported yet; keep the router within the range above.
 
 ## Working Examples in This Repo
 

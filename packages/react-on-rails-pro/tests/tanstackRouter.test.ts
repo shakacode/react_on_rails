@@ -1558,7 +1558,7 @@ describe('tanstack-router integration (Pro)', () => {
           'cleared between render-phase init and the post-hydration effect. ' +
           'TanStack Router\'s private "ssr" API may have changed — verify ' +
           '@tanstack/react-router is within the supported range ' +
-          '(>=1.139.0 <2.0.0).',
+          '(>=1.139.0 <1.170.19).',
       );
     } finally {
       process.env.NODE_ENV = originalNodeEnv;

@@ -133,7 +133,7 @@ function throwMissingHydrationInternals(): never {
   throw new Error(
     'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store.setState() or ' +
       'router.stores.setMatches() are required but not available. Ensure @tanstack/react-router ' +
-      '>=1.139.0 <2.0.0 is installed; older 1.x routers expose __store.setState(), while newer ' +
+      '>=1.139.0 <1.170.19 is installed; older 1.x routers expose __store.setState(), while newer ' +
       '1.x routers expose stores.setMatches().',
   );
 }
@@ -372,7 +372,7 @@ function TanStackHydrationApp({
           console.warn(
             'react-on-rails-pro/tanstack-router: Hydration uses TanStack Router private internals ' +
               '(matchRoutes, __store/stores, loadRouteChunk, looseRoutesById). Keep @tanstack/react-router ' +
-              'within the supported range (>=1.139.0 <2.0.0) and run integration tests when upgrading.',
+              'within the supported range (>=1.139.0 <1.170.19) and run integration tests when upgrading.',
           );
         }
 
@@ -489,7 +489,7 @@ function TanStackHydrationApp({
           'cleared between render-phase init and the post-hydration effect. ' +
           'TanStack Router\'s private "ssr" API may have changed — verify ' +
           '@tanstack/react-router is within the supported range ' +
-          '(>=1.139.0 <2.0.0).',
+          '(>=1.139.0 <1.170.19).',
       );
     }
 
