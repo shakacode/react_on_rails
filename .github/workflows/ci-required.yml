@@ -76,11 +76,16 @@ jobs:
             --consumer-root .
         # yamllint enable rule:line-length
 
+      - name: Set up Ruby for Shaka
+        uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74 # v1
+        with:
+          ruby-version: '3.4'
+
       - name: Check out pinned Shaka
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: shakacode/shaka
-          ref: 67c1d8f70f5c4eaa05f58f796be53a6866148139
+          ref: da95d68fd8215ae9f789a03a8c9588fb6ccf15c9
           path: .shaka-source
           fetch-depth: 1
           persist-credentials: false

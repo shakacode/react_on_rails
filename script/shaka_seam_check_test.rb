@@ -9,10 +9,15 @@ require "yaml"
 
 module ShakaTrustConfigHelper
   GitHubTrustFixture = Struct.new(:repository, :contents) do
-    def graphql(_query, owner:, name:, expression:)
+    def graphql(_query, owner:, name:, expression:, **modern_keywords)
       expected_expression = "#{'a' * 40}:.agents/trusted-github-actors.yml"
       raise "unexpected trust repository" unless [owner, name].join("/") == repository
       raise "unexpected trust expression: #{expression}" unless expression == expected_expression
+
+      modern_expression = modern_keywords.fetch(:newExpression, nil)
+      if modern_expression && modern_expression != "#{'a' * 40}:.agents/shaka/trusted-github-actors.yml"
+        raise "unexpected modern trust expression: #{modern_expression}"
+      end
 
       object = {
         "__typename" => "Blob", "text" => contents, "isBinary" => false,
@@ -127,6 +132,16 @@ class ShakaSeamCheckTest < Minitest::Test
 
   include ShakaTrustConfigHelper
   include ShakaSeamFixtureHelper
+
+  def test_repository_requests_two_local_reviewers
+    output, error, status = run_check(REPOSITORY_ROOT)
+
+    assert status.success?, error
+    config = JSON.parse(output)
+    assert_equal 2, config.fetch("review").fetch("local_review_count")
+    assert_operator config.fetch("review").fetch("local_review_agents").length, :>=, 2
+    assert_equal false, config.dig("validation", "grants_policy")
+  end
 
   def test_valid_candidate_reports_no_authority
     with_valid_seam do |root|
