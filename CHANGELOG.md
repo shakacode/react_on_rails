@@ -26,6 +26,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
+  `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
+  and prevents console replay from exposing server diagnostics that error metadata omits. Diagnostic signals
+  and clean-chunk replay retain their existing behavior. See [Issue 4991](https://github.com/shakacode/react_on_rails/issues/4991).
+
 - **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
   `serverWebpackConfig.js` removed client-only plugins by webpack class names only, so Rspack apps kept
   `rspack-manifest-plugin` and `CssExtractRspackPlugin` in the server compilation and in the RSC compilations
