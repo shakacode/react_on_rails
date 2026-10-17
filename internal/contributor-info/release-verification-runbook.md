@@ -100,7 +100,7 @@ steps from this runbook's "Demo Fleet Release-Track Prompt" and that repo's mani
 in the child prompt; do not assume its checkout contains them.
 Require local install, tests, build, and smoke before push, independent review, exact-head
 required CI, and the deployment/smoke evidence below before calling the PR ready or merging.
-Copy the full deployment/smoke paragraph below into every child prompt.
+Copy the full review-app and post-merge verification requirements below into every child prompt.
 
 For each repo with a review-app pipeline, explicitly request deployment through its
 documented workflow. CPFlow's first deployment requires +review-app-deploy or
@@ -114,7 +114,31 @@ keep private URLs and captures in their authorized private destination. Refresh 
 and smoke evidence for every new PR head. Failed, pending, or unknown deployment
 or smoke evidence blocks readiness. For a repo without a review-app pipeline, record
 that limitation and local smoke evidence; obtain a maintainer disposition for a required
-review-app gate rather than silently treating it as passed.
+review-app gate using the explicit task-scoped exception defined below.
+These review-app gates apply before Auto merge to both hard_gate and soft_track upgrade PRs;
+standing-health report_only or not_required settings do not waive them. Missing credentials,
+configuration, or skipped deployment steps are blockers, even when the workflow is green.
+Only an explicit maintainer exception naming this task, failed gate, and accepted consequence
+can clear such a blocker; record that decision and the verification gap on the PR.
+Verify provider rollout completion and the ready serving image's association with the tested
+head; a healthy old replica does not prove the new deployment passed.
+
+After merge, verify the automatic staging deployment for the resulting merge commit.
+Wait until provider metadata confirms rollout completion and ready replicas serving that
+commit's image, then repeat the basic hosted smoke checks against staging. Keep the review
+app until staging verification passes or a maintainer explicitly authorizes cleanup as part
+of the task-scoped staging exception below. Then delete the owned review app and disposable
+volumes, secrets, policies, and preview images; remove its temporary credential-policy targets
+without broadening access. Verify resource absence and retained staging access. Record the
+merge commit, staging run/image, tested URL, smoke results, and cleanup proof in the PR.
+If staging deployment is unavailable or fails, retain an owned blocker and next action;
+do not report completion or substitute a manual production deployment.
+An explicit task-scoped maintainer exception must name any unavailable staging gate and its
+accepted consequence. After authorized cleanup is verified, report complete with accepted
+exceptions, naming each unverified gate and its decision; never report those gates as passed.
+This is the terminal exception path for the reporting and per-repo checklist below.
+If no review app or temporary resources were created, record cleanup
+as not applicable with evidence; preserve all shared resources.
 
 For this stable-upgrade task, the user's Merge Auto choice grants
 auto_merge_when_gates_pass for both hard_gate and soft_track upgrade PRs, overriding a
@@ -124,11 +148,14 @@ size/risk limits. Report any resulting approval handoff. Keep GitHub delayed aut
 queue settings unchanged; Shaka owns merge submission and terminal outcome verification.
 
 Retain each created chat ID and PR URL. Wait for terminal outcomes with the host's chat
-coordination tools and report every manifest member as merged, awaiting approval, blocked,
-already current, or skipped with a reason. Soft-track failures do not gate the fleet release
+coordination tools and report every manifest member as complete, complete with accepted
+exceptions, merged with post-merge work
+pending/blocked, awaiting approval, blocked, already current, or skipped with a reason.
+Soft-track failures do not gate the fleet release
 unless a maintainer promotes them; they still block readiness and merge of that repo's PR.
-Verify merged changes reached the default branch; report
-remaining work explicitly.
+Verify merged changes reached the default branch and review-app cleanup was verified.
+Staging rollout and smoke must pass or follow the explicit exception path above.
+Report remaining work explicitly; merge alone is not completion.
 
 Before declaring fleet adoption complete, verify demo-fleet.yml's
 standing_health.stable_release and standing_health.rsc_version match the resolved snapshot.
@@ -319,9 +346,18 @@ For each repo:
    keeping private evidence private. Refresh evidence after each new head. A successful
    build or skipped deployment does not prove the review app works; missing or failed
    required evidence blocks that PR. If no pipeline exists, document local smoke and the
-   limitation, and obtain a maintainer disposition for any required review-app gate.
+   limitation, and follow the launcher's explicit task-scoped exception requirements.
+   Apply this readiness gate before Auto merge for both tiers, regardless of standing-health
+   report_only/not_required settings. Confirm provider rollout completion and a ready image
+   tied to the tested head; a green job serving an old replica is insufficient.
 9. If `demo-fleet.yml` metadata is wrong after inspection, open a separate `react_on_rails` PR
    updating package manager, commands, smoke paths, review-app data, or `verify` state.
+10. After an authorized merge, follow the launcher's post-merge verification requirements:
+    verify the automatic staging rollout of the merge commit and repeat hosted smoke before
+    deleting the review app. Verify disposable-resource absence and removal of temporary access
+    targets, retaining staging access. Publish public-safe proof and any owned blocker; keep
+    the task open until cleanup is verified and staging verification passes or its explicit
+    exception path above is complete. Distinguish complete with accepted exceptions from passed.
 
 Tracking and issues:
 - Find or create the release tracker: `{{TRACKING_ISSUE}}`.
