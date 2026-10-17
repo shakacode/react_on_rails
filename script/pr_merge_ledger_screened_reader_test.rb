@@ -45,15 +45,17 @@ class PrMergeLedgerScreenedReaderTest < Minitest::Test
   def test_excluded_body_is_not_required_and_metadata_is_preserved
     data = packet
     data["issue_comments"] = []
-    data["excluded_interactions"] = [{ "url" => URL, "kind" => "issue_comment", "author" => "maintainer",
-                                       "body_withheld" => true, "verification_unavailable" => false }]
-    reader = ShakaScreenedComments.new(data, HEAD)
-    rows = [metadata]
-    reader.apply!(rows, "issue_comments")
-    reader.verify_complete!
-    refute rows.first.key?("body")
-    assert_equal "node-id", rows.first.fetch("id")
-    assert_equal 1, reader.provenance.fetch("withheld_count")
+    [true, false].each do |body_withheld|
+      data["excluded_interactions"] = [{ "url" => URL, "kind" => "issue_comment", "author" => "maintainer",
+                                         "body_withheld" => body_withheld, "verification_unavailable" => false }]
+      reader = ShakaScreenedComments.new(data, HEAD)
+      rows = [metadata]
+      reader.apply!(rows, "issue_comments")
+      reader.verify_complete!
+      refute rows.first.key?("body")
+      assert_equal "node-id", rows.first.fetch("id")
+      assert_equal 1, reader.provenance.fetch("withheld_count")
+    end
   end
 
   def test_changed_head_missing_screening_and_actor_mismatch_fail_closed
@@ -77,6 +79,13 @@ class PrMergeLedgerScreenedReaderTest < Minitest::Test
     data["excluded_interactions"] = [{ "url" => URL, "kind" => "issue_comment", "author" => "maintainer",
                                        "body_withheld" => true, "verification_unavailable" => true }]
     assert_raises(PrMergeLedger::Error) { ShakaScreenedComments.new(data, HEAD) }
+    data["excluded_interactions"].first["body_withheld"] = false
+    assert_raises(PrMergeLedger::Error) { ShakaScreenedComments.new(data, HEAD) }
+    data["excluded_interactions"].first["verification_unavailable"] = false
+    [nil, "false"].each do |flag|
+      data["excluded_interactions"].first["body_withheld"] = flag
+      assert_raises(PrMergeLedger::Error) { ShakaScreenedComments.new(data, HEAD) }
+    end
     reader = ShakaScreenedComments.new(packet, HEAD)
     assert_raises(PrMergeLedger::Error) { reader.apply!([metadata.merge("body" => "raw")], "issue_comments") }
   end

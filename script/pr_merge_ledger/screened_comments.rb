@@ -73,7 +73,8 @@ class ShakaScreenedComments
   def add_exclusions!
     @packet.fetch("excluded_interactions").each do |entry|
       section = SECTIONS.key(entry.fetch("kind"))
-      unless section && entry["body_withheld"] == true && entry["verification_unavailable"] == false
+      valid_flag = entry["body_withheld"] == true || entry["body_withheld"] == false
+      unless section && valid_flag && entry["verification_unavailable"] == false
         raise PrMergeLedger::Error, "screened comment verification is unavailable"
       end
 
