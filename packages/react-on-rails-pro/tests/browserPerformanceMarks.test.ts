@@ -13,6 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
   createBrowserPerformanceMarkScript,
   markBrowserPerformance,
@@ -232,29 +234,12 @@ describe('browserPerformanceMarks runtime helper', () => {
     expect(queue?.at(-1)).toEqual(expect.objectContaining({ name: 'react-on-rails:rsc:payload:204' }));
   });
 
-  it('keeps the generated inline mark script body aligned with the Ruby stream script', () => {
-    const markScript = createBrowserPerformanceMarkScript('react-on-rails:rsc:contract', {
-      source: 'react-on-rails-pro',
-      phase: 'stream-complete',
-      bytes: 2048,
-    });
+  it('keeps the generated inline mark script body aligned with the shared contract', () => {
+    const contract = JSON.parse(
+      readFileSync(resolve(__dirname, 'fixtures/browser-performance-mark-contract.json'), 'utf8'),
+    ) as { markName: string; detail: Record<string, unknown>; scriptBody: string };
 
-    expect(markScript).toBe(
-      '(function(){var detail={"source":"react-on-rails-pro","phase":"stream-complete","bytes":2048};' +
-        'var entry={name:"react-on-rails:rsc:contract",detail:detail};' +
-        'var perf=self.performance;' +
-        'var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&' +
-        '"detail" in PerformanceMark.prototype;' +
-        'if(perf&&typeof perf.mark==="function"){' +
-        'if(supportsDetail){try{perf.mark("react-on-rails:rsc:contract",{detail:detail});return;}' +
-        'catch(error){}}' +
-        'try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}' +
-        'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
-        '}else{entry.fallback="performance-mark-unavailable";}' +
-        'var queue=self.REACT_ON_RAILS_PERFORMANCE_MARKS=' +
-        'self.REACT_ON_RAILS_PERFORMANCE_MARKS||[];queue.push(entry);' +
-        'if(queue.length>200){queue.splice(0,queue.length-200);}})()',
-    );
+    expect(createBrowserPerformanceMarkScript(contract.markName, contract.detail)).toBe(contract.scriptBody);
   });
 
   it('falls back to null detail when generated inline mark details cannot be JSON-stringified', () => {
