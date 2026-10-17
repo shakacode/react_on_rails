@@ -858,9 +858,9 @@ module ReactOnRails
       end
 
       location = http_response["location"]
-      return unless !location.nil? && (!location.is_a?(String) || location.match?(/[\r\n]/))
+      return unless !location.nil? && (!location.is_a?(String) || location.match?(/[\\\x00-\x1f\x7f]/))
 
-      raise ReactOnRails::Error, "Expected HTTP Location to be a string without newlines."
+      raise ReactOnRails::Error, "Expected HTTP Location to be a string without control characters or backslashes."
     end
 
     def merge_server_rendered_client_props!(render_options, result)

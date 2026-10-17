@@ -232,7 +232,7 @@ return { renderedHtml: '', httpResponse: { status: 308, location: '/new-path?ids
 
 Rails applies the integer status (200–599) and exact optional `Location` before
 response headers are committed. A status of 200 preserves an existing controller
-status. Invalid metadata, including a newline in `Location`, raises an error.
+status. Invalid metadata, including control characters or literal backslashes in `Location`, raises an error.
 Render functions are trusted application code and choose their redirect destinations.
 This contract is available in the OSS package; the Pro TanStack Router helper
 supplies it automatically. It does not change the legacy `redirectLocation` field.

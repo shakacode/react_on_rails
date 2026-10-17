@@ -599,6 +599,24 @@ describe ReactOnRailsHelper do
         expect(ssr_response.headers["Location"]).to eq("/poll/123")
       end
 
+      it "rejects Location values a browser can reinterpret as another origin" do
+        ["/\attacker.invalid", "/\t/attacker.invalid", "/\u0000/attacker.invalid"].each do |location|
+          expect do
+            send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 307, "location" => location })
+          end.to raise_error(ReactOnRails::Error)
+          expect(ssr_response.status).to eq(200)
+          expect(ssr_response.headers["Location"]).to be_nil
+        end
+      end
+
+      it "preserves intentional absolute destinations and percent-encoded path characters" do
+        ["https://example.com/products?ids=1%2C2", "/%5Cproducts?name=a%20b"].each do |location|
+          send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 308, "location" => location })
+          expect(ssr_response.status).to eq(308)
+          expect(ssr_response.headers["Location"]).to eq(location)
+        end
+      end
+
       it "rejects invalid HTTP metadata and response splitting" do
         invalid_metadata = [
           { "status" => 999 },
