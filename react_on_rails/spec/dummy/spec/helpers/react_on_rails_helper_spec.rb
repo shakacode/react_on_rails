@@ -600,7 +600,7 @@ describe ReactOnRailsHelper do
       end
 
       it "rejects Location values a browser can reinterpret as another origin" do
-        ["/\attacker.invalid", "/\t/attacker.invalid", "/\u0000/attacker.invalid"].each do |location|
+        ['/\attacker.invalid', "/\t/attacker.invalid", "/\u0000/attacker.invalid"].each do |location|
           expect do
             send(:apply_server_rendered_http_response!, "httpResponse" => { "status" => 307, "location" => location })
           end.to raise_error(ReactOnRails::Error)
