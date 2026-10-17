@@ -2,9 +2,85 @@
 
 require "ripper"
 require "open3"
+require "tmpdir"
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
+  describe "#update_gitignore_for_auto_registration" do
+    let(:gitignore_destination) { Dir.mktmpdir("renderer-cache-ignore") }
+
+    before do
+      _stdout, stderr, status = Open3.capture3("git", "init", "--quiet", gitignore_destination)
+      raise stderr unless status.success?
+    end
+
+    after { FileUtils.remove_entry(gitignore_destination) }
+
+    def update_cache_gitignore(content, options)
+      File.write(File.join(gitignore_destination, ".gitignore"), content)
+      generator = described_class.new([], options, { destination_root: gitignore_destination })
+      generator.send(:update_gitignore_for_auto_registration)
+      generator.send(:update_gitignore_for_auto_registration)
+      File.read(File.join(gitignore_destination, ".gitignore"))
+    end
+
+    cache_mentions = {
+      "# .node-renderer-bundles" => 1,
+      "/.node-renderer-bundles.stale-*/" => 1,
+      "!.node-renderer-bundles" => 1,
+      ".node-renderer-bundles\n!.node-renderer-bundles" => 2,
+      "!.node-renderer-bundles\n.node-renderer-bundles" => 1,
+      ".node-renderer-bundles\n!.node-renderer-bundles/" => 2,
+      ".node-renderer-bundles\n!*" => 2
+    }
+    %i[pro rsc].each do |mode|
+      context "with --#{mode}" do
+        cache_mentions.each do |entry, expected_cache_entries|
+          it "ignores the real cache and preseed siblings when the existing entry is #{entry.inspect}" do
+            content = update_cache_gitignore("#{entry}\n", { mode => true })
+
+            stdout, _stderr, status = Open3.capture3(
+              "git", "-C", gitignore_destination, "check-ignore", "--no-index",
+              ".node-renderer-bundles/hash/server-bundle.js",
+              ".node-renderer-bundles.preseed.lock",
+              ".node-renderer-bundles.artifact-snapshots/hash/server-bundle.js"
+            )
+            expect(status.exitstatus).to eq(0)
+            expect(stdout.lines.map(&:chomp)).to contain_exactly(
+              ".node-renderer-bundles/hash/server-bundle.js",
+              ".node-renderer-bundles.preseed.lock",
+              ".node-renderer-bundles.artifact-snapshots/hash/server-bundle.js"
+            )
+            expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(expected_cache_entries)
+          end
+        end
+
+        it "adds missing siblings without duplicating an existing active cache entry" do
+          content = update_cache_gitignore(".node-renderer-bundles\n", { mode => true })
+          expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles" }).to eq(1)
+          expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles.preseed.lock" }).to eq(1)
+          expect(content.lines.count { |line| line.chomp == ".node-renderer-bundles.artifact-snapshots" }).to eq(1)
+        end
+
+        it "keeps similarly named source paths available to Git" do
+          update_cache_gitignore("", { mode => true })
+          _stdout, _stderr, status = Open3.capture3(
+            "git", "-C", gitignore_destination, "check-ignore", "--no-index",
+            ".node-renderer-bundles-custom-source/server-bundle.js"
+          )
+          expect(status.exitstatus).to eq(1)
+        end
+      end
+    end
+
+    it "does not add the cache entries for an OSS install" do
+      content = update_cache_gitignore("# .node-renderer-bundles\n", {})
+      expect(content.lines.map(&:chomp)).not_to include(
+        ".node-renderer-bundles", ".node-renderer-bundles.preseed.lock", ".node-renderer-bundles.artifact-snapshots"
+      )
+    end
+  end
+
   describe "OSS home page Pro guidance" do
     it "explains that the optional key only sets attribution status" do
       note = described_class.new.send(:home_page_pro_note_for_oss_app)
