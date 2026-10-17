@@ -138,9 +138,12 @@ To test RSC with Rspack in your project:
    endorsed the `react-server-dom-webpack` runtime with Rspack. React does not publish an
    Rspack binding either: `react-server-dom-rspack`, used by Rspack's own RSC path, is a
    pre-1.0 package built outside React's releases. Because React on Rails Pro uses React's
-   official `react-server-dom-webpack` runtime, React's security fixes reach apps through a
-   normal dependency update. The native `RSCRspackPlugin` is maintained by ShakaCode in
-   `react-on-rails-rsc`.
+   official `react-server-dom-webpack` runtime, React's security fixes ship in that package
+   rather than in a fork. An app is protected only once its lockfile resolves the patched
+   version, including the copy `react-on-rails-rsc` depends on; check with your package
+   manager (for example `pnpm why react-server-dom-webpack`), and update or override that
+   transitive dependency if it still resolves a vulnerable release. The native
+   `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
 
 ## CSS / FOUC Status
 
