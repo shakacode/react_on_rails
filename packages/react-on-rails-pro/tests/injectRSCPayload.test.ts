@@ -69,10 +69,7 @@ type RedactionOutcome = {
 };
 
 const redactionContract = JSON.parse(
-  readFileSync(
-    resolvePath(__dirname, '../../../react_on_rails_pro/spec/fixtures/rsc-error-metadata-contract.json'),
-    'utf8',
-  ),
+  readFileSync(resolvePath(__dirname, 'fixtures/rsc-error-metadata-contract.json'), 'utf8'),
 ) as {
   baseMetadata: Record<string, unknown>;
   environments: Array<{ name: string; railsEnv?: string; outcome: 'full' | 'redacted' }>;

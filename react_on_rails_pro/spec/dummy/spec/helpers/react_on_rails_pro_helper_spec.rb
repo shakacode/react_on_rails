@@ -1349,8 +1349,7 @@ describe ReactOnRailsProHelper do
   end
 
   describe "#internal_rsc_payload_react_component" do
-    # Obviously-synthetic stand-ins for server-internal error text. These deliberately mirror the
-    # shared contract below; the existing examples also exercise the helper transform chain.
+    # Synthetic server-internal error text for the focused helper transform examples.
     let(:synthetic_message) { "User 48213 not authorized for org 77" }
     let(:synthetic_stack) do
       "Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)"
@@ -1394,7 +1393,9 @@ describe ReactOnRailsProHelper do
       expect(input_chunk).to include("html" => "payload")
     end
 
-    contract_path = File.expand_path("../../../fixtures/rsc-error-metadata-contract.json", __dir__)
+    contract_path = File.expand_path(
+      "../../../../../packages/react-on-rails-pro/tests/fixtures/rsc-error-metadata-contract.json", __dir__
+    )
     contract = JSON.parse(File.read(contract_path))
     contract.fetch("environments").each do |environment|
       context "with shared redaction contract: #{environment.fetch('name')}" do
