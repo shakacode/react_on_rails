@@ -169,9 +169,10 @@ for (const workflowFile of [
     event_name: 'pull_request',
     event: { pull_request: { number: 4499 } },
     sha: 'old-head',
+    run_id: 101,
   };
   const oldGroup = evaluateExpression(groupExpression, prEvent);
-  const newGroup = evaluateExpression(groupExpression, { ...prEvent, sha: 'new-head' });
+  const newGroup = evaluateExpression(groupExpression, { ...prEvent, sha: 'new-head', run_id: 102 });
   assert.equal(newGroup, oldGroup, `${workflowFile} synchronize must supersede the previous head`);
   assert.equal(evaluateExpression(cancelExpression, prEvent), true);
   assert.notEqual(
@@ -191,8 +192,8 @@ for (const workflowFile of [
     assert.equal(evaluateExpression(cancelExpression, event), false, `${workflowFile} ${eventName} ${ref}`);
     assert.notEqual(
       evaluateExpression(groupExpression, event),
-      evaluateExpression(groupExpression, { ...event, sha: 'new-head' }),
-      `${workflowFile} must retain different non-PR heads`,
+      evaluateExpression(groupExpression, { ...event, run_id: 102 }),
+      `${workflowFile} must keep same-head non-PR runs independent`,
     );
     assert.notEqual(evaluateExpression(groupExpression, event), oldGroup);
   }
