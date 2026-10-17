@@ -13,6 +13,11 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { buildLengthPrefixedResult } from '../../react-on-rails/src/serverRenderUtils.ts';
+import {
+  formatPropRequestChunk,
+  formatRenderCompleteChunk,
+} from '../../react-on-rails-pro-node-renderer/src/worker/streamingUtils.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 
 const encoder = new TextEncoder();
@@ -50,6 +55,55 @@ const collectByteRecords = (...chunks: Uint8Array[]) => {
 };
 
 describe('LengthPrefixedStreamParser', () => {
+  it.each([null, [], [1], 42, true, 'metadata'])(
+    'rejects non-object metadata %j before yielding',
+    (metadata) => {
+      const parser = new LengthPrefixedStreamParser();
+      const onChunk = jest.fn();
+      const frame = encoder.encode(`${JSON.stringify(metadata)}\t0\n`);
+
+      for (let split = 0; split < frame.length; split += 1) {
+        const splitParser = new LengthPrefixedStreamParser();
+        splitParser.feed(frame.subarray(0, split), onChunk);
+        expect(() => splitParser.feed(frame.subarray(split), onChunk)).toThrow(
+          'metadata JSON must be an object',
+        );
+      }
+      expect(() => parser.feed(frame, onChunk)).toThrow('metadata JSON must be an object');
+      expect(onChunk).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([{}, { nested: [null, 42], messageType: 'trace' }])('accepts object metadata %j', (metadata) => {
+    expect(collectRecords(toRecord('hello', metadata))).toEqual([{ content: 'hello', metadata }]);
+  });
+
+  it.each(['', '\n', '\r\n', '\n\r\n'])(
+    'parses actual producer frames at every byte split with separator %j',
+    (separator) => {
+      const frames = [
+        buildLengthPrefixedResult('café 😄', '', {}),
+        buildLengthPrefixedResult(null, '', {}),
+        buildLengthPrefixedResult({ componentHtml: '你好' }, '', {}),
+        decoder.decode(formatPropRequestChunk('users')),
+        decoder.decode(formatRenderCompleteChunk()),
+      ];
+      const bytes = encoder.encode(frames.join(separator));
+      const expected = [
+        { content: 'café 😄', metadata: { consoleReplayScript: '' } },
+        { content: 'null', metadata: { consoleReplayScript: '' } },
+        { content: '{"componentHtml":"你好"}', metadata: { consoleReplayScript: '' } },
+        { content: '', metadata: { messageType: 'propRequest', propName: 'users' } },
+        { content: '', metadata: { messageType: 'renderComplete' } },
+      ];
+
+      for (let split = 0; split <= bytes.length; split += 1) {
+        expect(collectByteRecords(bytes.subarray(0, split), bytes.subarray(split))).toEqual(expected);
+      }
+      expect(collectByteRecords(...Array.from(bytes, (byte) => Uint8Array.of(byte)))).toEqual(expected);
+    },
+  );
+
   it('tolerates leading blank lines before the first record', () => {
     const records = collectRecords(`\n${toRecord('hello', { index: 0 })}`);
 
@@ -143,6 +197,20 @@ describe('LengthPrefixedStreamParser', () => {
     expect(() => {
       parser.feed(encoder.encode(`not-json-or-length\n${toRecord('content')}`), () => {});
     }).toThrow('Malformed length-prefixed header: missing tab separator');
+  });
+
+  it.each(['{', '{}\t5\n', '{}\t5\nhi'])('still warns on a truncated trailing record %j', (tail) => {
+    const parser = new LengthPrefixedStreamParser();
+    const onChunk = jest.fn();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      parser.feed(encoder.encode(toRecord('hello') + tail), onChunk);
+      parser.flush();
+      expect(onChunk).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Incomplete length-prefixed stream'));
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('does not warn when flushing a trailing CR-only separator fragment', () => {
