@@ -91,6 +91,241 @@ describe('fetchRSC HTTP responses', () => {
     jest.resetModules();
   });
 
+  it.each(['text', 7, null, false, undefined])(
+    'leaves untracked scalar roots (%j) untracked',
+    async (root) => {
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+      expect(getRSCStreamState(Promise.resolve(root))).toBeUndefined();
+    },
+  );
+
+  it.each(['text', 7, null, false, undefined])(
+    'tracks completion for a scalar HTTP root (%j)',
+    async (root) => {
+      const { fetchRSC } = await loadClientModule(
+        jest.fn((stream: ReadableStream<Uint8Array>) => {
+          void readStreamText(stream);
+          return Promise.resolve(root);
+        }),
+      );
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+      fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('root')));
+      const request = fetchRSC({
+        componentName: 'Card',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '/rsc',
+      });
+      const payload = await request;
+      expect(payload).toBe(root);
+      await expect(getRSCStreamState(request)?.completion).resolves.toBe(true);
+    },
+  );
+
+  it('decodes a healthy record split across response reads', async () => {
+    const record = toLengthPrefixedRecord('fragmented payload');
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const character of record) controller.enqueue(encoder.encode(character));
+        controller.close();
+      },
+    });
+    const { fetchRSC } = await loadClientModule(jest.fn(readStreamText));
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+    const request = fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    await expect(request).resolves.toBe('fragmented payload');
+    await expect(getRSCStreamState(request)?.completion).resolves.toBe(true);
+  });
+
+  it('records decoder cancellation as a failed completion', async () => {
+    let decoderReader!: ReadableStreamDefaultReader<Uint8Array>;
+    const { fetchRSC } = await loadClientModule(
+      jest.fn((stream: ReadableStream<Uint8Array>) => {
+        decoderReader = stream.getReader();
+        return Promise.resolve('root');
+      }),
+    );
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('root')));
+    const request = fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    await request;
+    await decoderReader.cancel();
+    await expect(getRSCStreamState(request)?.completion).resolves.toBe(false);
+    expect(getRSCStreamState(request)?.error).toBeInstanceOf(Error);
+  });
+
+  it('does not certify completion before the decoder drains the final records', async () => {
+    let bodyController!: ReadableStreamDefaultController<Uint8Array>;
+    let decoderReader!: ReadableStreamDefaultReader<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        bodyController = controller;
+      },
+    });
+    const { fetchRSC } = await loadClientModule(
+      jest.fn(async (stream: ReadableStream<Uint8Array>) => {
+        decoderReader = stream.getReader();
+        await decoderReader.read();
+        return 'early root';
+      }),
+    );
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+    bodyController.enqueue(encoder.encode(toLengthPrefixedRecord('root')));
+    const request = fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    await expect(request).resolves.toBe('early root');
+    const completion = getRSCStreamState(request)?.completion;
+    let completed = false;
+    void completion?.then(() => {
+      completed = true;
+    });
+    bodyController.enqueue(encoder.encode(toLengthPrefixedRecord('final record', { hasErrors: true })));
+    bodyController.close();
+    // Drain parser/transport microtasks without letting the decoder consume its tail.
+    for (let i = 0; i < 10; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.resolve();
+    }
+    expect(completed).toBe(false);
+    expect((await decoderReader.read()).done).toBe(false);
+    expect(completed).toBe(false);
+    expect((await decoderReader.read()).done).toBe(true);
+    await expect(completion).resolves.toBe(false);
+  });
+
+  it.each(['{"hasErrors":false}\t4\nx', '{"hasErrors":false}\t4'])(
+    'does not certify clean EOF with an incomplete record (%j)',
+    async (tail) => {
+      let controller!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start: (value) => {
+          controller = value;
+        },
+      });
+      const root = React.createElement('div', null, 'early root');
+      const { fetchRSC } = await loadClientModule(
+        jest.fn((stream: ReadableStream<Uint8Array>) => {
+          void readStreamText(stream).catch(() => undefined);
+          return Promise.resolve(root);
+        }),
+      );
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+      fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+      controller.enqueue(encoder.encode(toLengthPrefixedRecord('root')));
+      const request = fetchRSC({
+        componentName: 'Card',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '/rsc',
+      });
+      await request;
+      controller.enqueue(encoder.encode(tail));
+      controller.close();
+      await expect(getRSCStreamState(request)?.completion).resolves.toBe(false);
+      expect(Boolean(getRSCStreamState(request)?.error)).toBe(true);
+    },
+  );
+
+  it.each([
+    [{ hasErrors: true }, false, false],
+    [{ hasErrors: false }, true, false],
+    [{ renderingError: { message: 'Boundary failed' } }, false, false],
+    [{ hasErrors: false, renderingError: { stack: 'Error: boundary failure' } }, false, false],
+    [{ renderingError: { message: '  ', stack: '\n' } }, true, false],
+    [{ hasErrors: false }, false, true],
+  ])(
+    'does not certify a diagnostic-only failed Flight stream (metadata=%j)',
+    async (metadata, successful, transportFailure) => {
+      let controller!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start(streamController) {
+          controller = streamController;
+        },
+      });
+      const root = React.createElement('div', null, 'decoded root');
+      const { fetchRSC } = await loadClientModule(
+        jest.fn((stream: ReadableStream<Uint8Array>) => {
+          void readStreamText(stream).catch(() => undefined);
+          return Promise.resolve(root);
+        }),
+      );
+      const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+      fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+      controller.enqueue(encoder.encode(toLengthPrefixedRecord('root', { hasErrors: false })));
+      const request = fetchRSC({
+        componentName: 'Card',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '/rsc',
+      });
+      await request;
+      const completion = getRSCStreamState(request)?.completion;
+      expect(completion).toBeDefined();
+      let completed = false;
+      void completion!.then(() => {
+        completed = true;
+      });
+      await Promise.resolve();
+      expect(completed).toBe(false);
+      if (transportFailure) {
+        controller.error(new Error('late transport failure'));
+      } else {
+        controller.enqueue(encoder.encode(toLengthPrefixedRecord('boundary', metadata)));
+        controller.close();
+      }
+      await expect(completion).resolves.toBe(successful);
+      expect(Boolean(getRSCStreamState(request)?.error)).toBe(!successful);
+    },
+  );
+
+  it('does not certify a failed stream when error logging throws', async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    let decodedStream!: Promise<string>;
+    const body = new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+      },
+    });
+    const { fetchRSC } = await loadClientModule(
+      jest.fn((stream: ReadableStream<Uint8Array>) => {
+        decodedStream = readStreamText(stream);
+        void decodedStream.catch(() => undefined);
+        return Promise.resolve(React.createElement('div', null, 'early root'));
+      }),
+    );
+    const { getRSCStreamState } = await import('../src/RSCStreamCompletion.ts');
+    fetchMock.mockResolvedValue({ ok: true, status: 200, body } as Response);
+    const request = fetchRSC({
+      componentName: 'Card',
+      componentProps: {},
+      rscPayloadGenerationUrlPath: '/rsc',
+    });
+    await request;
+    const state = getRSCStreamState(request)!;
+    expect(state.error).toBeUndefined();
+    const logging = jest.spyOn(console, 'error').mockImplementation(() => {
+      throw new Error('logging failed');
+    });
+    try {
+      controller.error(new Error('late transport failure'));
+      await expect(state.completion).resolves.toBe(false);
+      expect(state.error).toBeInstanceOf(Error);
+      await expect(decodedStream).rejects.toThrow('late transport failure');
+    } finally {
+      logging.mockRestore();
+    }
+  });
+
   it('rejects non-ok HTTP responses before parsing the RSC stream', async () => {
     const { createFromReadableStream, fetchRSC } = await loadClientModule();
     const componentProps = { id: 1 };
@@ -402,7 +637,7 @@ describe('fetchRSC HTTP responses', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('warns when a fetched length-prefixed response ends mid-record', async () => {
+  it('rejects and warns when a fetched length-prefixed response ends mid-record', async () => {
     const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
     const { fetchRSC } = await loadClientModule(createFromReadableStream);
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -416,7 +651,7 @@ describe('fetchRSC HTTP responses', () => {
           componentProps: {},
           rscPayloadGenerationUrlPath: '/rsc_payload',
         }),
-      ).resolves.toBe('');
+      ).rejects.toThrow('Incomplete RSC stream');
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
       );
