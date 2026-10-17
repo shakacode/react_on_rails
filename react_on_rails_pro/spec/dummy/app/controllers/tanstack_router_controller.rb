@@ -14,6 +14,9 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 class TanstackRouterController < ApplicationController
+  include ReactOnRailsPro::AsyncRendering
+  enable_async_react_rendering if: -> { params[:cached] == "async" }
+
   before_action :data
 
   rescue_from ReactOnRails::PrerenderError do |err|

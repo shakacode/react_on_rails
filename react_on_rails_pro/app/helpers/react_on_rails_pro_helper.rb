@@ -26,6 +26,9 @@ require "nokogiri"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
+  CACHED_HTTP_RESPONSE_MARKER = "rorp-http-response-v1"
+  private_constant :CACHED_HTTP_RESPONSE_MARKER
+
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
   HTML_SPACE_CHARACTERS = [" ", "\t", "\n", "\f", "\r"].freeze
   HTML_QUOTE_CHARACTERS = ['"', "'"].freeze
@@ -530,15 +533,16 @@ module ReactOnRailsProHelper
     result, cache_hit, cache_write_skipped = fetch_cache_entry(
       cache_key,
       cache_write_options,
-      cache_write_if:
+      cache_write_if: -> { server_rendered_component_cache_write_allowed?(cache_write_if) }
     ) do
       normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
-      yield
+      with_cached_http_response(yield)
     end
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
     result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
+    result = unwrap_cached_http_response(result)
     load_pack_for_cached_react_component(component_name, options) if cache_hit
     result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
 
@@ -563,6 +567,28 @@ module ReactOnRailsProHelper
     end
 
     [result, cache_hit, cache_write_skipped]
+  end
+
+  def server_rendered_component_cache_write_allowed?(condition)
+    http_response = server_rendered_http_response
+    return false if http_response && http_response["status"] >= 500
+
+    !condition || condition.call
+  end
+
+  def with_cached_http_response(content)
+    http_response = server_rendered_http_response
+    return content unless http_response
+    return content if http_response["status"] == 200 && http_response["location"].nil?
+
+    [CACHED_HTTP_RESPONSE_MARKER, content, http_response]
+  end
+
+  def unwrap_cached_http_response(value)
+    return value unless value.is_a?(Array) && value.length.between?(3, 4) && value.first == CACHED_HTTP_RESPONSE_MARKER
+
+    apply_server_rendered_http_response!("httpResponse" => value[2])
+    value[1]
   end
 
   def normalize_cached_pro_attribution(result, cached_csp_nonce = nil)
@@ -1740,7 +1766,7 @@ module ReactOnRailsProHelper
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
       load_pack_for_cached_react_component(component_name, cache_options)
       cached_result, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_result)
-      normalized_result = normalize_cached_pro_attribution(cached_result, cached_csp_nonce)
+      normalized_result = normalize_cached_pro_attribution(unwrap_cached_http_response(cached_result), cached_csp_nonce)
       return ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
     end
 
@@ -1777,9 +1803,11 @@ module ReactOnRailsProHelper
     task = @react_on_rails_async_barrier.async do
       ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
         result = react_component(component_name, options)
-        unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+        cached_result = with_cached_http_response(result)
+        cache_write_allowed = server_rendered_component_cache_write_allowed?(nil)
+        if cache_write_allowed && !ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
           cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-          Rails.cache.write(cache_key, append_cached_csp_nonce_marker(result), cache_options)
+          Rails.cache.write(cache_key, append_cached_csp_nonce_marker(cached_result), cache_options)
           ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
         end
         result

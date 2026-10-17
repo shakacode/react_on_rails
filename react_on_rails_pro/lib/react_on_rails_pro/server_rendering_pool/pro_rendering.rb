@@ -75,14 +75,11 @@ module ReactOnRailsPro
           prerender_cache_key = cache_key(js_code, render_options)
           prerender_cache_hit = true
 
-          result = if render_options.streaming?
-                     render_streaming_with_cache(prerender_cache_key, js_code, render_options)
-                   else
-                     Rails.cache.fetch(prerender_cache_key) do
-                       prerender_cache_hit = false
-                       render_on_pool(js_code, render_options)
-                     end
-                   end
+          if render_options.streaming?
+            result = render_streaming_with_cache(prerender_cache_key, js_code, render_options)
+          else
+            result, prerender_cache_hit = render_non_streaming_with_cache(prerender_cache_key, js_code, render_options)
+          end
 
           # Pass back the cache key in the results only if the result is a Hash
           if result.is_a?(Hash)
@@ -92,6 +89,27 @@ module ReactOnRailsPro
           end
 
           result
+        end
+
+        def render_non_streaming_with_cache(prerender_cache_key, js_code, render_options)
+          cache_hit = true
+          skip_cache_write = Object.new
+          result = catch(skip_cache_write) do
+            Rails.cache.fetch(prerender_cache_key) do
+              cache_hit = false
+              rendered_result = render_on_pool(js_code, render_options)
+              throw(skip_cache_write, rendered_result) if server_error_response?(rendered_result)
+
+              rendered_result
+            end
+          end
+          [result, cache_hit]
+        end
+
+        def server_error_response?(result)
+          http_response = result["httpResponse"] if result.is_a?(Hash)
+          status = http_response["status"] if http_response.is_a?(Hash)
+          status.is_a?(Integer) && status >= 500
         end
 
         def render_streaming_with_cache(prerender_cache_key, js_code, render_options)

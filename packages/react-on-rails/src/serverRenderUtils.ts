@@ -2,6 +2,7 @@ import type {
   RegisteredComponent,
   RegisteredComponentValue,
   RenderingError,
+  ServerRenderResult,
   FinalHtmlResult,
 } from './types/index.ts';
 import { remapSourceMappedStack } from './errorUtils.ts';
@@ -18,6 +19,7 @@ type RenderMetadataSource = {
   hasErrors?: boolean;
   error?: RenderingError;
   isShellReady?: boolean;
+  httpResponse?: ServerRenderResult['httpResponse'];
 };
 
 export function buildRenderMetadata(
@@ -27,6 +29,7 @@ export function buildRenderMetadata(
   return {
     consoleReplayScript,
     clientProps: renderState.clientProps,
+    httpResponse: renderState.httpResponse,
     hasErrors: renderState.hasErrors,
     renderingError: renderState.error && {
       message: renderState.error.message,

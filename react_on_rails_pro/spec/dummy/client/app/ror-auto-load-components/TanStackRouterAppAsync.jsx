@@ -25,6 +25,8 @@ import {
   createRouter,
   createBrowserHistory,
   createMemoryHistory,
+  redirect,
+  notFound,
 } from '@tanstack/react-router';
 import { RouterClient } from '@tanstack/react-router/ssr/client';
 import {
@@ -65,10 +67,41 @@ const secondRoute = createRoute({
   path: '/tanstack_router_async/second_page',
   component: SecondPage,
 });
-const routeTree = rootRoute.addChildren([homeRoute, secondRoute]);
+const redirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_router_async/redirect',
+  loader: () => {
+    throw redirect({
+      to: '/tanstack_router_async/second_page',
+      search: { ids: '1,2' },
+      hash: 'details',
+      statusCode: 308,
+    });
+  },
+});
+const notFoundRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_router_async/not_found',
+  loader: () => {
+    throw notFound();
+  },
+});
+const errorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_router_async/error',
+  loader: () => {
+    throw new Error('Loader failed');
+  },
+  errorComponent: () => <h2 id="tanstack-async-error">Loader failed</h2>,
+});
+const routeTree = rootRoute.addChildren([homeRoute, secondRoute, redirectRoute, notFoundRoute, errorRoute]);
 
 const options = {
-  createRouter: () => createRouter({ routeTree }),
+  createRouter: () =>
+    createRouter({
+      routeTree,
+      defaultNotFoundComponent: () => <h2 id="tanstack-async-not-found">Page not found</h2>,
+    }),
 };
 
 const deps = {
@@ -94,8 +127,9 @@ const TanStackRouterAppAsync = (props, railsContext) => {
       railsContext,
       RouterProvider,
       createMemoryHistory,
-    ).then(({ appElement, dehydratedState }) => ({
+    ).then(({ appElement, dehydratedState, httpResponse }) => ({
       renderedHtml: appElement,
+      httpResponse,
       clientProps: {
         __tanstackRouterDehydratedState: dehydratedState,
       },

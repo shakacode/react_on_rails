@@ -48,7 +48,7 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
       : result.renderedHtml;
   }
 
-  return { result: htmlResult ?? null, hasErrors, clientProps };
+  return { result: htmlResult ?? null, hasErrors, clientProps, httpResponse: result.httpResponse };
 }
 
 function processReactElement(result: ReactElement): string {

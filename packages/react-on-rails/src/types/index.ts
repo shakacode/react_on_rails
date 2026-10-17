@@ -154,6 +154,8 @@ interface ServerRenderResult {
   renderedHtml?: string | ServerRenderHashRenderedHtml | ReactElement;
   clientProps?: Record<string, unknown>;
   redirectLocation?: { pathname: string; search: string };
+  /** HTTP result selected during non-streaming SSR, applied by the Rails view helper. */
+  httpResponse?: { status: number; location?: string };
   routeError?: Error;
   error?: Error;
 }
@@ -761,6 +763,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;
 
 export type RenderState = {
+  httpResponse?: ServerRenderResult['httpResponse'];
   result: null | RenderStateHtml;
   clientProps?: Record<string, unknown>;
   hasErrors: boolean;

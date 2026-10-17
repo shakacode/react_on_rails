@@ -24,7 +24,28 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **Reserved `httpResponse` render-result key**: Non-streaming SSR now validates this top-level key as HTTP response metadata. **Action required for upgraders:** Rename any unrelated metadata currently stored under `httpResponse`.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
+
+- **[Pro]** **TanStack Router compatibility**: The integration now declares support for `@tanstack/react-router >=1.139.0 <1.170.19`. Version 1.170.19 removed the SSR response state and hydration internals this integration uses. **Action required for upgraders:** Keep TanStack Router below 1.170.19 until the integration supports its replacement APIs.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
+
+#### Added
+
+- **Rails HTTP responses from render functions**: Non-streaming render functions can return `httpResponse` to set status and `Location`. Applying a non-default response after headers are committed raises `ReactOnRails::Error`.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
+
 #### Fixed
+
+- **[Pro]** **TanStack Router HTTP outcomes**: Async non-streaming SSR now preserves redirect status and exact `Location`, including canonical URL redirects, and returns real 404 and 500 responses. Unknown-route markup retains its not-found state during hydration. For these non-streaming responses, ordinary and async component caches replay HTTP metadata; component and prerender caches skip 5xx writes. Streaming SSR and RSC are outside this contract.
+  **Action required for upgraders:** Include the route and search in cached router component keys. Custom render functions calling `serverRenderTanStackAppAsync` must forward `httpResponse`. Await these HTTP outcomes before response headers are committed.
+  [PR 5139](https://github.com/shakacode/react_on_rails/pull/5139) by
+  [Justin Gordon](https://github.com/justin808).
 
 - **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
   `serverWebpackConfig.js` removed client-only plugins by webpack class names only, so Rspack apps kept

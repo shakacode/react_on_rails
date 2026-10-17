@@ -272,6 +272,33 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(cache_store.value_for(result[:RORP_CACHE_KEY])).to eq({ html: "rendered" })
       end
 
+      [500, 503].each do |status|
+        it "retries HTTP #{status} and caches the recovered success" do
+          failure = { "html" => "failed", "httpResponse" => { "status" => status } }
+          success = { "html" => "recovered", "httpResponse" => { "status" => 200 } }
+          allow(pool).to receive(:exec_server_render_js).and_return(failure, success)
+          results = Array.new(3) { described_class.exec_server_render_js(js_code, build_render_options) }
+
+          expect(results.map { |result| result["httpResponse"]["status"] }).to eq([status, 200, 200])
+          expect(results.map { |result| result[:RORP_CACHE_HIT] }).to eq([false, false, true])
+          expect(pool).to have_received(:exec_server_render_js).twice
+        end
+      end
+
+      [200, 307, 308, 404].each do |status|
+        it "keeps HTTP #{status} cacheable with its metadata" do
+          response = { "status" => status }
+          response["location"] = "/target?ids=1%2C2#details" if status.between?(300, 399)
+          allow(pool).to receive(:exec_server_render_js).and_return("html" => "rendered", "httpResponse" => response)
+          2.times { described_class.exec_server_render_js(js_code, build_render_options) }
+          result = described_class.exec_server_render_js(js_code, build_render_options)
+
+          expect(result["httpResponse"]).to eq(response)
+          expect(result[:RORP_CACHE_HIT]).to be(true)
+          expect(pool).to have_received(:exec_server_render_js).once
+        end
+      end
+
       it "does not inject cache metadata into non-hash render results" do
         allow(pool).to receive(:exec_server_render_js).and_return("rendered")
 
