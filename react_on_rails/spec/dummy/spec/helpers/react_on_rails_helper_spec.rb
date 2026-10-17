@@ -1232,6 +1232,29 @@ describe ReactOnRailsHelper do
       expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
     end
 
+    it "keeps all built-in RailsContext keys aligned with the shared TypeScript contract" do
+      contract_path = File.expand_path(
+        "../../../../../packages/react-on-rails/tests/fixtures/rails-context-keys.json", __dir__
+      )
+      contract = JSON.parse(File.read(contract_path))
+      allow(ReactOnRails::Utils).to receive(:rsc_support_enabled?).and_return(true)
+      pro_config = Struct.new(:rsc_payload_generation_url_path).new("/contract-rsc-payload")
+      ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
+      request_details = request
+
+      [true, false].each do |server_side|
+        context_helper = PlainReactOnRailsHelper.new
+        context_helper.define_singleton_method(:request) { request_details }
+        context_helper.instance_variable_set(:@react_on_rails_rsc_stream_observability, true)
+        allow(context_helper).to receive(:csp_nonce).and_return("contract-nonce")
+
+        context = context_helper.send(:rails_context, server_side:)
+
+        expect(context.keys.map(&:to_s)).to match_array(contract.fetch("rubyKeys"))
+        expect(context[:serverSide]).to be(server_side)
+      end
+    end
+
     it "adds cspNonce when a nonce is available" do
       helper = PlainReactOnRailsHelper.new
       allow(helper).to receive(:csp_nonce).and_return("nonce123")
