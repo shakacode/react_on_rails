@@ -1602,11 +1602,8 @@ describe('injectRSCPayload', () => {
 
   it('keeps opt-in observability scripts out of ambiguous raw-text closing tag prefixes', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
-    const mockHTML = createMockHTMLStream({
-      5: 'before<style>body{color:red}</s',
-      25: 'tyle>after',
-    });
+    const mockRSC = new PassThrough();
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1615,11 +1612,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write('before<style>body{color:red}</s');
+
+    // Keep the raw-text tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('body{color:red}');
 
+    mockHTML.end('tyle>after');
     const resultStr = await allData;
     const styleIndex = resultStr.indexOf('<style>body{color:red}</style>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
