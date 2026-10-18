@@ -3,6 +3,7 @@ const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 
 function read(path) {
   return fs.readFileSync(path, 'utf8');
@@ -137,6 +138,85 @@ const hostedWorkflowFiles = [
   'pro-integration-tests.yml',
   'pro-test-package-and-gem.yml',
 ];
+
+// Replay the actual workflow expressions. These expressions use the shared
+// JavaScript-compatible subset of Actions syntax; actionlint checks Actions types.
+function evaluateExpression(expression, github) {
+  return vm.runInNewContext(expression.replace(/^\s*\$\{\{|\}\}\s*$/g, ''), {
+    github,
+    format: (template, ...values) => template.replace(/\{(\d+)\}/g, (_, index) => values[index]),
+  });
+}
+
+const suiteConcurrencyGroups = new Set();
+for (const workflowFile of [
+  'lint-js-and-ruby.yml',
+  'package-js-tests.yml',
+  'precompile-check.yml',
+  'pro-integration-tests.yml',
+  'pro-test-package-and-gem.yml',
+]) {
+  const workflow = read(`.github/workflows/${workflowFile}`);
+  const name = workflow.match(/^name: (.+)$/m)[1];
+  const concurrency = workflow.match(
+    /^concurrency:\n {2}group: >-\n([\s\S]*?)\n {2}cancel-in-progress: (.+)$/m,
+  );
+  assert.ok(concurrency, `${workflowFile} must cancel superseded PR runs`);
+  const groupExpression = concurrency[1].trim();
+  const cancelExpression = concurrency[2];
+  const prEvent = {
+    workflow: name,
+    event_name: 'pull_request',
+    event: { pull_request: { number: 4499 } },
+    sha: 'old-head',
+    run_id: 101,
+  };
+  const oldGroup = evaluateExpression(groupExpression, prEvent);
+  const newGroup = evaluateExpression(groupExpression, { ...prEvent, sha: 'new-head', run_id: 102 });
+  assert.equal(newGroup, oldGroup, `${workflowFile} synchronize must supersede the previous head`);
+  assert.equal(evaluateExpression(cancelExpression, prEvent), true);
+  assert.notEqual(
+    evaluateExpression(groupExpression, { ...prEvent, event: { pull_request: { number: 4500 } } }),
+    oldGroup,
+    `${workflowFile} must isolate different PRs`,
+  );
+  suiteConcurrencyGroups.add(oldGroup);
+  for (const [eventName, ref] of [
+    ['push', 'refs/heads/main'],
+    ['push', 'refs/heads/release/17.2.0'],
+    ['merge_group', 'refs/heads/gh-readonly-queue/main/test'],
+    ['workflow_dispatch', 'refs/heads/main'],
+    ['workflow_dispatch', 'refs/heads/feature'],
+  ]) {
+    const event = { ...prEvent, event_name: eventName, event: { pull_request: {} }, ref };
+    assert.equal(evaluateExpression(cancelExpression, event), false, `${workflowFile} ${eventName} ${ref}`);
+    assert.notEqual(
+      evaluateExpression(groupExpression, event),
+      evaluateExpression(groupExpression, { ...event, run_id: 102 }),
+      `${workflowFile} must keep same-head non-PR runs independent`,
+    );
+    assert.notEqual(evaluateExpression(groupExpression, event), oldGroup);
+  }
+}
+assert.equal(suiteConcurrencyGroups.size, 5, 'suite workflows must not cancel each other');
+
+// Hosted benchmarks are manual-only now: neither unrelated labels nor benchmark
+// labels should reintroduce the old label-presence duplicate-run window.
+const benchmarkPrTypes = benchmarkWorkflow.match(/ {2}pull_request:\n {4}types: \[([^\]]+)\]/)[1].split(', ');
+assert.ok(!benchmarkPrTypes.includes('labeled'), 'benchmark labels must not trigger automatic runs');
+const benchmarkMatrixJob = extractJob(benchmarkWorkflow, 'prepare-benchmark-matrix');
+const benchmarkMatrixCondition = benchmarkMatrixJob.match(/^ {4}if: (.+)$/m)[1];
+for (const label of ['bug', 'benchmark', 'benchmark-core', 'benchmark-pro', 'benchmark-pro-node-renderer']) {
+  assert.equal(
+    evaluateExpression(benchmarkMatrixCondition, {
+      event_name: 'pull_request',
+      event: { action: 'labeled', label: { name: label }, pull_request: { labels: [{ name: 'benchmark' }] } },
+    }),
+    false,
+    `adding ${label} to an already benchmark-labeled PR must not start benchmark suites`,
+  );
+}
+assert.equal(evaluateExpression(benchmarkMatrixCondition, { event_name: 'workflow_dispatch' }), true);
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
