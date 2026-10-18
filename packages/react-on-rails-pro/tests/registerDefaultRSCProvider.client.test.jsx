@@ -22,6 +22,9 @@ import * as React from 'react';
 describe('registerDefaultRSCProvider/client hydration parity', () => {
   beforeEach(() => {
     jest.resetModules();
+    jest.dontMock('../src/RSCProvider.tsx');
+    jest.dontMock('../src/getReactServerComponent.client.ts');
+    jest.dontMock('react-on-rails-rsc/client.browser');
   });
 
   afterEach(() => {
@@ -65,5 +68,45 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
 
     expect(wrappedByDefaultRSCProvider).toBe(true);
     expect(reactElement.props.children).toBe(appElement);
+  });
+  it('preserves stream health through the registered lazy HTTP loader without wrapping scalar roots', async () => {
+    const { getRSCStreamState, trackRSCStreamCompletion } = require('../src/RSCStreamCompletion.ts');
+    let finish;
+    const state = {
+      completion: new Promise((resolve) => {
+        finish = resolve;
+      }),
+    };
+    const inner = trackRSCStreamCompletion(Promise.resolve('same scalar'), state);
+    jest.doMock('../src/RSCProvider.tsx', () => ({
+      createRSCProvider: jest.fn(
+        () =>
+          ({ children }) =>
+            children,
+      ),
+    }));
+    jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
+    jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+      __esModule: true,
+      default: jest.fn(() => jest.fn(() => inner)),
+    }));
+    const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
+    require('../src/registerDefaultRSCProvider.client.tsx');
+    maybeWrapWithDefaultRSCProviderWithStatus(
+      <section />,
+      { rscPayloadGenerationUrlPath: '/rsc_payload' },
+      'default-provider-test',
+    );
+    const { createRSCProvider } = require('../src/RSCProvider.tsx');
+    const { getServerComponent } = createRSCProvider.mock.calls[0][0];
+    const request = getServerComponent({ componentName: 'Card', enforceRefetch: true });
+
+    await expect(request).resolves.toBe('same scalar');
+    expect(request).not.toBe(inner);
+    expect(getRSCStreamState(request)).toBe(state);
+    state.error = new Error('late descendant failure');
+    finish(false);
+    await expect(getRSCStreamState(request).completion).resolves.toBe(false);
+    expect(getRSCStreamState(request).error).toBe(state.error);
   });
 });
