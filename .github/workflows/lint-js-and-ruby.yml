@@ -1,4 +1,5 @@
 name: Lint JS and Ruby
+# Disposable scheduler verification for #5208: head A.
 
 permissions:
   contents: read
