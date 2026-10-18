@@ -1560,7 +1560,11 @@ class ReleaseForwardPort
 
     exact_sentence =
       "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
-    git("show", "-s", "--format=%B", authoritative_sha).lines.any? { |line| line.strip == exact_sentence }
+    body = git("show", "-s", "--format=%B", authoritative_sha)
+    return true if body.lines.any? { |line| line.strip == exact_sentence }
+
+    # Squash merges re-wrap the PR body, so also compare whole paragraphs with whitespace collapsed.
+    body.split(/\n\s*\n/).any? { |paragraph| paragraph.split.join(" ") == exact_sentence }
   end
 
   def validate_acknowledged_changelog_source!(source_changelog_sha)

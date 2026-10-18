@@ -798,6 +798,82 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#report_post_release_next_steps" do
+    let(:changelog_sha) { "73da43d49472ac91bf1f7a2e0baf2d97c9608591" }
+
+    it "tells a stable release-branch publish to record the final changelog on main and close out" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.2.0", branch: "release/17.2.0", changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include(
+        "POST-RELEASE NEXT STEPS",
+        "main does not have the 17.2.0 changelog yet",
+        "Record the final React on Rails 17.2.0 changelog",
+        "The final changelog records source CHANGELOG.md commit `#{changelog_sha}`.",
+        "script/release-forward-port --source origin/release/17.2.0 --target main --check",
+        "script/release-forward-port --source origin/release/17.2.0 --target main --changelog --check",
+        "script/release-finish close-out 17.2.0 --dry-run",
+        "release-train-runbook.md"
+      )
+    end
+
+    it "names the source changelog lookup when the commit SHA is unknown" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.2.0", branch: "release/17.2.0", changelog_source_sha: nil)
+      end
+
+      expect(output).to include(
+        "The final changelog records source CHANGELOG.md commit `<SHA>`.",
+        "Replace <SHA> with the output of: git log -1 --format=%H origin/release/17.2.0 -- CHANGELOG.md"
+      )
+      expect(output).not_to include("$(")
+    end
+
+    it "keeps an RC's changelog on the release branch and checks fix forward-ports" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.1", branch: "release/17.3.0",
+                                       changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include(
+        "script/release-forward-port --source origin/release/17.3.0 --target main --check",
+        "stays on release/17.3.0 until the final release"
+      )
+      expect(output).not_to include("Record the final React on Rails")
+    end
+
+    it "says nothing needs forward-porting for a release published from main" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0", branch: "main", changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include("Published from main, so nothing needs forward-porting",
+                                "Confirm the GitHub release for v17.3.0")
+      expect(output).not_to include("release-forward-port")
+    end
+
+    it "does not ask to confirm a GitHub release that was skipped for a missing changelog section" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.0", branch: "main", changelog_source_sha: changelog_sha,
+                                       changelog_section: false)
+      end
+
+      expect(output).to include("No GitHub release was created: CHANGELOG.md has no 17.3.0.rc.0 section")
+      expect(output).not_to include("Confirm the GitHub release")
+    end
+
+    it "tells a prerelease from a feature branch to bring its fixes to main" do
+      output = capture_stdout do
+        report_post_release_next_steps(version: "17.3.0.rc.0", branch: "jg/rc-spike",
+                                       changelog_source_sha: changelog_sha)
+      end
+
+      expect(output).to include("Published from jg/rc-spike", "must reach main through its own PR")
+      expect(output).not_to include("nothing needs forward-porting")
+    end
+  end
+
   describe "fenced compound release guidance" do
     let(:release_runbook) { "internal/contributor-info/release-train-runbook.md" }
 
@@ -7773,6 +7849,25 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "leaves registry verification to the caller when verify is false" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "package.json"),
+          JSON.generate("name" => "react-on-rails", "version" => "17.0.0")
+        )
+        allow(self).to receive(:npm_package_already_published?).and_return(false)
+        allow(self).to receive(:release_write_fence!)
+        allow(Open3).to receive(:capture2e)
+          .with("pnpm", "publish", chdir: dir)
+          .and_return(["published\n", instance_double(Process::Status, success?: true)])
+        expect(self).not_to receive(:verify_npm_package_published!)
+
+        publish_npm_with_retry(dir, "react-on-rails@17.0.0", max_retries: 1, verify: false)
+
+        expect(Open3).to have_received(:capture2e).once
+      end
+    end
+
     it "retries a transient npm E503 with bounded backoff and the same OTP" do
       Dir.mktmpdir do |dir|
         File.write(
@@ -8201,6 +8296,10 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#verify_npm_package_published!" do
+    it "waits at least ten minutes by default for npm to serve a just-published version" do
+      expect((NPM_PUBLISH_VERIFY_ATTEMPTS - 1) * NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS).to be >= 600
+    end
+
     it "retries transient npm metadata lookup failures before accepting the published package" do
       failed_status = instance_double(Process::Status, success?: false)
       successful_status = instance_double(Process::Status, success?: true)
@@ -17275,6 +17374,7 @@ RSpec.describe "release.rake helper methods" do
         events << [:npm, package]
         nil
       end
+      allow(task_receiver).to receive(:verify_npm_package_published!)
       allow(task_receiver).to receive(:publish_gem_with_retry) do |_dir, package, **_options|
         events << [:gem, package]
         nil
@@ -17383,6 +17483,48 @@ RSpec.describe "release.rake helper methods" do
             [:npm, "react-on-rails-pro@17.0.0-rc.10"]
           ]
         )
+        expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
+        expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
+      end
+    end
+
+    it "verifies every npm package after all npm publishes and before any gem publish" do
+      npm_publish_options = []
+      allow(task_receiver).to receive(:publish_npm_with_retry) do |_dir, package, **options|
+        events << [:npm, package]
+        npm_publish_options << options
+        nil
+      end
+      allow(task_receiver).to receive(:verify_npm_package_published!) do |name, version|
+        events << [:npm_verify, "#{name}@#{version}"]
+      end
+      allow(task_receiver).to receive(:sync_github_release_after_publish) { abort "stop after publication" }
+
+      invoke_accelerated_release_task(release_task)
+
+      packages = %w[react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app]
+                 .map { |name| "#{name}@17.0.0-rc.10" }
+      aggregate_failures do
+        expect(events.take(10)).to eq(
+          packages.map { |package| [:npm, package] } +
+          packages.map { |package| [:npm_verify, package] } +
+          [[:gem, "react_on_rails"], [:gem, "react_on_rails_pro"]]
+        )
+        expect(npm_publish_options).to all(include(verify: false))
+      end
+    end
+
+    it "publishes no gem and records no completion when npm verification fails" do
+      allow(task_receiver).to receive(:verify_npm_package_published!) do |name, _version|
+        abort "simulated npm verification failure" if name == "react-on-rails-pro"
+      end
+
+      failure = invoke_accelerated_release_task(release_task)
+
+      aggregate_failures do
+        expect(failure&.message).to eq("simulated npm verification failure")
+        expect(events.map(&:first)).to eq(%i[npm npm npm npm])
+        expect(task_receiver).not_to have_received(:publish_gem_with_retry)
         expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
         expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
       end
@@ -22845,11 +22987,11 @@ RSpec.describe "release.rake helper methods" do
       gemfile = File.read(File.join(dummy_root, "Gemfile"))
       lockfile = File.read(File.join(dummy_root, "Gemfile.lock"))
 
-      expect(gemfile).to include('gem "sqlite3", "~> 1.7", force_ruby_platform:')
-      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+\)$/)
-      expect(lockfile).to match(/^    sqlite3 \(1\.7\.\d+-arm64-darwin\)$/)
+      expect(gemfile).to include('gem "sqlite3", "~> 2.9", force_ruby_platform:')
+      expect(lockfile).to match(/^    sqlite3 \(2\.9\.\d+\)$/)
+      expect(lockfile).to match(/^    sqlite3 \(2\.9\.\d+-arm64-darwin\)$/)
       expect(lockfile).to match(/^  ruby$/)
-      expect(lockfile).to match(/^  sqlite3 \(~> 1\.7\)$/)
+      expect(lockfile).to match(/^  sqlite3 \(~> 2\.9\)$/)
       expect(lockfile).to match(/BUNDLED WITH\n   2\.5\.9\n\z/)
     end
   end

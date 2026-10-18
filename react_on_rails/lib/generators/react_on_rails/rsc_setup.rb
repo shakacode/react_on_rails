@@ -35,6 +35,7 @@ module ReactOnRails
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
       RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
       RSC_REACT_VERSION_RANGE = ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE
+      RSC_PACKAGE_VERSION_PIN = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
       RSC_MINIMUM_REACT_VERSION = RSC_REACT_VERSION_RANGE.sub(/\A[~^]/, "")
       RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
       RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
@@ -88,12 +89,14 @@ module ReactOnRails
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  RSC requires React #{RSC_SUPPORTED_REACT_LINE} (detected: #{react_version})
 
-            React Server Components in React on Rails Pro currently only supports
-            React #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}. Other React minor versions are
-            not yet supported.
+            This generator installs react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, which requires
+            React #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}. The React on Rails Pro node renderer refuses
+            to start when React and react-on-rails-rsc are on different lines.
 
             To install a compatible React version:
               #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
+
+            Run `bundle exec rake react_on_rails:doctor` afterwards to confirm the pairing.
           MSG
         elsif patch < RSC_MINIMUM_REACT_PATCH
           GeneratorMessages.add_warning(<<~MSG.strip)
@@ -102,7 +105,7 @@ module ReactOnRails
             Please upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
               #{manual_add_packages_command(["react@#{RSC_MINIMUM_REACT_VERSION}", "react-dom@#{RSC_MINIMUM_REACT_VERSION}"])}
 
-            react-on-rails-rsc 19.2.x with patch >= 19.2.1 is coordinated with
+            react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} is coordinated with
             React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ for the React on Rails Pro 17 RSC runtime.
           MSG
         end

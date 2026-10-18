@@ -114,6 +114,7 @@ const requiredPrGateJob = extractJob(requiredWorkflow, 'required-pr-gate');
 const agentWorkflowCheckoutStep = extractStep(requiredPrGateJob, 'Check out pinned agent workflows');
 const agentWorkflowDriftStep = extractStep(requiredPrGateJob, 'Validate pinned agent workflow copies');
 const shakaCheckoutStep = extractStep(requiredPrGateJob, 'Check out pinned Shaka');
+const shakaRubySetupStep = extractStep(requiredPrGateJob, 'Set up Ruby for Shaka');
 const shakaValidationStep = extractStep(requiredPrGateJob, 'Validate repository seam with Shaka');
 const agentWorkflowDriftManifest = read('.agents/agent-workflow-drift.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
@@ -187,9 +188,20 @@ assertMatches(
 );
 assertPinnedCheckout('ci-required pinned Shaka checkout', shakaCheckoutStep, {
   repository: 'shakacode/shaka',
-  ref: '67c1d8f70f5c4eaa05f58f796be53a6866148139',
+  ref: 'da95d68fd8215ae9f789a03a8c9588fb6ccf15c9',
   path: '.shaka-source',
 });
+assertMatches(
+  'ci-required Shaka Ruby setup action',
+  shakaRubySetupStep,
+  /uses: ruby\/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74\s+# v1/,
+);
+assertMatches('ci-required Shaka supported Ruby', shakaRubySetupStep, /ruby-version: '3\.4'/);
+assert.ok(
+  requiredPrGateJob.indexOf('Set up Ruby for Shaka') <
+    requiredPrGateJob.indexOf('Validate repository seam with Shaka'),
+  'Shaka Ruby setup must precede seam validation',
+);
 assertMatches(
   'ci-required Shaka candidate seam validation',
   shakaValidationStep,
