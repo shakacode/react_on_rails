@@ -37,6 +37,9 @@ const getReactServerComponentStub = path.join(
   'fixtures/rsc-manifest/getReactServerComponent.client.stub.ts',
 );
 
+// Real webpack compilation and compiler.close need an integration-test budget under parallel Jest load.
+jest.setTimeout(30_000);
+
 const runWebpack = () => {
   const volume = new Volume();
   const outputFileSystem = createFsFromVolume(volume);
