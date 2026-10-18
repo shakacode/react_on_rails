@@ -1349,9 +1349,7 @@ describe ReactOnRailsProHelper do
   end
 
   describe "#internal_rsc_payload_react_component" do
-    # Obviously-synthetic stand-ins for server-internal error text. These deliberately mirror the
-    # fixtures in packages/react-on-rails-pro/tests/injectRSCPayload.test.ts so the inline and
-    # fetched redaction paths can be compared case-for-case.
+    # Synthetic server-internal error text for the focused helper transform examples.
     let(:synthetic_message) { "User 48213 not authorized for org 77" }
     let(:synthetic_stack) do
       "Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)"
@@ -1393,6 +1391,40 @@ describe ReactOnRailsProHelper do
 
       expect(framed_wire_bytes(input_chunk)).to eq("{\"hasErrors\":false}\t00000007\npayload")
       expect(input_chunk).to include("html" => "payload")
+    end
+
+    contract_path = File.expand_path(
+      "../../../../../packages/react-on-rails-pro/tests/fixtures/rsc-error-metadata-contract.json", __dir__
+    )
+    contract = JSON.parse(File.read(contract_path))
+    contract.fetch("environments").each do |environment|
+      context "with shared redaction contract: #{environment.fetch('name')}" do
+        before { stub_rails_env(environment.fetch("railsEnv", "")) }
+
+        contract.fetch("cases").each do |test_case|
+          it test_case.fetch("name"), :aggregate_failures do
+            metadata = contract.fetch("baseMetadata").merge(test_case.fetch("metadata"))
+            input_chunk = metadata.merge("html" => '0:"synthetic-contract-flight"')
+            original_chunk = input_chunk.deep_dup
+            expected = contract.fetch("outcomes").fetch(test_case.fetch("expected").fetch(environment.fetch("outcome")))
+            expected_metadata = expected.fetch("metadata") == "original" ? metadata : expected.fetch("metadata")
+            expected_diagnostic = expected.fetch("diagnostic")
+            expected_diagnostic = metadata.slice("hasErrors", "renderingError") if expected_diagnostic == "original"
+
+            wire = framed_wire_bytes(input_chunk)
+            output_metadata = JSON.parse(wire.split("\t", 2).first)
+            diagnostic = if send(:rsc_payload_rendering_error_signal?, output_metadata)
+                           output_metadata.slice("hasErrors", "renderingError")
+                         end
+
+            expect(output_metadata).to eq(expected_metadata)
+            expect(diagnostic).to eq(expected_diagnostic)
+            expect(output_metadata.key?("consoleReplayScript")).to be(expected.fetch("consoleReplay"))
+            expect(wire).to end_with('0:"synthetic-contract-flight"')
+            expect(input_chunk).to eq(original_chunk)
+          end
+        end
+      end
     end
 
     it "redacts renderingError from the fetched payload metadata in production" do

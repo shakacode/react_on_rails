@@ -16,6 +16,7 @@
 import { Readable, PassThrough } from 'stream';
 import { readFileSync } from 'fs';
 import { resolve as resolvePath } from 'path';
+import { runInNewContext } from 'vm';
 import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
@@ -60,6 +61,25 @@ type ShakapackerAssetShapes = {
 const shakapackerAssetShapes = JSON.parse(
   readFileSync(resolvePath(__dirname, 'fixtures/rsc-css-gating/shakapacker-asset-shapes.json'), 'utf8'),
 ) as ShakapackerAssetShapes;
+
+type RedactionOutcome = {
+  diagnostic: Record<string, unknown> | 'original' | null;
+  metadata: Record<string, unknown> | 'original';
+  consoleReplay: boolean;
+};
+
+const redactionContract = JSON.parse(
+  readFileSync(resolvePath(__dirname, 'fixtures/rsc-error-metadata-contract.json'), 'utf8'),
+) as {
+  baseMetadata: Record<string, unknown>;
+  environments: Array<{ name: string; railsEnv?: string; outcome: 'full' | 'redacted' }>;
+  outcomes: Record<string, RedactionOutcome>;
+  cases: Array<{
+    name: string;
+    metadata: Record<string, unknown>;
+    expected: Record<'full' | 'redacted', string>;
+  }>;
+};
 
 // Shared utilities — createMockRSCStream wraps content in length-prefixed format,
 // createMockHTMLStream passes HTML through as-is.
@@ -483,6 +503,42 @@ describe('injectRSCPayload', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  describe.each(redactionContract.environments)('shared redaction contract: $name', (environment) => {
+    it.each(redactionContract.cases)('$name', async (testCase) => {
+      const metadata = { ...redactionContract.baseMetadata, ...testCase.metadata };
+      const expected = redactionContract.outcomes[testCase.expected[environment.outcome]];
+      const diagnosticMetadata = Object.fromEntries(
+        Object.entries(metadata).filter(([key]) => key === 'hasErrors' || key === 'renderingError'),
+      );
+      const expectedDiagnostic =
+        expected.diagnostic === 'original' ? diagnosticMetadata : expected.diagnostic;
+      const content = '0:"synthetic-contract-flight"';
+      const mockRSC = createMockRSCStreamWithMetadata(content, metadata);
+      const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+      const result = injectRSCPayload(
+        createMockHTMLStream(['<div>contract</div>']),
+        rscRequestTracker,
+        domNodeId,
+        undefined,
+        { railsEnv: environment.railsEnv },
+      );
+      const output = await collectStreamData(result);
+      const browser = {
+        REACT_ON_RAILS_RSC_ERRORS: {} as Record<string, unknown>,
+        REACT_ON_RAILS_RSC_PAYLOADS: {} as Record<string, string[]>,
+      };
+      const replay = jest.fn();
+      const context = { self: browser, console: { error: replay } };
+      for (const match of output.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)) {
+        runInNewContext(match[1], context);
+      }
+
+      expect(browser.REACT_ON_RAILS_RSC_ERRORS[rscPayloadKey] ?? null).toEqual(expectedDiagnostic);
+      expect(replay.mock.calls).toEqual(expected.consoleReplay ? [['synthetic-contract-replay']] : []);
+      expect(browser.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual([content]);
+    });
   });
 
   it('injects RSC diagnostic metadata without exposing unrelated stream metadata', async () => {
