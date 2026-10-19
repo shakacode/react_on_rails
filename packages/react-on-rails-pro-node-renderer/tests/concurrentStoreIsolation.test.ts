@@ -293,3 +293,47 @@ test("consumer disconnect cleanup still reads each render's store", async () => 
     bobContext.release();
   }
 });
+
+test.each([
+  [true, ['Alice', 'Bob']],
+  [false, ['Bob', 'Bob']],
+] as const)(
+  'isolateHydratedStores: %s controls the request store scope',
+  async (isolateHydratedStores, users) => {
+    const bundlePath = path.join(serverBundleCachePath(testName), 'switch-store-app.js');
+    buildSync({
+      entryPoints: [path.resolve(__dirname, 'fixtures/concurrentStoreApp.ts')],
+      outfile: bundlePath,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      conditions: ['node'],
+      external: ['react', 'react-dom', 'react-dom/*'],
+    });
+    buildConfig({
+      serverBundleCachePath: serverBundleCachePath(testName),
+      supportModules: true,
+      stubTimers: false,
+      isolateHydratedStores,
+    });
+    const aliceContext = await buildExecutionContext([bundlePath], true);
+    const bobContext = await buildExecutionContext([bundlePath], true);
+    // Both requests set their store before either reads it after an await.
+    const request = (user: string) => `(() => {
+    ReactOnRails.clearHydratedStores();
+    ReactOnRails.setStore('UserStore', ReactOnRails.getStoreGenerator('UserStore')({ user: ${JSON.stringify(user)} }, {}));
+    return Promise.resolve().then(() => ReactOnRails.getStore('UserStore').getState().user);
+  })()`;
+    try {
+      expect(
+        await Promise.all([
+          aliceContext.runInVM(request('Alice'), bundlePath),
+          bobContext.runInVM(request('Bob'), bundlePath),
+        ]),
+      ).toEqual(users);
+    } finally {
+      aliceContext.release();
+      bobContext.release();
+    }
+  },
+);

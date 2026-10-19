@@ -994,6 +994,10 @@ export async function buildExecutionContext(
   // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
   const requestHydratedStores = new Map<object, unknown>();
+  // Without this scope the store registries fall back to their shared per-VM map.
+  const inStoreScope: <T>(fn: () => T) => T = getConfig().isolateHydratedStores
+    ? (fn) => hydratedStoreScope.run(requestHydratedStores, fn)
+    : (fn) => fn();
   let released = false;
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
@@ -1028,7 +1032,7 @@ export async function buildExecutionContext(
       // so that code can store/retrieve data (e.g., asyncPropsManager).
       // IMPORTANT: We clean up immediately after execution to prevent the VM context
       // (which may be reused by other requests) from retaining references to this request's data.
-      let result = hydratedStoreScope.run(requestHydratedStores, () =>
+      let result = inStoreScope(() =>
         sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
           context.renderingRequest = renderingRequest;
           context.sharedExecutionContext = sharedExecutionContext;
@@ -1056,9 +1060,8 @@ export async function buildExecutionContext(
         const stream = result;
         const read = stream.read.bind(stream);
         const destroy = stream.destroy.bind(stream);
-        stream.read = (size?: number) => hydratedStoreScope.run(requestHydratedStores, () => read(size));
-        stream.destroy = (error?: Error) =>
-          hydratedStoreScope.run(requestHydratedStores, () => destroy(error));
+        stream.read = (size?: number) => inStoreScope(() => read(size));
+        stream.destroy = (error?: Error) => inStoreScope(() => destroy(error));
         const reportedErrors = new WeakSet<object>();
         // A stream error thrown inside the sandboxed VM realm is a genuine Error, but it
         // fails the worker-realm `instanceof Error` check because it comes from a different

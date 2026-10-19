@@ -682,6 +682,32 @@ describe('configBuilder', () => {
     });
   });
 
+  describe('isolateHydratedStores', () => {
+    it('defaults to true', () => {
+      delete process.env.RENDERER_ISOLATE_HYDRATED_STORES;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().isolateHydratedStores).toBe(true);
+    });
+
+    it('can be turned off with RENDERER_ISOLATE_HYDRATED_STORES', () => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'false';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().isolateHydratedStores).toBe(false);
+    });
+
+    it('prefers the explicit config value over the environment variable', () => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'false';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: true }).isolateHydratedStores).toBe(true);
+    });
+  });
+
   describe('replayServerAsyncOperationLogs defaults', () => {
     it('defaults to true when NODE_ENV is development', () => {
       process.env.NODE_ENV = 'development';

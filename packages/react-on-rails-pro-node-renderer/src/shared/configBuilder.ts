@@ -135,6 +135,10 @@ export interface Config {
   // If set to false, only logs that occur on the server prior to any awaited asynchronous operations will be replayed.
   // The default value is true in development, otherwise it is set to false.
   replayServerAsyncOperationLogs: boolean;
+  // If true (the default), each render request gets its own hydrated Redux store registry, so
+  // getStore() never reads another concurrent request's stores. Set to false to restore the shared
+  // per-VM registry if request scoping causes problems.
+  isolateHydratedStores: boolean;
   // Maximum number of VM contexts to keep in memory. Defaults to 4 so one draining and one current
   // RSC-enabled bundle generation can coexist during a rolling deployment.
   // Older contexts are removed when this limit is reached.
@@ -250,6 +254,14 @@ function defaultReplayServerAsyncOperationLogs() {
   return env.NODE_ENV?.toLowerCase() === 'development';
 }
 
+function defaultIsolateHydratedStores() {
+  if (env.RENDERER_ISOLATE_HYDRATED_STORES != null) {
+    return truthy(env.RENDERER_ISOLATE_HYDRATED_STORES);
+  }
+
+  return true;
+}
+
 function truthyHealthEndpointFlag(value: unknown) {
   return value === '1' || truthy(value);
 }
@@ -319,6 +331,9 @@ const defaultConfig: Config = {
   // Default to true in development, otherwise it is set to false.
   replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
 
+  // Default to true unless RENDERER_ISOLATE_HYDRATED_STORES turns request store scoping off.
+  isolateHydratedStores: defaultIsolateHydratedStores(),
+
   // Maximum number of VM contexts to keep in memory. Four covers one draining and one current
   // RSC-enabled generation (server + RSC for each generation).
   maxVMPoolSize: defaultMaxVMPoolSize(),
@@ -360,6 +375,8 @@ function envValuesUsed() {
     INCLUDE_TIMER_POLYFILLS: !('includeTimerPolyfills' in userConfig) && env.INCLUDE_TIMER_POLYFILLS,
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
+    RENDERER_ISOLATE_HYDRATED_STORES:
+      !('isolateHydratedStores' in userConfig) && env.RENDERER_ISOLATE_HYDRATED_STORES,
     MAX_VM_POOL_SIZE: !userConfig.maxVMPoolSize && env.MAX_VM_POOL_SIZE,
     VM_POOL_ROLLOUT_DRAIN_TIMEOUT: !userConfig.vmPoolRolloutDrainTimeout && env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT,
     RENDERER_CURRENT_GENERATION_MANIFEST:
@@ -487,6 +504,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     licenseToken: env.REACT_ON_RAILS_PRO_LICENSE?.trim() || undefined,
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
+    isolateHydratedStores: defaultIsolateHydratedStores(),
     maxVMPoolSize: defaultMaxVMPoolSize(),
     vmPoolRolloutDrainTimeout: defaultVmPoolRolloutDrainTimeout(),
     currentGenerationManifestPath: env.RENDERER_CURRENT_GENERATION_MANIFEST || undefined,
