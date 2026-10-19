@@ -61,6 +61,12 @@ Nothing is unmounted before the frame renders, so pausing or canceling `turbo:be
 
 Components outside the frame stay mounted. Redux stores are page-wide: a store the new frame content declares is initialized only if the page does not already have a store with that name.
 
+Turbo inserts only the frame's markup from the response, so anything the response renders outside the frame is discarded. That leads to three requirements:
+
+- **Bundles:** frame components must be registered by JavaScript the page already loaded. Pack tags in the frame response, including the ones `auto_load_bundle` appends, are not run. Load those packs on the page that holds the frame.
+- **Rails context:** React on Rails writes the `js-react-on-rails-context` element next to the first component a response renders. The page must already have one, or the frame response's first component must be inside the frame.
+- **Stores:** a store a frame component reads must already be on the page or have its hydration data rendered inside the frame. Store data that `redux_store_hydration_data` writes elsewhere in the layout is discarded.
+
 With the `react-on-rails-pro` package, each component's inline script mounts the new frame content as soon as it is inserted. Pro does not yet unmount the replaced frame's components on frame navigation; their React roots are released on the next full Turbo page visit.
 
 ### Turbo with Auto-Bundling
