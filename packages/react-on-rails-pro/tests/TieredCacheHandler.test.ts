@@ -152,7 +152,7 @@ describe('TieredCacheHandler', () => {
       expect(l2Spy).toHaveBeenCalledWith('t', 123);
     });
 
-    test('one layer rejecting or throwing synchronously never stops the other, logs message only', async () => {
+    test('one layer rejecting or throwing synchronously never stops the other, logs safe error labels', async () => {
       const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       try {
         const rejecting = {
@@ -163,8 +163,8 @@ describe('TieredCacheHandler', () => {
         const l2Spy = jest.spyOn(l2, 'revalidateTag');
         await new TieredCacheHandler(rejecting, l2).revalidateTag!('t', 5);
         expect(l2Spy).toHaveBeenCalledWith('t', 5);
-        // Message only — never the raw error object (console output can be
-        // replayed to the browser during RSC renders).
+        // Error class/code only — neither raw errors nor their messages can
+        // reach console output replayed to the browser during RSC renders.
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('L1 revalidateTag failed'), 'Error');
         expect(errorSpy.mock.calls.every((call) => !(call[1] instanceof Error))).toBe(true);
         // The message ('redis://user:secret@host down') must never reach the log.
@@ -181,6 +181,32 @@ describe('TieredCacheHandler', () => {
         const l2Spy2 = jest.spyOn(l2, 'revalidateTag');
         await expect(new TieredCacheHandler(throwing, l2).revalidateTag!('t', 6)).resolves.toBeUndefined();
         expect(l2Spy2).toHaveBeenCalledWith('t', 6);
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    test.each([
+      { label: 'a string rejection', error: 'redis://user:secret@internal:6379' },
+      { label: 'a null rejection', error: null },
+      { label: 'an object-valued code', error: { code: { password: 'secret' } } },
+      { label: 'a connection URL as code', error: { code: 'redis://user:secret@internal:6379' } },
+    ])('redacts $label while reaching the other tier', async ({ error }) => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const failing = {
+          get: jest.fn().mockResolvedValue(null),
+          set: jest.fn().mockResolvedValue(undefined),
+          revalidateTag: jest.fn().mockRejectedValue(error),
+        };
+        const otherTier = jest.spyOn(l2, 'revalidateTag');
+        await expect(new TieredCacheHandler(failing, l2).revalidateTag!('t', 7)).resolves.toBeUndefined();
+        expect(otherTier).toHaveBeenCalledWith('t', 7);
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('L1 revalidateTag failed'),
+          'UnknownError',
+        );
+        expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret');
       } finally {
         errorSpy.mockRestore();
       }

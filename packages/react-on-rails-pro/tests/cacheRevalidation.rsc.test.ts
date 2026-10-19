@@ -106,6 +106,34 @@ describe('unstable_revalidateTag', () => {
     expect(invalidatedAt!).toBeLessThanOrEqual(after);
   });
 
+  test.each([
+    { label: 'a string rejection', error: 'redis://user:secret@internal:6379' },
+    { label: 'a null rejection', error: null },
+    { label: 'an object-valued code', error: { code: { password: 'secret' } } },
+    { label: 'a connection URL as code', error: { code: 'redis://user:secret@internal:6379' } },
+  ])('redacts $label through the public fanout', async ({ error }) => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const failing: CacheHandler = {
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue(undefined),
+        revalidateTag: jest.fn().mockRejectedValue(error),
+      };
+      const healthy = makeRevalidatingSpy();
+      registerCacheHandler('failing', failing);
+      registerCacheHandler('healthy', healthy.handler);
+      await expect(unstable_revalidateTag('products')).resolves.toBeUndefined();
+      expect(healthy.revalidateCalls.map(([tag]) => tag)).toEqual(['products']);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed for 1 of 1 tag(s)'),
+        'UnknownError',
+      );
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   test('a failing handler — rejecting or throwing synchronously — never stops the others', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     try {
