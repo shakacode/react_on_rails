@@ -1181,6 +1181,22 @@ module ReactOnRails
         expect(described_class.sanitize_error_text(text)).to eq(text)
       end
 
+      it "finishes when a literal at sign opens the token after an encoded authority start" do
+        text = "%2F%2F@ab and %2F%2Fa@b and http:/\t/a@b"
+        result = Timeout.timeout(2) { described_class.sanitize_error_text(text) }
+        expect(result).to eq("%2F%2Fab and %2F%2Fb and http:/\t/b")
+      end
+
+      it "finds an encoded at sign directly before a literal one" do
+        text = "redis://user:pa/ss%40@host"
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@@host")
+      end
+
+      it "still strips an authority right after a skipped scheme-less split" do
+        text = "dir/ //user:s3cr3t%40host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("dir/ //host/x")
+      end
+
       it "stays fast on a large slash-heavy message without an at sign" do
         text = "%2F%2F #{'x %2F/ ' * 50_000}"
         expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error

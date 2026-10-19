@@ -582,9 +582,10 @@ module ReactOnRails
       position = 0
       token = nil
       while (authority_start = AUTHORITY_START.match(decoded, position))
-        position = authority_start.end(0)
+        position = authority_start.begin(0) + 1
         next if split_without_scheme?(decoded, authority_start)
 
+        position = authority_start.end(0)
         token = token_bounds(decoded, literal, position) unless token && token[0] >= position
         userinfo_end, replacement, position = userinfo_edit(decoded, literal, authority_start, token)
         spans << [from[authority_start.end(0)], to[userinfo_end], replacement] if userinfo_end
@@ -620,8 +621,11 @@ module ReactOnRails
       token_end = next_literal_index(decoded, literal, TOKEN_END, start)
       token = decoded[start...token_end]
       index = token.length
-      index -= 1 while (index = token.rindex("@", index - 1)) && literal[start + index]
-      [token_end, index && (start + index)]
+      # Stop at offset 0: rindex with a negative position counts from the end.
+      while index.positive? && (index = token.rindex("@", index - 1))
+        return [token_end, start + index] unless literal[start + index]
+      end
+      [token_end, nil]
     end
     private_class_method :token_bounds
 
