@@ -352,6 +352,19 @@ describe('unstable_cache tags', () => {
     await expect(nonString()).rejects.toThrow(TypeError);
   });
 
+  test.each(['product-\ud800', 'product-\udc00'])(
+    'rejects malformed UTF-16 tags before rendering or storing',
+    async (tag) => {
+      const { handler, setCalls } = makeSpyHandler();
+      registerCacheHandler('unicode-tag', handler);
+      const render = jest.fn(async () => 'x');
+      const cached = unstable_cache(render, { id: 'unicode-tag', kind: 'unicode-tag', tags: [tag] });
+      await expect(cached()).rejects.toThrow(TypeError);
+      expect(render).not.toHaveBeenCalled();
+      expect(setCalls).toEqual([]);
+    },
+  );
+
   test('falsy junk supplied as tags rejects instead of silently caching untagged', async () => {
     const { handler } = makeSpyHandler();
     registerCacheHandler('spy-falsy-tags', handler);

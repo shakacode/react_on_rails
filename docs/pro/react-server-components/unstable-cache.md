@@ -39,7 +39,7 @@ The options are:
 - `tags`: invalidation labels stored on each entry, for use with
   [`unstable_revalidateTag`](#invalidate-by-tag-javascript). Pass a static array, or a function of the
   cached function's arguments — `tags: ({ productId }) => ['products', 'product-' + productId]` — when
-  the tags depend on which entity is being rendered. Tags must be non-empty strings of at most 256
+  the tags depend on which entity is being rendered. Tags must be non-empty, well-formed Unicode strings of at most 256
   characters, with at most 64 distinct tags per call (invalid or over-limit tags throw a `TypeError`
   before the render runs), and an invalidation matches a stored tag byte-for-byte: the string you
   invalidate must be exactly the string you stored.
