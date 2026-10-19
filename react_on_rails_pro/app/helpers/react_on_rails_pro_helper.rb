@@ -1943,7 +1943,8 @@ module ReactOnRailsProHelper
   end
 
   def non_blank_rsc_metadata_string?(value)
-    value.is_a?(String) && value.strip.present?
+    # Match JavaScript String#trim whitespace, which excludes NUL/NEL and includes BOM.
+    value.is_a?(String) && value.match?(/[^\p{Zs}\u0009-\u000D\u2028\u2029\uFEFF]/u)
   end
 
   def build_react_component_result_for_server_streamed_content(

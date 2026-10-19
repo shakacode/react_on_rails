@@ -26,6 +26,24 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
+  and RSC Client Component providers now read only their request's stores in a shared Node Renderer
+  worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
+  APIs and page lifecycle behavior are unchanged. Set `isolateHydratedStores: false` or
+  `RENDERER_ISOLATE_HYDRATED_STORES=false` to restore the shared registry temporarily. Fixes [Issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
+  [PR 5133](https://github.com/shakacode/react_on_rails/pull/5133) by [justin808](https://github.com/justin808).
+
+- **A failed load of `react-dom/client` is reported instead of swallowed**: With React 18 or later, when
+  `react-dom/client` exists but one of its own dependencies fails to load, React on Rails now rethrows that
+  error when the bundle loads. Previously it was discarded and surfaced later as
+  `reactDomClient.hydrateRoot is not a function`, or not at all in a server bundle. React 16 and 17 apps are
+  unaffected: a missing `react-dom/client` still falls back to `react-dom`. The optional-module behavior
+  is preserved with webpack and Rspack.
+  RSC bundles avoid the client-only import. **Action required for upgraders:** if a server bundle now
+  fails to load, restore or bundle the missing dependency named in the original error.
+  Fixes [Issue 5180](https://github.com/shakacode/react_on_rails/issues/5180).
+  [PR 5181](https://github.com/shakacode/react_on_rails/pull/5181) by [justin808](https://github.com/justin808).
+
 - **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
   `serverWebpackConfig.js` removed client-only plugins by webpack class names only, so Rspack apps kept
   `rspack-manifest-plugin` and `CssExtractRspackPlugin` in the server compilation and in the RSC compilations
@@ -34,6 +52,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   apply the same change to the plugin filter in `config/rspack/serverWebpackConfig.js`. Fixes
   [Issue 5184](https://github.com/shakacode/react_on_rails/issues/5184).
   [PR 5185](https://github.com/shakacode/react_on_rails/pull/5185) by [justin808](https://github.com/justin808).
+
+- **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
+  `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
+  and prevents console replay from exposing server diagnostics that error metadata omits. Ruby diagnostics now use JavaScript trim whitespace rules:
+  NUL/NEL-only errors count as nonblank, while BOM-only errors do not. Clean-chunk replay is unchanged. See [Issue 4991](https://github.com/shakacode/react_on_rails/issues/4991).
 
 - **[Pro]** **Fragment-cached components no longer serve stale CSP nonces**: The `cached_*` helpers
   (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`,
