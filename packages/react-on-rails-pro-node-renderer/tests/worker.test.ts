@@ -879,37 +879,61 @@ describe('worker', () => {
     expect(fs.existsSync(path.join(serverBundleCachePathForTest(), 'uploads'))).toBe(false);
   });
 
-  test('post /upload-assets rejects multipart requests with more than 1,000 parts', async () => {
-    const app = createWorker({
-      password: 'my_password',
-    });
-    const fields: Record<string, unknown> = {
-      gemVersion,
-      protocolVersion,
-      railsEnv,
-      password: 'my_password',
-      'bundle_too-many-files': {
-        value: Buffer.from('bundle'),
-        options: { contentType: 'text/javascript', filename: 'bundle.js' },
-      },
-    };
-    for (let index = 0; index < 996; index += 1) {
-      fields[`asset${index}`] = {
-        value: Buffer.from('{}'),
-        options: { contentType: 'application/json', filename: `asset-${index}.json` },
+  test.each([
+    { extraFields: 995, totalParts: 1000, statusCode: 200 },
+    { extraFields: 996, totalParts: 1001, statusCode: 413 },
+  ])(
+    'post /upload-assets enforces the multipart limit at $totalParts parts',
+    async ({ extraFields, statusCode }) => {
+      const app = createWorker({ password: 'my_password' });
+      let uploadDir: string | undefined;
+      const responseFinished = new Promise<void>((resolve) => {
+        app.addHook('onResponse', async () => resolve());
+      });
+      app.addHook('onSend', (req, _res, payload, done) => {
+        uploadDir = req.uploadDir;
+        done(null, payload);
+      });
+      const fields: Record<string, unknown> = {
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'my_password',
+        'bundle_parts-limit': {
+          value: Buffer.from('bundle'),
+          options: { contentType: 'text/javascript', filename: 'bundle.js' },
+        },
       };
-    }
-    const { form } = formAutoContent(fields);
+      // Four protocol fields + one real file + these fields exercise the aggregate
+      // part limit without writing hundreds of files or hitting the field limit.
+      for (let index = 0; index < extraFields; index += 1) {
+        fields[`field${index}`] = 'value';
+      }
+      const { form } = formAutoContent(fields);
 
-    const res = await app
-      .inject()
-      .post('/upload-assets')
-      .payload(form.getBuffer())
-      .headers(form.getHeaders())
-      .end();
-
-    expect(res.statusCode).toBe(413);
-  });
+      try {
+        const res = await app
+          .inject()
+          .post('/upload-assets')
+          .payload(form.getBuffer())
+          .headers(form.getHeaders())
+          .end();
+        await responseFinished;
+        expect(res.statusCode).toBe(statusCode);
+        if (statusCode === 413) {
+          expect(res.json().code).toBe('FST_PARTS_LIMIT');
+        } else {
+          expect(
+            fs.existsSync(path.join(serverBundleCachePathForTest(), 'parts-limit', 'parts-limit.js')),
+          ).toBe(true);
+        }
+      } finally {
+        await app.close();
+      }
+      expect(uploadDir).toBeTruthy();
+      expect(fs.existsSync(uploadDir!)).toBe(false);
+    },
+  );
 
   test('post /upload-assets rejects unsafe uploaded filenames before copying assets', async () => {
     const bundleHash = 'unsafe-upload-filename-hash';
