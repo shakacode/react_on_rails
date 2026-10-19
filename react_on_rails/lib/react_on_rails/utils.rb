@@ -484,13 +484,111 @@ module ReactOnRails
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
-      text.to_s
-          .gsub(%r{//[^/?#]*@}, "//")
-          .gsub(%r{https?://[^\s]+}) do |match|
+      sanitized = text.to_s
+                      .gsub(%r{//[^/?#]*@}, "//")
+                      .gsub(%r{https?://[^\s]+}) do |match|
         trimmed = match.sub(/[).,;:'">\]]+\z/, "")
         sanitize_url_for_display(trimmed) + match[trimmed.length..]
       end
+      strip_obfuscated_userinfo(sanitized)
     end
+
+    OBFUSCATED_AUTHORITY_HINT = %r{%\h\h|/\s+/}
+    PERCENT_ESCAPE = /%[0-7]\h/
+    AUTHORITY_START = %r{/\s*/}
+    MAX_DECODE_PASSES = 3
+    private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :MAX_DECODE_PASSES
+
+    # Catches userinfo the literal patterns above cannot see: percent-encoded
+    # (including double-encoded and mixed-case) slashes and at signs, and
+    # whitespace between the authority slashes. Decodes the text into a view
+    # that maps each character back to its span of original text and records
+    # whether it was literal, then runs one scan over that view: after each
+    # authority start, everything up to the last at sign before the next literal
+    # whitespace is userinfo. Fails closed: an at sign later in the same token,
+    # even in a path, ends the userinfo. Works on bytes: every delimiter it looks
+    # for is ASCII, and byte offsets keep the scan linear for multibyte text.
+    def self.strip_obfuscated_userinfo(text)
+      bytes = text.b
+      return text unless bytes.match?(OBFUSCATED_AUTHORITY_HINT)
+
+      removals = userinfo_spans(*percent_decoded_view(bytes))
+      return text if removals.empty?
+
+      result = +"".b
+      position = 0
+      removals.each do |from, to|
+        result << bytes[position...from]
+        position = to
+      end
+      (result << bytes[position..]).force_encoding(text.encoding)
+    end
+    private_class_method :strip_obfuscated_userinfo
+
+    # Returns [decoded, from, to, literal]: decoded[i] came from text[from[i]...to[i]],
+    # and literal[i] is false when it was percent-decoded.
+    def self.percent_decoded_view(text)
+      view = [text, (0...text.length).to_a, (1..text.length).to_a, Array.new(text.length, true)]
+      MAX_DECODE_PASSES.times do
+        decoded_view = decode_percent_escapes(*view)
+        break unless decoded_view
+
+        view = decoded_view
+      end
+      view
+    end
+    private_class_method :percent_decoded_view
+
+    # Decodes ASCII %XX escapes only; other bytes cannot form URL delimiters.
+    # Returns nil when there is nothing left to decode.
+    def self.decode_percent_escapes(decoded, from, to, literal)
+      escapes = []
+      decoded.scan(PERCENT_ESCAPE) { escapes << Regexp.last_match.begin(0) }
+      return if escapes.empty?
+
+      next_view = [+"".b, [], [], []]
+      position = 0
+      escapes.each do |escape|
+        append_view_slice(next_view, [decoded, from, to, literal], position...escape)
+        next_view[0] << decoded[escape + 1, 2].hex.chr
+        next_view[1] << from[escape]
+        next_view[2] << to[escape + 2]
+        next_view[3] << false
+        position = escape + 3
+      end
+      append_view_slice(next_view, [decoded, from, to, literal], position...decoded.length)
+      next_view
+    end
+    private_class_method :decode_percent_escapes
+
+    def self.append_view_slice(target, source, range)
+      target.zip(source) { |target_part, source_part| target_part.concat(source_part[range]) }
+    end
+    private_class_method :append_view_slice
+
+    # Returns [from, to) spans of original text holding userinfo, in order.
+    # Authorities spelled entirely with literal characters belong to the literal
+    # patterns above, so a stack-trace path such as webpack://app/@babel/x.js
+    # keeps its text.
+    def self.userinfo_spans(decoded, from, to, literal)
+      spans = []
+      position = 0
+      while (match = AUTHORITY_START.match(decoded, position))
+        userinfo_start = match.end(0)
+        token_end = userinfo_start
+        token_end += 1 while (token_end = decoded.index(/\s/, token_end)) && !literal[token_end]
+        token_end ||= decoded.length
+        last_at = decoded[userinfo_start...token_end].rindex("@")
+        if last_at
+          userinfo_end = userinfo_start + last_at
+          obfuscated = match[0].length > 2 || literal[match.begin(0)..userinfo_end].include?(false)
+          spans << [from[userinfo_start], to[userinfo_end]] if obfuscated
+        end
+        position = [token_end, userinfo_start].max
+      end
+      spans
+    end
+    private_class_method :userinfo_spans
 
     # Replaces query values with [REDACTED], keeping keys for diagnostics.
     # Bare components without = (like ?eyJhbGciOi...) are treated as opaque

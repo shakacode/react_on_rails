@@ -1093,6 +1093,46 @@ module ReactOnRails
         text = "Connection refused - connect(2) for host:3800"
         expect(described_class.sanitize_error_text(text)).to eq(text)
       end
+
+      # Defense in depth: no current caller produces these spellings, but an
+      # encoded or whitespace-split authority must not carry credentials through.
+      {
+        "encoded slashes" => ["failed: http:%2F%2Fuser:s3cr3t%40host/x", "failed: http:%2F%2Fhost/x"],
+        "encoded scheme colon" => ["http%3A%2F%2Fuser:s3cr3t%40host/x", "http%3A%2F%2Fhost/x"],
+        "bare encoded authority" => ["%2F%2Fuser:s3cr3t%40host/x", "%2F%2Fhost/x"],
+        "mixed literal and encoded slashes" => ["http:/%2Fuser:s3cr3t%40host/x", "http:/%2Fhost/x"],
+        "mixed-case percent hex" => ["http:%2f%2Fuser:s3cr3t%40host/x", "http:%2f%2Fhost/x"],
+        "double-encoded authority" => ["http:%252F%252Fuser:s3cr3t%2540host/x", "http:%252F%252Fhost/x"],
+        "tab between slashes" => ["http:/\t/user:s3cr3t@host/x", "http:/\t/host/x"],
+        "encoded tab between slashes" => ["http:/%09/user:s3cr3t@host/x", "http:/%09/host/x"],
+        "encoded at sign inside the password" => ["http:%2F%2Fuser:s3%40cr3t%40host/x", "http:%2F%2Fhost/x"],
+        "encoded slash inside the password" => ["http:%2F%2Fuser:s3%2Fcr3t%40host/x", "http:%2F%2Fhost/x"],
+        "all-numeric password before a port" => ["http:%2F%2Fuser:12345%40host:3800/x", "http:%2F%2Fhost:3800/x"]
+      }.each do |spelling, (text, expected)|
+        it "strips credentials from an authority with #{spelling}" do
+          expect(described_class.sanitize_error_text(text)).to eq(expected)
+        end
+      end
+
+      it "strips each encoded authority in a message with several URLs" do
+        text = "a http:%2F%2Fu1:p1%40h1/x and b %2F%2Fu2:p2%40h2 done"
+        expect(described_class.sanitize_error_text(text)).to eq("a http:%2F%2Fh1/x and b %2F%2Fh2 done")
+      end
+
+      it "leaves encoded text without an authority credential unchanged" do
+        text = "GET /search?q=a%2Fb%40c and path %2F%2Fhost/x failed"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "leaves literal stack-trace paths intact when the message also has encoded text" do
+        text = "at webpack://app/node_modules/@babel/x.js (query a%2Fb)"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "stays fast on a large slash-heavy message without an at sign" do
+        text = "%2F%2F #{'x %2F/ ' * 50_000}"
+        expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error
+      end
     end
   end
 end
