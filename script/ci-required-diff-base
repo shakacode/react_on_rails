@@ -24,6 +24,7 @@ source "$SCRIPT_DIR/lib/git-diff-base"
 # its size baseline from the same first parent for the same reason.
 base_ref="${EVENT_BASE_REF}"
 base_source="event payload"
+run_all_suites=false
 
 if [ -n "${PULL_REQUEST_BASE_SHA}" ]; then
   base_ref="${PULL_REQUEST_BASE_SHA}"
@@ -101,14 +102,13 @@ if [ "${run_all_suites}" = "true" ] && [ -n "${GITHUB_OUTPUT}" ]; then
   # as they do there.
   detector_output="$(mktemp)"
   GITHUB_OUTPUT="$detector_output" script/ci-changes-detector "$base_ref"
-  while IFS='=' read -r key value; do
-    case "$key" in
-      docs_only | non_runtime_only) value=false ;;
-      *benchmark*) ;;
-      run_*) value=true ;;
-    esac
-    printf '%s=%s\n' "$key" "$value"
-  done < "$detector_output" >> "$GITHUB_OUTPUT"
+  # Rewrite only exact single-line flags; every other line, including any
+  # multi-line output block, passes through unchanged.
+  sed -E \
+    -e '/^run_[a-z_]*benchmark/b' \
+    -e 's/^(run_[a-z_]+)=(true|false)$/\1=true/' \
+    -e 's/^(docs_only|non_runtime_only)=(true|false)$/\1=false/' \
+    "$detector_output" >> "$GITHUB_OUTPUT"
   rm -f "$detector_output"
   echo "Overriding the selection above: every test suite runs because ${base_source} left no exact diff base."
 else

@@ -126,6 +126,9 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "run_ruby_tests=false"
     echo "run_generators=false"
     echo "run_core_benchmarks=false"
+    echo "changed_files<<EOF_FILES"
+    echo "docs.md"
+    echo "EOF_FILES"
   } >> "$GITHUB_OUTPUT"
 fi
 STUB
@@ -394,17 +397,24 @@ $actual"
   fi
 }
 
+# A multi-line output block must pass through untouched.
 ALL_SUITES_OUTPUT="docs_only=false
 non_runtime_only=false
 run_ruby_tests=true
 run_generators=true
-run_core_benchmarks=false"
+run_core_benchmarks=false
+changed_files<<EOF_FILES
+docs.md
+EOF_FILES"
 
 NARROW_OUTPUT="docs_only=true
 non_runtime_only=true
 run_ruby_tests=false
 run_generators=false
-run_core_benchmarks=false"
+run_core_benchmarks=false
+changed_files<<EOF_FILES
+docs.md
+EOF_FILES"
 
 # The case from the issue: a force-push, so the before SHA is gone. The step must
 # not spend fetches on it. No base reproduces the pushed changes (origin/main
