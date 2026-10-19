@@ -24,6 +24,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro]** **`RSCRoute` now uses React 19.2's `useEffectEvent` for `onRefetchError` and takes `ref` as a
+  regular prop instead of `forwardRef`**: The public `<RSCRoute ref={…}>` handle API and `onRefetchError`
+  behavior are unchanged, but the RSC client path now requires React >= 19.2 at runtime (the documented
+  Pro RSC floor — React 19.2.x and 19.3.x are the supported lines; React below 19.2 fails with
+  `useEffectEvent is not a function`). Calling `useEffectEvent` in a server component without
+  `'use client'` now gets the branded missing-directive diagnostic. Implements
+  [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
+  [PR 5031](https://github.com/shakacode/react_on_rails/pull/5031) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
