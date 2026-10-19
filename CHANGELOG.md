@@ -27,8 +27,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
-  package now handles `turbo:before-frame-render` and `turbo:frame-render`. It unmounts the components in the frame
-  being replaced and mounts the ones in its new content. Components outside the frame stay mounted.
+  package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
+  in the new frame content. Components outside the frame stay mounted.
   Previously the open-source package never mounted frame content loaded by navigation and leaked the
   replaced frame's React roots. Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
   [PR 5220](https://github.com/shakacode/react_on_rails/pull/5220) by [justin808](https://github.com/justin808).

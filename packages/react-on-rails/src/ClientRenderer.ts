@@ -659,12 +659,12 @@ function unmountAllComponents(): void {
 }
 
 /**
- * Unmount the components whose DOM nodes are inside `container`, such as a Turbo Frame whose
- * content is about to be replaced. Components elsewhere on the page stay mounted.
+ * Unmount the components whose DOM nodes are no longer in the document, such as the old content of
+ * a Turbo Frame that was just replaced. Components still in the document stay mounted.
  */
-export function unmountComponentsWithin(container: Element): void {
+export function unmountDetachedComponents(): void {
   renderedRoots.forEach((entry, domNodeId) => {
-    if (!container.contains(entry.domNode)) return;
+    if (entry.domNode.isConnected) return;
 
     try {
       teardownEntry(entry, domNodeId);

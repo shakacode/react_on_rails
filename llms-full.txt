@@ -11716,10 +11716,12 @@ With `turbo: true` set, React components inside a Turbo Frame work without extra
 <%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
 ```
 
-When a frame navigation replaces the frame's content, the `react-on-rails` package:
+When a frame navigation replaces the frame's content, the `react-on-rails` package handles `turbo:frame-render`:
 
-1. Unmounts the components inside the frame on `turbo:before-frame-render`, so their React roots do not leak.
-2. Mounts the components in the new frame content on `turbo:frame-render`.
+1. It unmounts the components the render removed from the page, so their React roots do not leak.
+2. It mounts the components in the new frame content.
+
+Nothing is unmounted before the frame renders, so pausing or canceling `turbo:before-frame-render` (for example, to animate the frame) leaves the old components working.
 
 Components outside the frame stay mounted. Redux stores are page-wide: a store the new frame content declares is initialized only if the page does not already have a store with that name.
 

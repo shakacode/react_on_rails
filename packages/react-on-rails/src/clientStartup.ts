@@ -1,6 +1,6 @@
 // Core package: Renders all components after full page load
 // Pro package: Can hydrate before page load and supports on-demand rendering
-import { renderAllComponents, renderComponentsWithin, unmountComponentsWithin } from './ClientRenderer.ts';
+import { renderAllComponents, renderComponentsWithin, unmountDetachedComponents } from './ClientRenderer.ts';
 import { onPageLoaded } from './pageLifecycle.ts';
 import { debugTurbolinks, turboInstalled } from './turbolinksUtils.ts';
 
@@ -10,24 +10,18 @@ export function reactOnRailsPageLoaded() {
   renderAllComponents();
 }
 
-// A Turbo Frame navigation replaces only the frame's content and fires frame events instead of
-// turbo:before-render/turbo:render, so the page lifecycle never sees it. Scope cleanup and
-// mounting to the frame, leaving components elsewhere on the page alone. The Pro package has its
-// own startup (proClientStartup) and does not install these listeners; it mounts frame content
-// through the inline script each component emits.
-function onTurboFrameEvent(event: Event, handler: (frame: Element) => void): void {
+// A Turbo Frame navigation replaces only the frame's content and fires turbo:frame-render instead
+// of turbo:before-render/turbo:render, so the page lifecycle never sees it. Once the frame has
+// rendered, unmount the components whose nodes the render removed and mount the ones in the new
+// content. Cleaning up after the render, not on turbo:before-frame-render, leaves components intact
+// when an app pauses or cancels the render (e.g. to animate the frame). The Pro package has its own
+// startup (proClientStartup) and does not install this listener; it mounts frame content through
+// the inline script each component emits.
+function onTurboFrameRender(event: Event): void {
   if (!turboInstalled() || !(event.target instanceof Element)) return;
-  debugTurbolinks(`${event.type}: frame #${event.target.id}`);
-  handler(event.target);
-}
-
-function setupTurboFrameListeners(): void {
-  document.addEventListener('turbo:before-frame-render', (event) =>
-    onTurboFrameEvent(event, unmountComponentsWithin),
-  );
-  document.addEventListener('turbo:frame-render', (event) =>
-    onTurboFrameEvent(event, renderComponentsWithin),
-  );
+  debugTurbolinks(`turbo:frame-render: frame #${event.target.id}`);
+  unmountDetachedComponents();
+  renderComponentsWithin(event.target);
 }
 
 export function clientStartup() {
@@ -48,5 +42,5 @@ export function clientStartup() {
   // Core package: Wait for full page load, then render all components
   // Pro package: Can start hydration immediately or wait for page load
   onPageLoaded(reactOnRailsPageLoaded);
-  setupTurboFrameListeners();
+  document.addEventListener('turbo:frame-render', onTurboFrameRender);
 }
