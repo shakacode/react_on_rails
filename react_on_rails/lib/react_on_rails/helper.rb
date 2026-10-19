@@ -12,6 +12,7 @@ require "react_on_rails/smart_error"
 require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
+require "react_on_rails/ssr_status_handler"
 require "active_support/concern"
 require "react_on_rails/pro_helper"
 require "react_on_rails/font_helper"
@@ -808,6 +809,10 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
+      # Store httpResponse metadata (status code, redirect location) in request.env
+      # so SsrStatusHandler can apply it in an after_action callback.
+      store_ssr_http_response(result) if result.is_a?(Hash)
+
       # clientProps are only expected on successful SSR hashes. Current error hashes do not
       # include that key, so non-SSR/error paths skip this merge entirely.
       merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
@@ -1049,6 +1054,22 @@ module ReactOnRails
         JS
       end
       result
+    end
+
+    # Stores httpResponse metadata from the render result in request.env so that
+    # SsrStatusHandler's after_action can set the HTTP status and Location header.
+    # First httpResponse wins for pages with multiple react_component calls.
+    # No-op outside a request context (e.g. mailers, tests without a request).
+    def store_ssr_http_response(result)
+      http_response = result["httpResponse"]
+      return unless http_response.is_a?(Hash)
+      return unless defined?(request) && request.respond_to?(:env)
+
+      env_key = ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_ENV_KEY
+      # First non-200 wins — don't overwrite if already set.
+      return if request.env[env_key]
+
+      request.env[env_key] = http_response
     end
 
     def in_mailer?
