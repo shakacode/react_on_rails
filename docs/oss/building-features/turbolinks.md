@@ -52,12 +52,14 @@ With `turbo: true` set, React components inside a Turbo Frame work without extra
 <%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
 ```
 
-When a frame navigation replaces the frame's content, React on Rails:
+When a frame navigation replaces the frame's content, the `react-on-rails` package:
 
 1. Unmounts the components inside the frame on `turbo:before-frame-render`, so their React roots do not leak.
 2. Mounts the components in the new frame content on `turbo:frame-render`.
 
 Components outside the frame stay mounted. Redux stores are page-wide: a store the new frame content declares is initialized only if the page does not already have a store with that name.
+
+With the `react-on-rails-pro` package, each component's inline script mounts the new frame content as soon as it is inserted. Pro does not yet unmount the replaced frame's components on frame navigation; their React roots are released on the next full Turbo page visit.
 
 ### Turbo with Auto-Bundling
 

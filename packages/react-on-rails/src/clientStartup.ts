@@ -13,7 +13,8 @@ export function reactOnRailsPageLoaded() {
 // A Turbo Frame navigation replaces only the frame's content and fires frame events instead of
 // turbo:before-render/turbo:render, so the page lifecycle never sees it. Scope cleanup and
 // mounting to the frame, leaving components elsewhere on the page alone. The Pro package has its
-// own startup and mounts frame content through the inline script each component emits.
+// own startup (proClientStartup) and does not install these listeners; it mounts frame content
+// through the inline script each component emits.
 function onTurboFrameEvent(event: Event, handler: (frame: Element) => void): void {
   if (!turboInstalled() || !(event.target instanceof Element)) return;
   debugTurbolinks(`${event.type}: frame #${event.target.id}`);

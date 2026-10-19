@@ -162,6 +162,8 @@ end
 describe "Turbo Frame navigation", :js do
   include_examples "Turbo Frame navigation with React components"
 
+  # The dummy still runs the OSS client package; stubbing Pro adds the inline mount script, so this
+  # checks that the script and the frame listeners do not mount the new component twice.
   context "with pro features and immediate hydration" do
     include_context "with pro features and immediate hydration"
 
