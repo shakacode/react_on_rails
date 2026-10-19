@@ -24,6 +24,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Improved
+
+- **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
+  request digest over `js_code` and its serialized props only when prerender caching needs it as a
+  cache key. Uncached renders send the Node Renderer a cheap `Component-pid-counter` id in the same
+  URL segment, which the renderer only logs. The route shape is unchanged.
+  [PR 5217](https://github.com/shakacode/react_on_rails/pull/5217) by
+  [justin808](https://github.com/justin808). Fixes
+  [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
+
 #### Fixed
 
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
