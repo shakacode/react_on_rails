@@ -514,7 +514,7 @@ RSpec.describe "script/release-forward-port" do
 
   # Adds a release-first commit (no -x footer) as a final-plan PICK and its omitted-pick manifest row.
   def add_release_first_omission(repo, fixture, subject, replacement_sha: "NONE", omission_class: nil,
-                                 approval: "maintainer approved the exact omission")
+                                 tracking_issue: nil)
     git(repo, "checkout", "release/1.0.0")
     write_file(repo, "#{subject.downcase.gsub(/[^a-z0-9]+/, '-')}.txt", "#{subject}\n")
     release_sha = commit_all(repo, subject)
@@ -526,10 +526,11 @@ RSpec.describe "script/release-forward-port" do
       "replacement_sha" => replacement_sha,
       "replacement_disposition" => "NONE",
       "proof" => "main already carries an equivalent change",
-      "approval" => approval
+      "approval" => "maintainer approved the exact omission"
     }
     if replacement_sha == "NONE"
       row["omission_class"] = omission_class
+      row["tracking_issue"] = tracking_issue if tracking_issue
     else
       row["replacement_disposition"] = {
         "replacement_sha" => replacement_sha,
@@ -1081,11 +1082,9 @@ RSpec.describe "script/release-forward-port" do
         add_release_first_omission(repo, fixture, "Release: set package versions for 1.0.0.rc.2 (#4997)",
                                    omission_class: "version-only")
         add_release_first_omission(repo, fixture, "Revert live main patch (#5070)", omission_class: "revert-of-live")
-        add_release_first_omission(
-          repo, fixture, "Qualify Rspack support (#5026)",
-          omission_class: "deferred",
-          approval: "maintainer deferred it; https://github.com/shakacode/react_on_rails/issues/5066 tracks the port"
-        )
+        add_release_first_omission(repo, fixture, "Qualify Rspack support (#5026)",
+                                   omission_class: "deferred",
+                                   tracking_issue: "https://github.com/shakacode/react_on_rails/issues/5120")
         _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
 
         expect(status).to be_success, stderr
@@ -1106,13 +1105,30 @@ RSpec.describe "script/release-forward-port" do
 
         expect(status).not_to be_success
         expect(stderr).to include("row 1 shape is invalid")
+      end
+    end
 
-        row["omission_class"] = "deferred"
+    it "rejects a deferred release-first omission without its own bare tracking issue" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Qualify Rspack support (#5066)", omission_class: "deferred")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+
+        row["tracking_issue"] = "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-789"
         write_selective_closeout_inputs(repo, fixture)
         _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
 
         expect(status).not_to be_success
-        expect(stderr).to include("row 1 deferred omission approval must link its tracking issue")
+        expect(stderr).to include("row 1 tracking_issue must be a bare issue URL")
+
+        row["tracking_issue"] = "https://github.com/shakacode/react_on_rails/issues/5066"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 tracking_issue names the omitted change itself")
       end
     end
 
@@ -3937,6 +3953,8 @@ RSpec.describe "script/release-forward-port" do
       git(repo, "checkout", "-b", "release/1.0.1")
       write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.2"))
       rc_bump_sha = commit_all(repo, "Release: bump versions to 1.0.1.rc.2")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.3"))
+      bare_plural_rc_bump_sha = commit_all(repo, "Bump versions to 1.0.1.rc.3")
       write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
       stable_bump_sha = commit_all(repo, "Release: bump version to 1.0.1")
       git(repo, "checkout", "main")
@@ -3946,6 +3964,7 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Release: bump versions to 1.0.1.rc.2")
       expect(stdout).to include("rc version bump commit")
+      expect(stdout).to include("SKIP #{bare_plural_rc_bump_sha[0, 12]} Bump versions to 1.0.1.rc.3")
       expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Release: bump version to 1.0.1")
       expect(stdout).to include("stable release version bump commit")
       expect(stdout).not_to include("PICK ")

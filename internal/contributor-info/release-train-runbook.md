@@ -1646,9 +1646,11 @@ run normal-mode `script/release-forward-port` or
      `omission_class`, with exactly one of these values:
      - `version-only`: a release version bump the helper did not recognize.
      - `revert-of-live`: a release revert of a change that stays live on `main`.
-     - `deferred`: a change the maintainers deferred out of `main` for now. Its
-       `approval` must link the `shakacode/react_on_rails` issue that tracks the
-       later forward-port.
+     - `deferred`: a change the maintainers deferred out of `main` for now. The
+       row also needs `tracking_issue`, a bare
+       `https://github.com/shakacode/react_on_rails/issues/N` URL for the open
+       issue that tracks the later forward-port. It may not name a PR number
+       from the release commit subject; the checker confirms the rest.
 
    For example, the 17.1.0 close-out would have recorded #4845 (replaced by
    #5017/#5047), #4928/#4931/#4935 (landed through the combined forward-ports
@@ -1764,6 +1766,8 @@ run normal-mode `script/release-forward-port` or
        approval origin_sha proof release_sha replacement_disposition replacement_sha
      ]
      release_first_unreplaced_row_keys = (expected_row_keys + ["omission_class"]).sort
+     deferred_row_keys = (release_first_unreplaced_row_keys + ["tracking_issue"]).sort
+     tracking_issue_url = %r{\Ahttps://github\.com/shakacode/react_on_rails/issues/([1-9][0-9]*)\z}
      release_first_omission_classes = %w[deferred revert-of-live version-only]
      expected_replacement_disposition_keys = %w[
        approval_record approved_by audited_main_sha replacement_sha
@@ -1784,9 +1788,13 @@ run normal-mode `script/release-forward-port` or
      rows.each_with_index do |row, index|
        release_first_unreplaced =
          row.is_a?(Hash) && row["origin_sha"] == "NONE" && row["replacement_sha"] == "NONE"
+       allowed_row_keys =
+         if !release_first_unreplaced then expected_row_keys
+         elsif row["omission_class"] == "deferred" then deferred_row_keys
+         else release_first_unreplaced_row_keys
+         end
        fail_validation.call("row #{index} shape is invalid") unless
-         row.is_a?(Hash) &&
-         row.keys.sort == (release_first_unreplaced ? release_first_unreplaced_row_keys : expected_row_keys)
+         row.is_a?(Hash) && row.keys.sort == allowed_row_keys
        %w[proof approval].each do |field|
          value = row[field]
          fail_validation.call("row #{index} #{field} is empty or UNKNOWN") unless
@@ -1800,9 +1808,13 @@ run normal-mode `script/release-forward-port` or
          fail_validation.call("row #{index} release-first omission without a replacement needs " \
                               "omission_class #{release_first_omission_classes.join(", ")}") unless
            release_first_omission_classes.include?(row["omission_class"])
-         fail_validation.call("row #{index} deferred omission approval must link its tracking issue") if
-           row["omission_class"] == "deferred" &&
-           !row["approval"].match?(%r{https://github\.com/shakacode/react_on_rails/issues/[1-9][0-9]*\b})
+         if row["omission_class"] == "deferred"
+           tracking_number = row["tracking_issue"].to_s[tracking_issue_url, 1]
+           fail_validation.call("row #{index} tracking_issue must be a bare issue URL") unless tracking_number
+           subject = capture_command.call("git", "show", "-s", "--format=%s", row.fetch("release_sha"))
+           fail_validation.call("row #{index} tracking_issue names the omitted change itself") if
+             subject.scan(/#([1-9][0-9]*)/).flatten.include?(tracking_number)
+         end
        end
        replacement = row["replacement_sha"]
        fail_validation.call("row #{index} replacement_sha must be a full SHA or NONE") unless
@@ -1976,7 +1988,8 @@ This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips
-> `Bump version to ...rc.N` commits, including the `Release: bump versions to ...rc.N` form. For stable non-RC version bumps, the helper always marks the commit
+> `Bump version to ...rc.N` commits. It also accepts `Bump versions to`, and either form after a
+> `Release:` prefix, such as `Release: bump versions to ...rc.N`. For stable non-RC version bumps, the helper always marks the commit
 > `MANUAL`, regardless of `main`'s current version, so the operator explicitly decides whether to extract
 > only the CHANGELOG hunks. For prerelease non-RC bumps (for example `beta` or `dev`), it compares
 > `main`'s current version to the commit subject and skips with an explicit version-drift message when
