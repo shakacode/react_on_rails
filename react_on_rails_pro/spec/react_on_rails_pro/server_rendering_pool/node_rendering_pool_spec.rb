@@ -254,6 +254,29 @@ module ReactOnRailsPro
           expect(Digest::MD5).not_to have_received(:hexdigest)
         end
 
+        it "keeps generated ids within Fastify's default 100-character route param limit" do
+          allow(render_options).to receive(:react_component_name).and_return("A" * 300)
+
+          segment = described_class.prepare_render_path(render_options).split("/").last
+
+          expect(segment).to start_with("#{'A' * 48}-#{Process.pid}-")
+          expect(segment.length).to be <= 100
+        end
+
+        it "keeps generated ids unique across threads" do
+          paths = Array.new(8) do
+            Thread.new { Array.new(50) { described_class.prepare_render_path(render_options) } }
+          end.flat_map(&:value)
+
+          expect(paths.uniq.size).to eq(400)
+        end
+
+        it "uses the cheap id for the incremental-render endpoint too" do
+          path = described_class.prepare_incremental_render_path(render_options)
+
+          expect(path).to match(%r{\A/bundles/server123/incremental-render/App_Header_Bar-#{Process.pid}-\d+\z})
+        end
+
         it "keeps the prerender cache digest in the path when caching already computed it" do
           allow(render_options).to receive(:request_digest).and_return("cache-digest")
 

@@ -19,7 +19,8 @@ module ReactOnRailsPro
     class NodeRenderingPool
       RENDERED_HTML_KEY = "renderedHtml"
       REQUEST_ID_MUTEX = Mutex.new
-      private_constant :REQUEST_ID_MUTEX
+      REQUEST_ID_NAME_MAX_LENGTH = 48
+      private_constant :REQUEST_ID_MUTEX, :REQUEST_ID_NAME_MAX_LENGTH
 
       class << self
         attr_reader :bundle_hash
@@ -191,7 +192,7 @@ module ReactOnRailsPro
           "/bundles/#{bundle_hash}/#{endpoint}/#{request_id_segment(render_options)}"
         end
 
-        # The renderer ignores the last path segment; it only tells requests apart in logs.
+        # The renderer does not use the last path segment; it can only show up in request logs.
         # Use the prerender cache digest when caching already computed it, and otherwise a cheap
         # per-process id so uncached renders skip hashing the whole js_code (issue #4880).
         # Removing the segment from the protocol is tracked in issue #4873.
@@ -199,8 +200,9 @@ module ReactOnRailsPro
           digest = render_options.request_digest
           return digest if digest.present?
 
+          # Fastify rejects route params over 100 characters by default, so bound the name.
           component_name = render_options.react_component_name.to_s.gsub(/[^\w.-]/, "_")
-          "#{component_name}-#{Process.pid}-#{next_request_id}"
+          "#{component_name[0, REQUEST_ID_NAME_MAX_LENGTH]}-#{Process.pid}-#{next_request_id}"
         end
 
         def next_request_id
