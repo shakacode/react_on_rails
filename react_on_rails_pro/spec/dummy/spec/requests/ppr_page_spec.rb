@@ -167,4 +167,35 @@ describe "PPR page requests", :caching, :server_rendering do
     expect(prerender_calls).to eq(2)              # full prerender again under the new version
     expect(evictions).to be_empty                 # structural: the old entry is not even read, so nothing evicts
   end
+
+  # Regression this catches: any hop of the #4897 asset-manifest handoff silently dropping the
+  # manifest — renderer emits pprAssetManifest → Rails stores envelope["assets"] → a warm
+  # request injects it as railsContext.pprShellAssets into the resume JS. Every hop degrades
+  # gracefully to nil, so when this seam breaks nothing fails: CSS/init-script dedup just
+  # quietly stops. The JS halves are covered in pprServerRenderedReactComponent.test.jsx;
+  # the Rails middle is covered nowhere else.
+  it "stores the renderer's asset manifest and injects it as pprShellAssets into the warm resume JS" do
+    path = page_path("assets-value")
+
+    get path
+
+    envelope = Rails.cache.read(cache_write_keys.fetch(0))
+    expect(envelope["assets"]).to be_a(String)
+    manifest = JSON.parse(envelope["assets"])
+    expect(manifest.keys).to match_array(%w[stylesheetHrefs initScriptKeys])
+    # PprPageForTesting is plain React (no RSC payloads), so both arrays are EMPTY — the
+    # renderer still always emits the manifest (pinned by the JS test "captures the asset
+    # manifest even when the prerender has no RSC payloads"). Deterministic either way:
+    expect(manifest["stylesheetHrefs"]).to all(be_a(String))
+    expect(manifest["initScriptKeys"]).to all(be_a(String))
+
+    renderer_stream_js_calls.clear # isolate the WARM request's render calls below
+    get path
+
+    resume_js = renderer_stream_js_calls.find { |js| js.include?("pprResumeServerRenderedReactComponent") }
+    expect(resume_js).not_to be_nil
+    # Pins the exact injection the generated-JS spec never covers (server_rendering_js_code.rb,
+    # the line next to the covered pprPostponedState wire key).
+    expect(resume_js).to include("railsContext.pprShellAssets = #{envelope['assets'].to_json};")
+  end
 end
