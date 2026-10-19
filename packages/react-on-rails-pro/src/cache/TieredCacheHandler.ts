@@ -64,7 +64,7 @@ export class TieredCacheHandler implements CacheHandler {
   // matching the fanout's own behavior for handlers without the method).
   // Best-effort per layer: one layer rejecting or throwing synchronously never
   // stops the other, and this method itself never throws.
-  async revalidateTag(tag: string, invalidatedAt?: number): Promise<void> {
+  async revalidateTag?(tag: string, invalidatedAt?: number): Promise<void> {
     const forward = (layer: CacheHandler, name: string): Promise<void> => {
       const { revalidateTag } = layer;
       if (typeof revalidateTag !== 'function') return Promise.resolve();
