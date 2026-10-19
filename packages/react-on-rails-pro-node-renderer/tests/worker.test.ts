@@ -888,11 +888,10 @@ describe('worker', () => {
       const app = createWorker({ password: 'my_password' });
       let uploadDir: string | undefined;
       const responseFinished = new Promise<void>((resolve) => {
-        app.addHook('onResponse', async () => resolve());
-      });
-      app.addHook('onSend', (req, _res, payload, done) => {
-        uploadDir = req.uploadDir;
-        done(null, payload);
+        app.addHook('onResponse', async (req) => {
+          uploadDir = req.uploadDir;
+          resolve();
+        });
       });
       const fields: Record<string, unknown> = {
         gemVersion,

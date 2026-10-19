@@ -21,16 +21,16 @@ import { createForm, SERVER_BUNDLE_TIMESTAMP } from './httpRequestUtils';
 import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 
 const { config } = createTestConfig('htmlStreaming');
-// Only the controlled streaming test holds the fixture's one-second async work.
-// React scheduling and every other request continue to use real timers.
-let pendingComponentTimers;
+// The controlled test gates the fixture's one-second VM callbacks. Other delays
+// and requests outside that test use real timers.
+let holdComponentTimer;
 const app = buildApp({
   ...config,
   additionalContext: {
     ...config.additionalContext,
     setTimeout(callback, delay, ...args) {
-      if (pendingComponentTimers && delay === 1000) {
-        pendingComponentTimers.push(() => callback(...args));
+      if (holdComponentTimer && delay === 1000) {
+        holdComponentTimer(() => callback(...args));
         return undefined;
       }
       return setTimeout(callback, delay, ...args);
@@ -167,7 +167,18 @@ describe('html streaming', () => {
     const heldTimers = [];
     const releasedBatches = [];
     let shellReceived = false;
-    pendingComponentTimers = heldTimers;
+    let deliveryAvailable = false;
+    const releasePending = () => {
+      if (!deliveryAvailable || heldTimers.length === 0) return;
+      deliveryAvailable = false;
+      const batch = heldTimers.splice(0);
+      releasedBatches.push(batch.length);
+      batch.forEach((callback) => callback());
+    };
+    holdComponentTimer = (callback) => {
+      heldTimers.push(callback);
+      releasePending();
+    };
 
     try {
       const { status, chunks, fullBody } = await makeRequest(
@@ -178,10 +189,10 @@ describe('html streaming', () => {
           signal: AbortSignal.timeout(8000),
           onChunks(receivedChunks) {
             shellReceived ||= receivedChunks.some((chunk) => chunk.includes(SHELL_HEADER));
-            if (shellReceived && receivedChunks.length > 0 && heldTimers.length > 0) {
-              const batch = heldTimers.splice(0);
-              releasedBatches.push(batch.length);
-              batch.forEach((callback) => callback());
+            if (shellReceived && receivedChunks.length > 0) {
+              // Retain this receipt if the producer registers its next timer later.
+              deliveryAvailable = true;
+              releasePending();
             }
           },
         },
@@ -194,8 +205,8 @@ describe('html streaming', () => {
       expect(fullBody).toContain('branch1 (level 0)');
       expect(fullBody).toContain('branch2 (level 0)');
     } finally {
-      pendingComponentTimers = undefined;
-      heldTimers.length = 0;
+      holdComponentTimer = undefined;
+      heldTimers.splice(0).forEach((callback) => callback());
     }
   }, 10000);
 
