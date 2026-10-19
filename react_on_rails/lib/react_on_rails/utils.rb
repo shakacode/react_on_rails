@@ -493,21 +493,22 @@ module ReactOnRails
       strip_obfuscated_userinfo(sanitized)
     end
 
-    OBFUSCATED_AUTHORITY_HINT = %r{%\h\h|/\s+/}
+    OBFUSCATED_AUTHORITY_HINT = %r{%\h\h|/[ \t]+/}
     PERCENT_ESCAPE = /%[0-7]\h/
-    AUTHORITY_START = %r{/\s*/}
+    AUTHORITY_START = %r{/[ \t]*/}
+    AUTHORITY_END = %r{[/?#\s]}
+    TOKEN_END = /\s/
     MAX_DECODE_PASSES = 3
-    private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :MAX_DECODE_PASSES
+    private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :AUTHORITY_END, :TOKEN_END,
+                     :MAX_DECODE_PASSES
 
     # Catches userinfo the literal patterns above cannot see: percent-encoded
-    # (including double-encoded and mixed-case) slashes and at signs, and
-    # whitespace between the authority slashes. Decodes the text into a view
-    # that maps each character back to its span of original text and records
-    # whether it was literal, then runs one scan over that view: after each
-    # authority start, everything up to the last at sign before the next literal
-    # whitespace is userinfo. Fails closed: an at sign later in the same token,
-    # even in a path, ends the userinfo. Works on bytes: every delimiter it looks
-    # for is ASCII, and byte offsets keep the scan linear for multibyte text.
+    # (including double-encoded and mixed-case) slashes and at signs, and a space
+    # or tab between the authority slashes. Decodes the text into a view that
+    # maps each character back to its span of original text and records whether
+    # it was literal, then runs one scan over that view (see userinfo_spans).
+    # Works on bytes: every delimiter it looks for is ASCII, and byte offsets
+    # keep the scan linear for multibyte text.
     def self.strip_obfuscated_userinfo(text)
       bytes = text.b
       return text unless bytes.match?(OBFUSCATED_AUTHORITY_HINT)
@@ -567,36 +568,35 @@ module ReactOnRails
     private_class_method :append_view_slice
 
     # Returns [from, to) spans of original text holding userinfo, in order.
-    # Authorities whose slashes and at sign are literal belong to the literal
-    # patterns above, so a stack-trace path such as webpack://app/@babel/x.js
-    # keeps its text.
+    # After each authority start, the userinfo runs to the last at sign (literal
+    # or decoded) before the authority ends. With literal slashes, the authority
+    # ends at the first literal /, ?, # or whitespace, as URI parsing would end it,
+    # so webpack://app/node_modules/@babel/x.js keeps its text. With decoded or
+    # whitespace-split slashes, it fails closed and runs to the next literal
+    # whitespace, so a literal slash inside an encoded password cannot hide it.
     def self.userinfo_spans(decoded, from, to, literal)
       spans = []
       position = 0
-      while (match = AUTHORITY_START.match(decoded, position))
-        userinfo_start = match.end(0)
-        token_end = userinfo_start
-        token_end += 1 while (token_end = decoded.index(/\s/, token_end)) && !literal[token_end]
-        token_end ||= decoded.length
-        last_at = decoded[userinfo_start...token_end].rindex("@")
-        if last_at
-          userinfo_end = userinfo_start + last_at
-          spans << [from[userinfo_start], to[userinfo_end]] if obfuscated_authority?(match, literal, userinfo_end)
-        end
-        position = token_end
+      while (authority_start = AUTHORITY_START.match(decoded, position))
+        userinfo_start = authority_start.end(0)
+        obfuscated = authority_start[0].length > 2 || literal[authority_start.begin(0)...userinfo_start].include?(false)
+        authority_end = next_literal_index(decoded, literal, obfuscated ? TOKEN_END : AUTHORITY_END, userinfo_start)
+        last_at = decoded[userinfo_start...authority_end].rindex("@")
+        spans << [from[userinfo_start], to[userinfo_start + last_at]] if last_at
+        position = authority_end
       end
       spans
     end
     private_class_method :userinfo_spans
 
-    # Only the delimiters decide: an escape elsewhere in the token, such as %20 in
-    # file:///My%20App/node_modules/@babel/x.js, leaves a literal URL to the literal patterns.
-    def self.obfuscated_authority?(authority_start, literal, at_index)
-      authority_start[0].length > 2 ||
-        literal[authority_start.begin(0)...authority_start.end(0)].include?(false) ||
-        !literal[at_index]
+    # Index of the first literal (not decoded) match of pattern at or after start,
+    # or the end of the text.
+    def self.next_literal_index(decoded, literal, pattern, start)
+      index = start
+      index += 1 while (index = decoded.index(pattern, index)) && !literal[index]
+      index || decoded.length
     end
-    private_class_method :obfuscated_authority?
+    private_class_method :next_literal_index
 
     # Replaces query values with [REDACTED], keeping keys for diagnostics.
     # Bare components without = (like ?eyJhbGciOi...) are treated as opaque

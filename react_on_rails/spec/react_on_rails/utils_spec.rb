@@ -1145,6 +1145,31 @@ module ReactOnRails
         expect(result).to be_valid_encoding
       end
 
+      it "strips an encoded at sign before a literal at sign later in the path" do
+        text = "at //user:s3cr3t%40host/@babel/x.js"
+        expect(described_class.sanitize_error_text(text)).to eq("at //host/@babel/x.js")
+      end
+
+      it "strips an encoded authority that follows a literal one in the same token" do
+        text = "webpack://app/x,http:%2F%2Fuser:s3cr3t@host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("webpack://app/x,http:%2F%2Fhost/x")
+      end
+
+      it "strips an encoded authority whose password has a literal slash" do
+        text = "http:%2F%2Fuser:pa/ss%40host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
+      end
+
+      it "keeps an encoded at sign in a literal URL's path" do
+        text = "GET http://api.example.com/users/john%40example.com failed"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "does not treat a line break between two paths as an authority" do
+        text = "cwd: /srv/app/\n/srv/app/node_modules/@babel/core/lib/index.js (a%20b)"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
       it "stays fast on a large slash-heavy message without an at sign" do
         text = "%2F%2F #{'x %2F/ ' * 50_000}"
         expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error
