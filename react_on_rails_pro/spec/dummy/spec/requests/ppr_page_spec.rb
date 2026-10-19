@@ -118,6 +118,9 @@ describe "PPR page requests", :caching, :server_rendering do
     expect(resume_calls).to eq(0)
     expect(cache_write_keys.size).to eq(1)
     expect(response.body).to include("Static section rendered in the PPR shell")
+    # No reveal machinery either: $RC is the script a resume stream emits to swap a Suspense
+    # fallback for streamed content, and a fully static page must carry none of it.
+    expect(response.body).not_to include("$RC(")
   end
 
   # Regression this catches: re-introducing the #4581 class of bug — persisting a shell from
