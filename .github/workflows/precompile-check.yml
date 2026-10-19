@@ -70,6 +70,8 @@ jobs:
           PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
           PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
           EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+          # A force-push replaces github.event.before; the helper then diffs from origin/main (#5119).
+          EVENT_FORCED: ${{ github.event.forced || false }}
         run: |
           # Force-full hosted CI is the explicit escape hatch that bypasses
           # optimized change selection. Hosted readiness alone stays path-based.
