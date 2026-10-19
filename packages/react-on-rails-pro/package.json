@@ -17,7 +17,7 @@
     "test:public-ref-types": "node --test scripts/check-public-ref-types.test.mjs",
     "test:packed-esm-floor": "node --test scripts/packed-esm-floor.test.mjs",
     "test:packed-react-compatibility": "node --test scripts/packed-react-compatibility-manifest.test.mjs && node --test scripts/packed-react-compatibility-cases.test.mjs && node scripts/packed-react-compatibility-smoke.mjs",
-    "type-check": "tsc --noEmit --noErrorTruncation",
+    "type-check": "tsc --noEmit --noErrorTruncation && tsc --noEmit --noErrorTruncation --project type-tests/tsconfig.json",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
     "prepublishOnly": "pnpm run build"
   },
