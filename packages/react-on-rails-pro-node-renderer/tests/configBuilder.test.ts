@@ -707,6 +707,32 @@ describe('configBuilder', () => {
       expect(buildConfig().isolateHydratedStores).toBe(true);
     });
 
+    it.each([undefined, null])('keeps the environment default for an unset config value (%p)', (value) => {
+      delete process.env.RENDERER_ISOLATE_HYDRATED_STORES;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: value as unknown as boolean }).isolateHydratedStores).toBe(
+        true,
+      );
+    });
+
+    it.each(['', 0, 'false'])('stays on for a non-boolean config value (%p)', (value) => {
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: value as unknown as boolean }).isolateHydratedStores).toBe(
+        true,
+      );
+    });
+
+    it('lets an explicit false config value turn isolation off despite the environment', () => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'true';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: false }).isolateHydratedStores).toBe(false);
+    });
+
     it('prefers the explicit config value over the environment variable', () => {
       process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'false';
 

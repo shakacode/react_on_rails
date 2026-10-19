@@ -260,6 +260,13 @@ function defaultIsolateHydratedStores() {
   return !(value === 'false' || value === 'no' || value === '0');
 }
 
+// Only an explicit `false` disables isolation; an unset value keeps the environment default.
+// The value is `unknown` because JavaScript callers can forward anything, such as an unset env value.
+function resolveIsolateHydratedStores(value: unknown, fallback: boolean) {
+  if (value === false) return false;
+  return value === undefined || value === null ? fallback : true;
+}
+
 function truthyHealthEndpointFlag(value: unknown) {
   return value === '1' || truthy(value);
 }
@@ -374,7 +381,7 @@ function envValuesUsed() {
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
     RENDERER_ISOLATE_HYDRATED_STORES:
-      !('isolateHydratedStores' in userConfig) && env.RENDERER_ISOLATE_HYDRATED_STORES,
+      userConfig.isolateHydratedStores == null && env.RENDERER_ISOLATE_HYDRATED_STORES,
     MAX_VM_POOL_SIZE: !userConfig.maxVMPoolSize && env.MAX_VM_POOL_SIZE,
     VM_POOL_ROLLOUT_DRAIN_TIMEOUT: !userConfig.vmPoolRolloutDrainTimeout && env.VM_POOL_ROLLOUT_DRAIN_TIMEOUT,
     RENDERER_CURRENT_GENERATION_MANIFEST:
@@ -513,6 +520,10 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     config.password = runtimeDefaultConfig.password;
   }
   config.licenseToken = userConfig.licenseToken?.trim() || runtimeDefaultConfig.licenseToken;
+  config.isolateHydratedStores = resolveIsolateHydratedStores(
+    userConfig.isolateHydratedStores,
+    runtimeDefaultConfig.isolateHydratedStores,
+  );
   config.currentGenerationManifestPath = config.currentGenerationManifestPath?.trim() || undefined;
 
   // Handle bundlePath deprecation

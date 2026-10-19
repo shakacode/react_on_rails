@@ -994,8 +994,8 @@ export async function buildExecutionContext(
   // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
   const requestHydratedStores = new Map<object, unknown>();
-  // Without this scope the store registries fall back to their shared map. Only an explicit
-  // `false` turns it off, so an unset value forwarded from JavaScript config keeps isolation.
+  // Without this scope the store registries fall back to their shared map. buildConfig
+  // normalizes the option so only an explicit `false` turns it off.
   const inStoreScope: <T>(fn: () => T) => T = getConfig().isolateHydratedStores
     ? (fn) => hydratedStoreScope.run(requestHydratedStores, fn)
     : (fn) => fn();
