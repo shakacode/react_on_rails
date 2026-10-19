@@ -8,6 +8,18 @@ const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 // Wilcoxon signed-rank test cannot reach significance below 6 clean pairs
 // (min two-sided p = 2^(1-n)), so never set this below 6.
 const NUMBER_OF_MEASUREMENTS = Number(process.env.SHAKAPERF_PPR_MEASUREMENTS ?? 12);
+// Enforce the floor, not just document it: below 6 pairs the Wilcoxon test can NEVER reach
+// p < 0.05 (min p = 2^(1-n); n=4 gives 0.125), so the "no worse" statistical gate is silently
+// blind — every undersampled run reports green regardless of regression size. NaN (a typo'd
+// env value) would also sail through bare comparisons, so validate the shape too.
+if (!Number.isInteger(NUMBER_OF_MEASUREMENTS) || NUMBER_OF_MEASUREMENTS < 6) {
+  throw new Error(
+    `SHAKAPERF_PPR_MEASUREMENTS must be an integer >= 6 (got ${JSON.stringify(
+      process.env.SHAKAPERF_PPR_MEASUREMENTS,
+    )}): below 6 paired samples the Wilcoxon test cannot reach p < 0.05, so the regression gate ` +
+      'cannot fail — an undersampled run is not a release-gate run.',
+  );
+}
 
 export default defineConfig({
   shared: {
@@ -16,6 +28,13 @@ export default defineConfig({
       process.env.SHAKAPERF_EXPERIMENT_URL ?? process.env.SHAKAPERF_CONTROL_URL ?? DEFAULT_TARGET_URL,
     viewports: [DESKTOP_VIEWPORT],
     parallelism: 1,
+    // No retries: the runner's default (2) retries ASSERTION failures, not just
+    // infrastructure crashes, and a retry-recovered task passes the run as
+    // merely "flaky". For this gate the guard's assertions ARE the evidence —
+    // an intermittent warm-hit/resume failure must turn the gate red, not get
+    // retried into a green verdict. Infrastructure flakes become terminal too;
+    // rerunning the gate is cheap next to a false release verdict.
+    retries: 0,
   },
 
   // ShakaPerf validates all category defaults while loading the config, even
@@ -39,6 +58,13 @@ export default defineConfig({
   perf: {
     viewports: ['desktop'],
     numberOfMeasurements: NUMBER_OF_MEASUREMENTS,
+    // "No worse" enforcement: shaka-perf 0.1.3 fails the run (exit 1) on ANY
+    // statistically significant slower-direction metric via its regression
+    // chip — that verdict path never consults regressionThreshold, which is an
+    // absolute tolerance in MILLISECONDS (not a ratio) feeding only the console
+    // alert and a report.json field; 0.1ms keeps the alert aligned with the
+    // verdict. The plan §6 improvement floor (warm-hit TTFB ≤ 10% of streaming)
+    // is NOT machine-enforced by this stage — see README "Enforcement status".
     regressionThreshold: 0.1,
     pValueThreshold: 0.05,
     regressionThresholdStat: 'estimator',
