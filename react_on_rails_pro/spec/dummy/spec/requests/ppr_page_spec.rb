@@ -29,10 +29,10 @@ describe "PPR page requests", :caching, :server_rendering do
   let(:write_refusal_reasons) { [] }
 
   # holeDelayMs must exceed config.ppr_settle_budget_ms (500) or the hole settles inside the
-  # budget and the scenario silently becomes fully static. 800 keeps a 1.6x margin while
-  # costing roughly half the warm-up spec's 1500 ms per resume render.
+  # budget and the scenario silently becomes fully static. 1000 keeps a 2x margin on slow CI
+  # boxes while still costing a third less than the warm-up spec's 1500 ms per resume render.
   def page_path(dynamic_value, extra = "")
-    "/ppr_page_for_testing?cacheKey=#{cache_key_param}&holeDelayMs=800&dynamicValue=#{dynamic_value}#{extra}"
+    "/ppr_page_for_testing?cacheKey=#{cache_key_param}&holeDelayMs=1000&dynamicValue=#{dynamic_value}#{extra}"
   end
 
   before do
