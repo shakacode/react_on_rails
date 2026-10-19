@@ -116,8 +116,18 @@ mkdir -p "$REPO/script"
 
 cat > "$REPO/script/ci-changes-detector" <<'STUB'
 #!/usr/bin/env bash
-# Stub standing in for the real detector: record the base ref it was handed.
+# Stub standing in for the real detector: record the base ref it was handed,
+# and write a narrow docs-only selection like the real one would.
 echo "DETECTOR_BASE=$1"
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "docs_only=true"
+    echo "non_runtime_only=true"
+    echo "run_ruby_tests=false"
+    echo "run_generators=false"
+    echo "run_core_benchmarks=false"
+  } >> "$GITHUB_OUTPUT"
+fi
 STUB
 chmod +x "$REPO/script/ci-changes-detector"
 
@@ -351,6 +361,7 @@ run_push_case() {
   mkdir -p "$CLONE/script"
   cp "$REPO/script/ci-changes-detector" "$CLONE/script/ci-changes-detector"
 
+  : > "$WORKDIR/github-output.txt"
   LAST_OUTPUT="$(
     cd "$CLONE" || exit 1
     CI=1 \
@@ -369,32 +380,63 @@ run_push_case() {
   LAST_RC=$?
 }
 
+assert_outputs() {
+  local expected="$1"
+  local label="$2"
+  local actual
+
+  actual="$(cat "$WORKDIR/github-output.txt")"
+  if [ "$actual" != "$expected" ]; then
+    fail "$label: expected GITHUB_OUTPUT:
+$expected
+got:
+$actual"
+  fi
+}
+
+ALL_SUITES_OUTPUT="docs_only=false
+non_runtime_only=false
+run_ruby_tests=true
+run_generators=true
+run_core_benchmarks=false"
+
+NARROW_OUTPUT="docs_only=true
+non_runtime_only=true
+run_ruby_tests=false
+run_generators=false
+run_core_benchmarks=false"
+
 # The case from the issue: a force-push, so the before SHA is gone. The step must
-# not spend fetches on it, and must hand the detector origin/main.
-run_push_case "forced push with an unreachable before SHA falls back to origin/main" \
+# not spend fetches on it. No base reproduces the pushed changes (origin/main
+# misses files the force-push reverted), so every test suite runs.
+run_push_case "forced push with an unreachable before SHA runs every test suite" \
   true "$REPLACED_TIP"
 assert_rc 0 "forced unreachable push"
-assert_contains "$LAST_OUTPUT" "::warning::Force-push replaced $REPLACED_TIP" "forced unreachable push"
+assert_contains "$LAST_OUTPUT" "::warning::Force-push replaced $REPLACED_TIP, so the pushed changes cannot be listed. Running every test suite." "forced unreachable push"
 assert_contains "$LAST_OUTPUT" "Diff base: origin/main (source: force-push fallback)" "forced unreachable push"
 assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=origin/main" "forced unreachable push"
 assert_not_contains "$LAST_OUTPUT" "Deepening shallow history" "forced unreachable push"
+assert_outputs "$ALL_SUITES_OUTPUT" "forced unreachable push"
+assert_contains "$LAST_OUTPUT" "Overriding the selection above: every test suite runs" "forced unreachable push"
 
 # Without the forced flag the step tries the real deepen and unshallow paths
-# first, and falls back only once the SHA is still missing.
-run_push_case "unforced push with an unreachable before SHA falls back after deepening" \
+# first, and runs every suite only once the SHA is still missing.
+run_push_case "unforced push with an unreachable before SHA runs every suite after deepening" \
   false "$REPLACED_TIP"
 assert_rc 0 "unforced unreachable push"
 assert_contains "$LAST_OUTPUT" "Deepening shallow history" "unforced unreachable push"
 assert_contains "$LAST_OUTPUT" "::warning::Push base $REPLACED_TIP is still unreachable after fetching more history" "unforced unreachable push"
 assert_contains "$LAST_OUTPUT" "Diff base: origin/main (source: unreachable push base fallback)" "unforced unreachable push"
 assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=origin/main" "unforced unreachable push"
+assert_outputs "$ALL_SUITES_OUTPUT" "unforced unreachable push"
 
-# A forced push falls back even when the old tip is still fetchable: the
-# rewritten branch is not a descendant of it, so it is not this push's range.
-run_push_case "forced push with a reachable before SHA still falls back" \
+# A forced push runs every suite even when the old tip is still fetchable: the
+# rewritten branch does not descend from it, so before..HEAD is not the push.
+run_push_case "forced push with a reachable before SHA still runs every suite" \
   true "$RELEASE_BASE"
 assert_rc 0 "forced reachable push"
 assert_contains "$LAST_OUTPUT" "Diff base: origin/main (source: force-push fallback)" "forced reachable push"
+assert_outputs "$ALL_SUITES_OUTPUT" "forced reachable push"
 
 # Regression guard: an ordinary push whose before SHA deepening can reach keeps
 # the event base, with no fallback warning.
@@ -404,6 +446,7 @@ assert_rc 0 "unforced reachable push"
 assert_contains "$LAST_OUTPUT" "Diff base: $RELEASE_BASE (source: event payload)" "unforced reachable push"
 assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=$RELEASE_BASE" "unforced reachable push"
 assert_not_contains "$LAST_OUTPUT" "::warning::" "unforced reachable push"
+assert_outputs "$NARROW_OUTPUT" "unforced reachable push"
 
 # The forced flag must not leak into pull_request or merge_group runs.
 EVENT_FORCED=true run_case "merge_group ignores a forced flag" \

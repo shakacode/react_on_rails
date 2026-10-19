@@ -72,27 +72,48 @@ elif [ "${GITHUB_EVENT_NAME}" = "push" ] && git_diff_base_sha_ref "$base_ref" &&
   # A push event's base is github.event.before, the branch tip the push
   # replaced. After a force-push that commit is no longer on any remote
   # branch, so no amount of deepening can fetch it and the detector would
-  # fail hard (#5119). Diff from the merge base with origin/main instead.
-  # That base is at least as wide as the pushed range, so it can only
-  # select more suites, never skip a changed file.
+  # fail hard (#5119). No other base reproduces the push's own changes:
+  # diffing from origin/main misses files the force-push reverted, and is
+  # empty when HEAD is already on main. So this run classifies against
+  # origin/main for the log, then runs every test suite below.
   if [ "${EVENT_FORCED}" = "true" ]; then
-    echo "::warning::Force-push replaced ${base_ref}, so it is not a usable diff base. Falling back to the merge base with origin/main; this can select more suites than the push changed."
+    echo "::warning::Force-push replaced ${base_ref}, so the pushed changes cannot be listed. Running every test suite."
     base_ref="origin/main"
     base_source="force-push fallback"
+    run_all_suites=true
   elif ! git_diff_base_verify_ref "$base_ref" &&
     ! git_diff_base_resolve "$base_ref" HEAD strict >/dev/null &&
     ! git_diff_base_verify_ref "$base_ref"; then
     # Only a base that is still missing falls back. A base that was fetched
     # but shares no history with HEAD keeps failing in the detector below.
-    echo "::warning::Push base ${base_ref} is still unreachable after fetching more history, so the error above is expected. Falling back to the merge base with origin/main; this can select more suites than the push changed."
+    echo "::warning::Push base ${base_ref} is still unreachable after fetching more history, so the error above is expected. Running every test suite."
     base_ref="origin/main"
     base_source="unreachable push base fallback"
+    run_all_suites=true
   fi
 fi
 
 echo "Diff base: ${base_ref} (source: ${base_source})"
 
-script/ci-changes-detector "$base_ref"
+if [ "${run_all_suites}" = "true" ] && [ -n "${GITHUB_OUTPUT}" ]; then
+  # Like each workflow's force-full hosted path: every run_* test flag on
+  # and both skip flags off. Benchmark flags keep the detector's value,
+  # as they do there.
+  detector_output="$(mktemp)"
+  GITHUB_OUTPUT="$detector_output" script/ci-changes-detector "$base_ref"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      docs_only | non_runtime_only) value=false ;;
+      *benchmark*) ;;
+      run_*) value=true ;;
+    esac
+    printf '%s=%s\n' "$key" "$value"
+  done < "$detector_output" >> "$GITHUB_OUTPUT"
+  rm -f "$detector_output"
+  echo "Overriding the selection above: every test suite runs because ${base_source} left no exact diff base."
+else
+  script/ci-changes-detector "$base_ref"
+fi
 
 # Show the exact file set behind the classification above so a widened
 # diff is visible at a glance. The detector has already fetched and
