@@ -26,6 +26,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, React on Rails
+  now handles `turbo:before-frame-render` and `turbo:frame-render`. It unmounts the components in the frame
+  being replaced and mounts the ones in its new content. Components outside the frame stay mounted.
+  Previously the open-source package never mounted frame content loaded by navigation and leaked the
+  replaced frame's React roots. Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
+  [PR 5217](https://github.com/shakacode/react_on_rails/pull/5217) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
   and RSC Client Component providers now read only their request's stores in a shared Node Renderer
   worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store

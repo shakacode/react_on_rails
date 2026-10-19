@@ -616,6 +616,23 @@ export function renderAllComponents(): void {
 }
 
 /**
+ * Render the components inside `container`, such as a Turbo Frame that just received new content.
+ * Stores are page-wide, so new store elements anywhere on the page are initialized; stores that
+ * already exist keep their state.
+ */
+export function renderComponentsWithin(container: Element): void {
+  const railsContext = getRailsContext();
+  if (!railsContext) return;
+
+  forEachStore(railsContext);
+
+  const componentElements = container.querySelectorAll('.js-react-on-rails-component');
+  for (let i = 0; i < componentElements.length; i += 1) {
+    renderElement(componentElements[i], railsContext);
+  }
+}
+
+/**
  * Public API function that can be called to render a component after it has been loaded.
  * This is the function that should be exported and used by the Rails integration.
  * Returns a Promise for API compatibility with pro version.
@@ -639,6 +656,23 @@ function unmountAllComponents(): void {
     }
   });
   renderedRoots.clear();
+}
+
+/**
+ * Unmount the components whose DOM nodes are inside `container`, such as a Turbo Frame whose
+ * content is about to be replaced. Components elsewhere on the page stay mounted.
+ */
+export function unmountComponentsWithin(container: Element): void {
+  renderedRoots.forEach((entry, domNodeId) => {
+    if (!container.contains(entry.domNode)) return;
+
+    try {
+      teardownEntry(entry, domNodeId);
+    } catch (error) {
+      console.error(teardownErrorLabel(entry, domNodeId), error);
+    }
+    renderedRoots.delete(domNodeId);
+  });
 }
 
 /**

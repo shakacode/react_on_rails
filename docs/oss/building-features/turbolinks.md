@@ -39,9 +39,9 @@ ReactOnRails.setOptions({
 });
 ```
 
-**3. Use Turbo Frames** (works out of the box)
+**3. Use Turbo Frames**
 
-Turbo Frames work with React components without any special configuration:
+With `turbo: true` set, React components inside a Turbo Frame work without extra code:
 
 ```erb
 <%# app/views/items/index.html.erb %>
@@ -51,6 +51,13 @@ Turbo Frames work with React components without any special configuration:
 
 <%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
 ```
+
+When a frame navigation replaces the frame's content, React on Rails:
+
+1. Unmounts the components inside the frame on `turbo:before-frame-render`, so their React roots do not leak.
+2. Mounts the components in the new frame content on `turbo:frame-render`.
+
+Components outside the frame stay mounted. Redux stores are page-wide: a store the new frame content declares is initialized only if the page does not already have a store with that name.
 
 ### Turbo with Auto-Bundling
 
@@ -133,7 +140,7 @@ Use `content_for` to render your body content first, capturing auto-appends befo
 
 **Why Turbo Streams Need Special Handling:**
 
-Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. React on Rails Pro hydrates components immediately when they are inserted into the DOM, without waiting for page load events, so Turbo Stream updates work out of the box.
+Unlike Turbo Frame navigation, Turbo Streams don't dispatch the render events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. React on Rails Pro hydrates components immediately when they are inserted into the DOM, without waiting for page load events, so Turbo Stream updates work out of the box.
 
 **Example: Create a Turbo Stream Response**
 

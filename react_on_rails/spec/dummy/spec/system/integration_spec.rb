@@ -135,6 +135,40 @@ describe "TurboStream send react component", :js do
   end
 end
 
+shared_examples "Turbo Frame navigation with React components" do
+  def probe_events(test_id, event)
+    events = page.evaluate_script("window.__HYDRATION_SCHEDULING_EVENTS__ || []")
+    events.count { |entry| entry["testId"] == test_id && entry["event"] == event }
+  end
+
+  it "mounts the incoming frame's component and unmounts only the replaced frame's root" do
+    visit "/turbo_frame_navigation"
+    expect(page).to have_css("[data-testid='frame-first'][data-hydrated='true']")
+    expect(page).to have_css("[data-testid='outside-frame'][data-hydrated='true']")
+    # Survives only if the frame navigation does not reload the whole page.
+    page.execute_script("window.__TURBO_FRAME_NAVIGATION_MARKER__ = true")
+
+    click_on "Load next frame"
+
+    expect(page).to have_css("[data-testid='frame-second'][data-hydrated='true']")
+    expect(page).to have_no_css("[data-testid='frame-first']")
+    expect(page.evaluate_script("window.__TURBO_FRAME_NAVIGATION_MARKER__")).to be(true)
+    expect(probe_events("frame-first", "unmounted")).to eq(1)
+    expect(probe_events("frame-second", "hydrated")).to eq(1)
+    expect(probe_events("outside-frame", "unmounted")).to eq(0)
+  end
+end
+
+describe "Turbo Frame navigation", :js do
+  include_examples "Turbo Frame navigation with React components"
+
+  context "with pro features and immediate hydration" do
+    include_context "with pro features and immediate hydration"
+
+    include_examples "Turbo Frame navigation with React components"
+  end
+end
+
 describe "Pages/client_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 

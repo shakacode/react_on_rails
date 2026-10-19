@@ -3,8 +3,13 @@
  */
 
 import * as React from 'react';
-import { renderComponent, renderAllComponents, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
-import { reactOnRailsPageLoaded } from '../src/clientStartup.ts';
+import {
+  renderComponent,
+  renderAllComponents,
+  reactOnRailsComponentLoaded,
+  unmountComponentsWithin,
+} from '../src/ClientRenderer.ts';
+import { clientStartup, reactOnRailsPageLoaded } from '../src/clientStartup.ts';
 import type { RendererFunction } from '../src/types/index.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
@@ -17,6 +22,7 @@ type GlobalWithPageUnloadCallbacks = typeof globalThis & {
 };
 
 jest.mock('../src/pageLifecycle.ts', () => ({
+  onPageLoaded: jest.fn(),
   onPageUnloaded: jest.fn((callback: PageUnloadCallback) => {
     const globalWithCallbacks = globalThis as GlobalWithPageUnloadCallbacks;
     globalWithCallbacks.__REACT_ON_RAILS_TEST_PAGE_UNLOADED_CALLBACKS__ ||= [];
@@ -1296,6 +1302,114 @@ describe('ClientRenderer', () => {
       // The old root was unmounted during replacement, and a new root was created for the new node.
       expect(rootUnmount).toHaveBeenCalledTimes(1);
       expect(mockHydrateOrRender).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // Issue #5128: a Turbo Frame navigation replaces only the frame, so cleanup and mounting must be
+  // scoped to the frame rather than the page.
+  describe('Turbo Frame navigation (issue #5128)', () => {
+    // turboInstalled() reads only `ReactOnRails.option('turbo')`.
+    const globalWithReactOnRails = globalThis as unknown as { ReactOnRails?: unknown };
+    let turboEnabled = false;
+    let rootUnmounts: Record<string, jest.Mock>;
+
+    const appendComponent = (parent: Element, domNodeId: string): void => {
+      const componentElement = document.createElement('script');
+      componentElement.type = 'application/json';
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', domNodeId);
+      componentElement.textContent = JSON.stringify({ message: domNodeId });
+      parent.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = domNodeId;
+      parent.appendChild(targetNode);
+    };
+
+    const createFrame = (): Element => {
+      const frame = document.createElement('turbo-frame');
+      frame.id = 'react-frame';
+      document.body.appendChild(frame);
+      return frame;
+    };
+
+    const dispatchFrameEvent = (frame: Element, type: string): void => {
+      frame.dispatchEvent(new Event(type, { bubbles: true }));
+    };
+
+    beforeEach(() => {
+      runPageUnload();
+      setupRailsContext();
+      turboEnabled = false;
+      globalWithReactOnRails.ReactOnRails = {
+        option: (key: string) => key === 'turbo' && turboEnabled,
+      };
+
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, message);
+      ComponentRegistry.register({ TestComponent });
+
+      rootUnmounts = {};
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      mockHydrateOrRender.mockClear();
+      mockHydrateOrRender.mockImplementation((domNode: Element) => {
+        const unmount = jest.fn();
+        rootUnmounts[domNode.id] = unmount;
+        return { render: jest.fn(), unmount };
+      });
+    });
+
+    afterEach(() => {
+      delete globalWithReactOnRails.ReactOnRails;
+    });
+
+    it('unmounts only the roots inside the given container', () => {
+      appendComponent(document.body, 'outside');
+      const frame = createFrame();
+      appendComponent(frame, 'inside');
+      renderAllComponents();
+
+      unmountComponentsWithin(frame);
+
+      expect(rootUnmounts.inside).toHaveBeenCalledTimes(1);
+      expect(rootUnmounts.outside).not.toHaveBeenCalled();
+
+      // The unmounted root is forgotten, so a page unload does not unmount it twice.
+      runPageUnload();
+      expect(rootUnmounts.inside).toHaveBeenCalledTimes(1);
+      expect(rootUnmounts.outside).toHaveBeenCalledTimes(1);
+    });
+
+    it('swaps the frame components on Turbo frame events once Turbo is enabled', () => {
+      clientStartup();
+      appendComponent(document.body, 'outside');
+      const frame = createFrame();
+      appendComponent(frame, 'first');
+      renderAllComponents();
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+
+      // Without the `turbo` option, frame events are ignored like page-level Turbo events.
+      dispatchFrameEvent(frame, 'turbo:before-frame-render');
+      expect(rootUnmounts.first).not.toHaveBeenCalled();
+
+      turboEnabled = true;
+      dispatchFrameEvent(frame, 'turbo:before-frame-render');
+      expect(rootUnmounts.first).toHaveBeenCalledTimes(1);
+
+      frame.innerHTML = '';
+      appendComponent(frame, 'second');
+      dispatchFrameEvent(frame, 'turbo:frame-render');
+
+      expect(mockHydrateOrRender).toHaveBeenLastCalledWith(
+        document.getElementById('second'),
+        expect.anything(),
+        false,
+        expect.anything(),
+      );
+      expect(rootUnmounts.outside).not.toHaveBeenCalled();
+      // The outside root was not mounted again.
+      expect(mockHydrateOrRender).toHaveBeenCalledTimes(3);
     });
   });
 
