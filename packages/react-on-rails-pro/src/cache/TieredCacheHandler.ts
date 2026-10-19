@@ -14,6 +14,7 @@
  */
 
 import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
+import cacheErrorLabel from './cacheErrorLabel.ts';
 
 export interface TieredCacheHandlerOptions {
   /**
@@ -74,9 +75,7 @@ export class TieredCacheHandler implements CacheHandler {
           // messages can carry host:port or credentials, and console output
           // may be replayed to the browser during RSC renders (same policy as
           // revalidation.ts and RedisCacheHandler.revalidateTag).
-          const label =
-            (err as NodeJS.ErrnoException)?.code ?? (err instanceof Error ? err.name : String(err));
-          console.error(`TieredCacheHandler: ${name} revalidateTag failed:`, label);
+          console.error(`TieredCacheHandler: ${name} revalidateTag failed:`, cacheErrorLabel(err));
         });
     };
     await Promise.all([forward(this.l1, 'L1'), forward(this.l2, 'L2')]);

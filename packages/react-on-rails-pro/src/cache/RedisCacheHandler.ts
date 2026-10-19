@@ -15,6 +15,7 @@
 
 import type { Redis, RedisOptions } from 'ioredis';
 import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
+import cacheErrorLabel from './cacheErrorLabel.ts';
 
 // Serialized-blob format. v2 is the only format this handler reads or writes:
 // [version 0x02 (1)] [timestamp f64BE (8)] [revalidate i32BE (4)]
@@ -291,10 +292,7 @@ export class RedisCacheHandler implements CacheHandler {
       // Error class/code only, never the message: revalidateTag can run inside
       // an RSC render whose console output is replayed to browsers, and ioredis
       // connection errors put the internal host:port in the message.
-      console.warn(
-        '[RedisCacheHandler] revalidateTag failed, skipping:',
-        (err as NodeJS.ErrnoException).code ?? (err as Error).name ?? String(err),
-      );
+      console.warn('[RedisCacheHandler] revalidateTag failed, skipping:', cacheErrorLabel(err));
     }
   }
 

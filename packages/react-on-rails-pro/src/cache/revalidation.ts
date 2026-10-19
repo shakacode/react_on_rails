@@ -15,6 +15,7 @@
 
 import { getUniqueCacheHandlersSnapshot } from './cacheHandlerRegistry.ts';
 import { validateTags } from './tagValidation.ts';
+import cacheErrorLabel from './cacheErrorLabel.ts';
 
 declare global {
   // eslint-disable-next-line vars-on-top, no-underscore-dangle -- global augmentation needs var; dunder name matches the sandbox-global convention
@@ -63,11 +64,9 @@ export async function revalidateTagsAt(tags: string | string[], invalidatedAt: n
             // carry connection details (ioredis puts host:port in
             // ECONNREFUSED messages). Handler name + error class/code locate
             // the culprit without disclosing topology.
-            const label =
-              (err as NodeJS.ErrnoException)?.code ?? (err instanceof Error ? err.name : String(err));
             console.error(
               `unstable_revalidateTag: ${handler.constructor?.name ?? 'handler'} failed for 1 of ${list.length} tag(s):`,
-              label,
+              cacheErrorLabel(err),
             );
           }),
       );

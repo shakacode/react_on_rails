@@ -430,6 +430,26 @@ describe('RedisCacheHandler', () => {
       }
     });
 
+    test.each([
+      { label: 'a string rejection', error: 'redis://user:secret@internal:6379' },
+      { label: 'a null rejection', error: null },
+      { label: 'an object-valued code', error: { code: { password: 'secret' } } },
+      { label: 'a connection URL as code', error: { code: 'redis://user:secret@internal:6379' } },
+    ])('handles $label without exposing it or throwing', async ({ error }) => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        mockRedisInstance.rorpTagStampMax.mockRejectedValueOnce(error);
+        await expect(handler.revalidateTag!('t')).resolves.toBeUndefined();
+        expect(warnSpy).toHaveBeenCalledWith(
+          '[RedisCacheHandler] revalidateTag failed, skipping:',
+          'UnknownError',
+        );
+        expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('secret');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     test('never throws: a failing stamp write warns with the error CODE/NAME, never the message', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       // ioredis puts the internal host:port in connection-error messages, and
