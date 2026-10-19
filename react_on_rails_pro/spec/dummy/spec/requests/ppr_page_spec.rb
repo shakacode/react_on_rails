@@ -141,4 +141,30 @@ describe "PPR page requests", :caching, :server_rendering do
     expect(prerender_calls).to eq(2)                      # re-rendered from scratch
     expect(cache_write_keys).to be_empty
   end
+
+  # Regression this catches: dropping ReactOnRailsPro::Ppr.react_version_cache_key from the
+  # key array in ppr_cache_key. React makes no promise that a PostponedState from one version
+  # can be resumed by another, so an upgrade must produce a STRUCTURAL miss — a different
+  # key, with the old entry never read at all. The version detector itself is covered in
+  # ppr_spec.rb; the subject here is key composition, so stubbing the key method is the seam.
+  it "a React version change produces a structural cache miss, not a hit and not an eviction" do
+    evictions = []
+    ppr_event_subscriptions << ActiveSupport::Notifications.subscribe(
+      ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION
+    ) { |*, payload| evictions << payload }
+    path = page_path("version-value")
+
+    get path
+
+    expect(lookup_outcomes).to eq([:miss])
+    expect(prerender_calls).to eq(1)
+
+    allow(ReactOnRailsPro::Ppr).to receive(:react_version_cache_key).and_return("react-99.0.0-spec")
+
+    get path
+
+    expect(lookup_outcomes).to eq(%i[miss miss])  # a second miss — never a hit on the old entry
+    expect(prerender_calls).to eq(2)              # full prerender again under the new version
+    expect(evictions).to be_empty                 # structural: the old entry is not even read, so nothing evicts
+  end
 end
