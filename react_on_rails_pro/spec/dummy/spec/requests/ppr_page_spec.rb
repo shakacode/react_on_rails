@@ -91,4 +91,55 @@ describe "PPR page requests", :caching, :server_rendering do
     expect(response.body).to include("props-of-request-2")
     expect(response.body).not_to include("props-of-request-1")
   end
+
+  # Regression this catches: the fully-static path growing a pointless resume request, or a
+  # shell-only envelope (postponed_state nil) failing read validation so warm requests
+  # silently re-render. ?fullyStatic=true renders no Suspense boundary at all, so the whole
+  # page settles inside the budget — the success case of PPR, not an error.
+  it "fully static page: shell-only envelope cached, no resume, warm request uses zero renderer calls" do
+    path = page_path("static-value", "&fullyStatic=true")
+
+    get path
+
+    expect(response).to have_http_status(:ok)
+    expect(lookup_outcomes).to eq([:miss])
+    expect(prerender_calls).to eq(1)
+    expect(resume_calls).to eq(0)
+    envelope = Rails.cache.read(cache_write_keys.fetch(0))
+    expect(envelope["postponed_state"]).to be_nil
+    expect(envelope["checksum"]).to eq(
+      ReactOnRailsPro::Ppr.compute_checksum(envelope["shell_html"], nil)
+    )
+
+    get path
+
+    expect(response).to have_http_status(:ok)
+    expect(lookup_outcomes).to eq(%i[miss hit])
+    expect(prerender_calls).to eq(1)          # unchanged: no renderer call at all on the warm request
+    expect(resume_calls).to eq(0)
+    expect(cache_write_keys.size).to eq(1)
+    expect(response.body).to include("Static section rendered in the PPR shell")
+  end
+
+  # Regression this catches: re-introducing the #4581 class of bug — persisting a shell from
+  # a render that reported an error, so every later visitor gets the broken page until the
+  # entry expires. ?throwAsyncError=true rejects inside the hole during the server render.
+  it "a failing render returns a page but is never cached, and the next request re-renders" do
+    path = page_path("error-value", "&throwAsyncError=true")
+
+    get path
+
+    expect(response).to have_http_status(:ok)             # the shell flushed before the error
+    expect(response.body).to include("PPR header for testing")
+    expect(lookup_outcomes).to eq([:miss])
+    expect(cache_write_keys).to be_empty                  # nothing cached
+    expect(write_refusal_reasons).to eq(["render_error"]) # the write was explicitly refused
+
+    get path
+
+    expect(response).to have_http_status(:ok)
+    expect(lookup_outcomes).to eq(%i[miss miss])          # still cold: a miss, never a hit
+    expect(prerender_calls).to eq(2)                      # re-rendered from scratch
+    expect(cache_write_keys).to be_empty
+  end
 end
