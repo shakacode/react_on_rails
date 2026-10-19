@@ -36,6 +36,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808). Fixes
   [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
 
+#### Changed
+
+- **[Pro]** **`RSCRoute` now uses React 19.2's `useEffectEvent` for `onRefetchError` and takes `ref` as a
+  regular prop instead of `forwardRef`**: The public `<RSCRoute ref={…}>` handle API and `onRefetchError`
+  behavior are unchanged, but the RSC client path now requires React >= 19.2 at runtime (the documented
+  Pro RSC floor — React 19.2.x and 19.3.x are the supported lines; React below 19.2 fails with
+  `useEffectEvent is not a function`). Calling `useEffectEvent` in a server component without
+  `'use client'` now gets the branded missing-directive diagnostic. Implements
+  [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
+  [PR 5031](https://github.com/shakacode/react_on_rails/pull/5031) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
@@ -819,16 +831,6 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [ihabadham](https://github.com/ihabadham).
 
 #### Changed
-
-- **[Pro]** **`RSCRoute` now uses React 19.2's `useEffectEvent` for `onRefetchError` and takes `ref` as a
-  regular prop instead of `forwardRef`**: The public `<RSCRoute ref={…}>` handle API and `onRefetchError`
-  behavior are unchanged, but the RSC client path now requires React >= 19.2 at runtime (matching the
-  documented Pro 17 RSC requirement of React 19.2.x; React below 19.2 fails with
-  `useEffectEvent is not a function`). Calling `useEffectEvent` in a server component without
-  `'use client'` now gets the branded missing-directive diagnostic. Implements
-  [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
-  [PR 5031](https://github.com/shakacode/react_on_rails/pull/5031) by
-  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro] Render requests now send raw JavaScript bodies to the Node renderer**: Non-bundle render
   requests use a raw `application/vnd.react-on-rails.render-request+javascript` body with metadata in
