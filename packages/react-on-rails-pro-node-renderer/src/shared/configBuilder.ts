@@ -254,12 +254,10 @@ function defaultReplayServerAsyncOperationLogs() {
   return env.NODE_ENV?.toLowerCase() === 'development';
 }
 
+// Isolation protects against cross-request state leaks, so only an explicit false-like value turns it off.
 function defaultIsolateHydratedStores() {
-  if (env.RENDERER_ISOLATE_HYDRATED_STORES != null) {
-    return truthy(env.RENDERER_ISOLATE_HYDRATED_STORES);
-  }
-
-  return true;
+  const value = env.RENDERER_ISOLATE_HYDRATED_STORES?.trim().toLowerCase();
+  return !(value === 'false' || value === 'no' || value === '0');
 }
 
 function truthyHealthEndpointFlag(value: unknown) {

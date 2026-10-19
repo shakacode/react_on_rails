@@ -691,12 +691,20 @@ describe('configBuilder', () => {
       expect(buildConfig().isolateHydratedStores).toBe(true);
     });
 
-    it('can be turned off with RENDERER_ISOLATE_HYDRATED_STORES', () => {
-      process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'false';
+    it.each(['false', 'FALSE', ' no ', '0'])('turns off for RENDERER_ISOLATE_HYDRATED_STORES=%p', (value) => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = value;
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
       expect(buildConfig().isolateHydratedStores).toBe(false);
+    });
+
+    it.each(['true', '1', '', 'on', 'True'])('stays on for RENDERER_ISOLATE_HYDRATED_STORES=%p', (value) => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = value;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().isolateHydratedStores).toBe(true);
     });
 
     it('prefers the explicit config value over the environment variable', () => {
