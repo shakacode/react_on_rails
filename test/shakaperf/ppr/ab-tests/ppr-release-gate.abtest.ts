@@ -40,9 +40,10 @@ const warmRouteBeforeMeasurement = async ({ context, url }: BeforeNavigateContex
 
 // Guard: both sides load the SAME PPR route (rsc-fouc precedent — assertions are absolute,
 // so the gate fails even when both sides are equally broken). Every sample proves the page
-// it measured (a) served the shell inside the warm-hit budget and (b) actually streamed the
-// hole content, so a broken or cold-serving fixture fails loudly instead of producing
-// plausible-looking numbers.
+// it measured (a) served the shell inside the warm-hit budget and (b) actually
+// server-streamed the hole content — checked in the raw response HTML, where client
+// hydration cannot mask a dead resume stream — so a broken or cold-serving fixture fails
+// loudly instead of producing plausible-looking numbers.
 abTest(
   'ppr warm hit serves cached shell and streams hole content',
   {
@@ -72,14 +73,84 @@ abTest(
 
     await annotate('waiting for the streamed hole content');
     await page.waitForSelector('#ppr-hole-content', { state: 'visible', timeout: 15_000 });
+
+    // The DOM check above proves the page *ended up* with hole content, but client hydration
+    // alone produces that too: DelayedPprHole renders synchronously in the browser, so a dead
+    // resume stream still grows `#ppr-hole-content` client-side — and such failures dodge the
+    // TTFB budget (an erroring hole skips the 500ms settle floor and serves a fast 200 whose
+    // cache write is refused; a post-flush resume failure happens on a genuinely warm hit).
+    // The harness owns the measured navigation, so the measured response body itself cannot
+    // be captured here. Instead, re-exercise the warm-resume path with two sequential plain
+    // GETs: the first re-populates the cache when the measured request degraded post-flush
+    // and evicted the entry (ppr_handle_post_flush_degradation); the second is therefore a
+    // warm hit whose raw HTML must carry the server-streamed hole — hydration cannot mask a
+    // raw response.
+    //
+    // Each probe pins its own unique dynamicValue (same cacheKey, so the same shell entry) and
+    // requires THAT value inside the raw hole HTML. Presence of `#ppr-hole-content` alone would
+    // also be satisfied by a fully settled prerender cached WITH its hole (a settle-budget
+    // regression: static-shell support serves completed HTML from cache without any resume) —
+    // fast, hole present, but the dynamic value is stale from the first request. A fresh
+    // per-probe value only appears when the server actually rendered this request's props:
+    // via the resume phase on a warm hit, or the full stream on a cold miss.
+    //
+    // Residual gap: a failure striking ONLY the measured request while both probes stay
+    // healthy is invisible until the ppr.cache.lookup event wiring (#5102), the documented
+    // planned upgrade.
+    const side = isControl ? 'control' : 'experiment';
+    const probeServerRenderedHole = async (probeName: string) => {
+      const probeUrl = new URL(page.url());
+      const freshValue = `shakaperf-${probeName}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      probeUrl.searchParams.set('dynamicValue', freshValue);
+      const probe = await page.request.get(probeUrl.toString());
+      if (!probe.ok()) {
+        throw new Error(`server-stream ${probeName} failed with HTTP ${probe.status()} for ${probeUrl}`);
+      }
+      const probeHtml = await probe.text();
+      if (!probeHtml.includes('id="ppr-hole-content"')) {
+        throw new Error(
+          `${side} raw server HTML (${probeName}) has no #ppr-hole-content — the server render ` +
+            'never delivers the hole (hole error: fast 200 with the cache write refused; or the ' +
+            'resume phase fails on warm hits via post-flush degradation); any DOM-visible hole ' +
+            'content came from client hydration',
+        );
+      }
+      // Scope the freshness check to the RENDERED element: the cache-hit path regenerates the
+      // per-request component spec tag (hydration props JSON) even when the rendered hole is
+      // stale cached HTML, so a whole-document substring search would match the JSON and prove
+      // nothing. Extract the server-rendered #ppr-dynamic-value text instead (no script
+      // execution — raw markup only; the props JSON never contains `id="ppr-dynamic-value"`).
+      const renderedValues = [...probeHtml.matchAll(/id="ppr-dynamic-value"[^>]*>([^<]*)</g)].map(
+        (m) => m[1],
+      );
+      if (!renderedValues.includes(freshValue)) {
+        throw new Error(
+          `${side} raw server HTML (${probeName}) rendered #ppr-dynamic-value as ` +
+            `${JSON.stringify(renderedValues)} instead of this request's dynamicValue ` +
+            `(${freshValue}) — the server returned stale cached hole HTML instead of resuming ` +
+            'with fresh props (settle-budget regression: the prerender no longer postpones the ' +
+            'hole); a fresh hydration-props JSON blob does not count as server-rendered content',
+        );
+      }
+    };
+
+    // Probe 1 re-warms after a possible measured-request eviction; probe 2 is then
+    // deterministically a warm hit exercising the resume path.
+    await annotate('asserting the hole content was server-streamed');
+    await probeServerRenderedHole('probe-1');
+    await annotate('asserting a warm resume renders fresh props');
+    await probeServerRenderedHole('probe-2');
   },
 );
 
 // The primary A/B pair (plan §6): PPR warm hit (experiment) vs streaming SSR (control),
 // different routes on ONE server (#3255 Decision 5 — same delivery path within the pair).
-// The pass target is read from the report's TTFB and LCP rows: warm-hit TTFB ≤ 10% of
-// streaming-SSR TTFB, LCP no worse. The body carries no comparison logic — the statistics
-// stage owns the verdict; the body only makes sure each sampled page finished streaming.
+// Enforcement split (README "Enforcement status"): the statistics stage fails the run on
+// any statistically significant TTFB/LCP regression — "no worse" is machine-enforced; the
+// plan §6 improvement floor (warm-hit TTFB ≤ 10% of streaming-SSR TTFB) is NOT, and is read
+// manually from the report's TTFB rows until the #5101 fixture makes the ratio meaningful.
+// The body carries no comparison logic; it only makes sure each sampled page finished
+// streaming.
 abTest(
   'ppr warm hit vs streaming ssr ttfb and lcp',
   {
