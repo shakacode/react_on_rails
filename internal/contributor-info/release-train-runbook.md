@@ -1646,7 +1646,9 @@ run normal-mode `script/release-forward-port` or
      `omission_class`, with exactly one of these values:
      - `version-only`: a release version bump the helper did not recognize.
      - `revert-of-live`: a release revert of a change that stays live on `main`.
-     - `deferred`: a change the maintainers deferred out of `main` for now.
+     - `deferred`: a change the maintainers deferred out of `main` for now. Its
+       `approval` must link the `shakacode/react_on_rails` issue that tracks the
+       later forward-port.
 
    For example, the 17.1.0 close-out would have recorded #4845 (replaced by
    #5017/#5047), #4928/#4931/#4935 (landed through the combined forward-ports
@@ -1672,11 +1674,14 @@ run normal-mode `script/release-forward-port` or
    the helper itself rejects any acknowledgement that is not currently
    classified `MANUAL`.
 
-   The row's `proof`, `approval`, and `replacement_disposition` fields are
-   structured attestations bound to exact objects; they do not prove the
-   underlying semantic facts or the approver's authority. Before accepting the
-   manifest, the maker and independent checker must each re-derive the omitted
-   origin and replacement audit against the exact fetched tips, and separately
+   The row's `proof`, `approval`, `replacement_disposition`, and
+   `omission_class` fields are structured attestations bound to exact objects;
+   they do not prove the underlying semantic facts or the approver's authority.
+   The validator does not check that a `version-only` commit changes only
+   versions or that a `revert-of-live` commit reverts a change live on `main`.
+   Before accepting the manifest, the maker and independent checker must each
+   re-derive the omitted origin, omission class, and replacement audit against
+   the exact fetched tips, and separately
    verify approval authorship, repository permission, and trust from every live
    authenticated approval record. Any stale, inaccessible, untrusted, or
    `UNKNOWN` audit or approval remains fail-closed.
@@ -1795,6 +1800,9 @@ run normal-mode `script/release-forward-port` or
          fail_validation.call("row #{index} release-first omission without a replacement needs " \
                               "omission_class #{release_first_omission_classes.join(", ")}") unless
            release_first_omission_classes.include?(row["omission_class"])
+         fail_validation.call("row #{index} deferred omission approval must link its tracking issue") if
+           row["omission_class"] == "deferred" &&
+           !row["approval"].match?(%r{https://github\.com/shakacode/react_on_rails/issues/[1-9][0-9]*\b})
        end
        replacement = row["replacement_sha"]
        fail_validation.call("row #{index} replacement_sha must be a full SHA or NONE") unless

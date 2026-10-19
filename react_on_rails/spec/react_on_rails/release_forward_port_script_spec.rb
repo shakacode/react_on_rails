@@ -513,7 +513,8 @@ RSpec.describe "script/release-forward-port" do
   end
 
   # Adds a release-first commit (no -x footer) as a final-plan PICK and its omitted-pick manifest row.
-  def add_release_first_omission(repo, fixture, subject, replacement_sha: "NONE", omission_class: nil)
+  def add_release_first_omission(repo, fixture, subject, replacement_sha: "NONE", omission_class: nil,
+                                 approval: "maintainer approved the exact omission")
     git(repo, "checkout", "release/1.0.0")
     write_file(repo, "#{subject.downcase.gsub(/[^a-z0-9]+/, '-')}.txt", "#{subject}\n")
     release_sha = commit_all(repo, subject)
@@ -525,7 +526,7 @@ RSpec.describe "script/release-forward-port" do
       "replacement_sha" => replacement_sha,
       "replacement_disposition" => "NONE",
       "proof" => "main already carries an equivalent change",
-      "approval" => "maintainer approved the exact omission"
+      "approval" => approval
     }
     if replacement_sha == "NONE"
       row["omission_class"] = omission_class
@@ -1077,10 +1078,14 @@ RSpec.describe "script/release-forward-port" do
                                    replacement_sha: fixture.fetch(:replacement_sha))
         add_release_first_omission(repo, fixture, "Fix test-only flake (#5087)",
                                    replacement_sha: fixture.fetch(:replacement_sha))
-        add_release_first_omission(repo, fixture, "Release: bump versions to 1.0.0.rc.2 (#4997)",
+        add_release_first_omission(repo, fixture, "Release: set package versions for 1.0.0.rc.2 (#4997)",
                                    omission_class: "version-only")
         add_release_first_omission(repo, fixture, "Revert live main patch (#5070)", omission_class: "revert-of-live")
-        add_release_first_omission(repo, fixture, "Qualify Rspack support (#5026)", omission_class: "deferred")
+        add_release_first_omission(
+          repo, fixture, "Qualify Rspack support (#5026)",
+          omission_class: "deferred",
+          approval: "maintainer deferred it; https://github.com/shakacode/react_on_rails/issues/5066 tracks the port"
+        )
         _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
 
         expect(status).to be_success, stderr
@@ -1101,6 +1106,13 @@ RSpec.describe "script/release-forward-port" do
 
         expect(status).not_to be_success
         expect(stderr).to include("row 1 shape is invalid")
+
+        row["omission_class"] = "deferred"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 deferred omission approval must link its tracking issue")
       end
     end
 
