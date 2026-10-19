@@ -659,12 +659,26 @@ function unmountAllComponents(): void {
 }
 
 /**
- * Unmount the components whose DOM nodes are no longer in the document, such as the old content of
- * a Turbo Frame that was just replaced. Components still in the document stay mounted.
+ * The DOM ids of the components currently mounted inside `container`, such as a Turbo Frame about
+ * to render new content.
  */
-export function unmountDetachedComponents(): void {
+export function mountedComponentIdsWithin(container: Element): string[] {
+  const domNodeIds: string[] = [];
   renderedRoots.forEach((entry, domNodeId) => {
-    if (entry.domNode.isConnected) return;
+    if (container.contains(entry.domNode)) domNodeIds.push(domNodeId);
+  });
+  return domNodeIds;
+}
+
+/**
+ * Unmount the given components whose DOM nodes are no longer in the document, such as the old
+ * content of a Turbo Frame that was just replaced. A component still in the document stays mounted,
+ * and so does one whose id was mounted again on a new node.
+ */
+export function unmountDetachedComponents(domNodeIds: string[]): void {
+  domNodeIds.forEach((domNodeId) => {
+    const entry = renderedRoots.get(domNodeId);
+    if (!entry || entry.domNode.isConnected) return;
 
     try {
       teardownEntry(entry, domNodeId);

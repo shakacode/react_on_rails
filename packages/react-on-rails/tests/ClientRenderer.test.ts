@@ -7,6 +7,7 @@ import {
   renderComponent,
   renderAllComponents,
   reactOnRailsComponentLoaded,
+  mountedComponentIdsWithin,
   unmountDetachedComponents,
 } from '../src/ClientRenderer.ts';
 import { clientStartup, reactOnRailsPageLoaded } from '../src/clientStartup.ts';
@@ -1364,14 +1365,19 @@ describe('ClientRenderer', () => {
       delete globalWithReactOnRails.ReactOnRails;
     });
 
-    it('unmounts only the roots whose nodes left the document', () => {
+    it('unmounts only the recorded roots whose nodes left the document', () => {
       appendComponent(document.body, 'outside');
       const frame = createFrame();
       appendComponent(frame, 'inside');
       renderAllComponents();
+      const frameIds = mountedComponentIdsWithin(frame);
+      expect(frameIds).toEqual(['inside']);
 
+      // A root outside the frame that is detached at the same moment is not the frame's to clean up.
+      const outsideNode = document.getElementById('outside') as HTMLElement;
+      outsideNode.remove();
       frame.innerHTML = '';
-      unmountDetachedComponents();
+      unmountDetachedComponents(frameIds);
 
       expect(rootUnmounts.inside).toHaveBeenCalledTimes(1);
       expect(rootUnmounts.outside).not.toHaveBeenCalled();
@@ -1390,19 +1396,19 @@ describe('ClientRenderer', () => {
       renderAllComponents();
       const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
 
+      // Without the `turbo` option, frame events are ignored like page-level Turbo events.
+      dispatchFrameEvent(frame, 'turbo:before-frame-render');
+      dispatchFrameEvent(frame, 'turbo:frame-render');
+      expect(rootUnmounts.first).not.toHaveBeenCalled();
+      expect(mockHydrateOrRender).toHaveBeenCalledTimes(2);
+
       // An app may pause or cancel the frame render; nothing unmounts before the render happens.
+      turboEnabled = true;
       dispatchFrameEvent(frame, 'turbo:before-frame-render');
       expect(rootUnmounts.first).not.toHaveBeenCalled();
 
       frame.innerHTML = '';
       appendComponent(frame, 'second');
-
-      // Without the `turbo` option, frame events are ignored like page-level Turbo events.
-      dispatchFrameEvent(frame, 'turbo:frame-render');
-      expect(rootUnmounts.first).not.toHaveBeenCalled();
-      expect(mockHydrateOrRender).toHaveBeenCalledTimes(2);
-
-      turboEnabled = true;
       dispatchFrameEvent(frame, 'turbo:frame-render');
 
       expect(rootUnmounts.first).toHaveBeenCalledTimes(1);
