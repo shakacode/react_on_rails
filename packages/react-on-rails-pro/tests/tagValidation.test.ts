@@ -31,6 +31,18 @@ describe('validateTags', () => {
     expect(validateTags(['x'.repeat(MAX_TAG_LENGTH)])).toHaveLength(1);
   });
 
+  test.each(['\ud800', '\udc00', 'product-\ud800', '\ud800x\udc00'])(
+    'rejects malformed UTF-16 that would lose tag identity in UTF-8',
+    (tag) => {
+      expect(() => validateTags([tag])).toThrow(TypeError);
+    },
+  );
+
+  test('preserves valid Unicode, replacement characters, and distinct normalization forms', () => {
+    const tags = ['product-\u{1f600}', 'product-\ufffd', 'e\u0301', '\u00e9'];
+    expect(validateTags(tags)).toEqual(tags);
+  });
+
   test('caps the DISTINCT tag count at MAX_TAGS_PER_CALL (dedupe first)', () => {
     const distinct = Array.from({ length: MAX_TAGS_PER_CALL + 1 }, (_v, i) => `t${i}`);
     expect(() => validateTags(distinct)).toThrow(/at most 64 distinct tags/);

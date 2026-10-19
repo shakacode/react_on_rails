@@ -92,6 +92,18 @@ describe('unstable_revalidateTag', () => {
     await expect(unstable_revalidateTag(['ok', 'x'.repeat(257)])).rejects.toThrow(TypeError);
   });
 
+  test.each(['product-\ud800', 'product-\udc00'])(
+    'rejects malformed UTF-16 before invalidation fanout',
+    async (tag) => {
+      const spy = makeRevalidatingSpy();
+      registerCacheHandler('unicode-tag', spy.handler);
+      await expect(unstable_revalidateTag(tag)).rejects.toThrow(TypeError);
+      expect(spy.revalidateCalls).toEqual([]);
+      await unstable_revalidateTag('product-\ufffd');
+      expect(spy.revalidateCalls.map(([value]) => value)).toEqual(['product-\ufffd']);
+    },
+  );
+
   test('the public API stamps now: handlers receive a finite invalidatedAt', async () => {
     const spy = makeRevalidatingSpy();
     registerCacheHandler('kind-stamp', spy.handler);

@@ -35,6 +35,11 @@ export function validateTags(value: unknown): string[] {
     if (typeof tag !== 'string' || tag.length === 0 || tag.length > MAX_TAG_LENGTH) {
       throw new TypeError(`tags must be non-empty strings of at most ${MAX_TAG_LENGTH} characters`);
     }
+    // Redis encodes tag names as UTF-8. Reject lone UTF-16 surrogates rather
+    // than letting replacement characters collapse distinct tag identities.
+    if (Buffer.from(tag, 'utf8').toString('utf8') !== tag) {
+      throw new TypeError('tags must contain well-formed Unicode strings');
+    }
   }
   const deduped = [...new Set(value as string[])];
   if (deduped.length > MAX_TAGS_PER_CALL) {
