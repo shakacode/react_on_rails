@@ -37,8 +37,11 @@ import { getServerRenderer } from '../cache/manifestLoaderServer.ts';
 import { setBuildId } from '../cache/buildIdProvider.ts';
 
 // `use` must NOT be listed: it is legal in Server Components.
-// `useEffectEvent` sits before its prefix `useEffect` so the alternation matches
-// the longer hook name without relying on regex backtracking.
+// `useEffectEvent` is listed before its prefix `useEffect` only so the first
+// alternation attempt already matches the longer name — a clarity
+// micro-optimization, not a correctness requirement: with the required
+// " is not a function" suffix, JS regex backtracking produces the same match
+// either way. Whole-identifier gating is the lookbehind's job (below).
 const CLIENT_HOOK_NAMES = [
   'useState',
   'useEffectEvent',

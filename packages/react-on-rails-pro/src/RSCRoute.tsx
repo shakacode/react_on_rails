@@ -183,10 +183,14 @@ type RSCContextValue = ReturnType<typeof useRSC>;
 // React 19 ref-as-prop: `ref` is a regular prop on function components, so no
 // forwardRef wrapper is needed. Keep these three components plain named
 // functions — do NOT reintroduce forwardRef or wrap them in React.memo:
-// useEffectEvent is silently frozen at its mount-time closure inside
-// ForwardRef/SimpleMemoComponent fibers (React never swaps their impl), which
-// would break the freshness of the refetch-error path with no error or
-// warning. Guarded by imperativeRefetch test 2c.
+// on React 19.2.x, useEffectEvent is silently frozen at its mount-time closure
+// inside ForwardRef/SimpleMemoComponent fibers (19.2 never swaps their impl;
+// fixed in React 19.3.0 by facebook/react#34831), which would break the
+// freshness of the refetch-error path with no error or warning. React 19.2
+// remains a supported RSC runtime (react-on-rails-rsc >= 19.2.1 peers on
+// react ^19.2.7), so the prohibition stays even though the repo's own
+// toolchain runs 19.3+. Guarded by imperativeRefetch test 2c — but only when
+// the suite runs on React 19.2.x; on 19.3+ the test passes either way.
 type RouteHandleRef = { ref?: Ref<RSCRouteHandle> };
 type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue } & RouteHandleRef;
 
@@ -287,7 +291,8 @@ function RSCRouteContent({
   // Always sees the latest committed onRefetchError prop without making the
   // effect below re-run on callback identity changes. Safe only because these
   // components are plain function components — see the ordering note above
-  // RouteHandleRef (useEffectEvent freezes inside forwardRef/memo).
+  // RouteHandleRef (on React 19.2.x, useEffectEvent freezes inside
+  // ForwardRef/SimpleMemoComponent fibers; fixed in 19.3.0).
   const emitRefetchError = useEffectEvent((error: ServerComponentFetchError) => {
     onRefetchError?.(error);
   });

@@ -1133,6 +1133,9 @@ class CapturingErrorBoundary extends React.Component<
 
     await waitFor(() => expect(freshCallback).toHaveBeenCalledTimes(1));
     expect(freshCallback.mock.calls[0][0]).toBe(ref.current!.refetchError);
+    // Pin the payload too: the emitted ServerComponentFetchError must wrap the
+    // injected failure, not just match whatever error the handle exposes.
+    expect(freshCallback.mock.calls[0][0].originalError).toBe(refetchFailure);
     expect(staleCallback).not.toHaveBeenCalled();
   });
 
