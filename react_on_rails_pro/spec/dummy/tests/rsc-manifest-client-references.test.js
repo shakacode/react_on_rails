@@ -20,8 +20,18 @@
 // react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb), which is pinned on
 // the generator side by spec/react_on_rails/generators/rsc_generator_spec.rb. If the override env
 // var, default manifest path, manifest shape, fallback ordering, discovery-compatibility fallback,
-// or error messages change here, these tests fail.
+// error messages, or the appended react-on-rails-pro client-component registrations (issue #5079)
+// change here, these tests fail.
 const path = require('path');
+
+// The pro package's shipped 'use client' components, appended (deduplicated) to every resolution
+// branch so they always reach react-client-manifest.json. Kept in lockstep with the generator's
+// emitted `reactOnRailsProClientReferences` list (pinned by rsc_generator_spec.rb).
+const PRO_CLIENT_REFERENCES = [
+  require.resolve('react-on-rails-pro/RSCRoute'),
+  require.resolve('react-on-rails-pro/RSCProvider'),
+  require.resolve('react-on-rails-pro/registerDefaultRSCProvider/client'),
+];
 
 jest.mock('shakapacker', () => ({
   config: { source_path: 'client', source_entry_path: 'packs' },
@@ -72,7 +82,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     fs.existsSync.mockReturnValue(true);
     fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
 
-    expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+    expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
     expect(fs.readFileSync).toHaveBeenCalledWith(path.resolve('tmp/custom-refs.json'), 'utf8');
   });
 
@@ -82,7 +92,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     fs.existsSync.mockReturnValue(true);
     fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
 
-    expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+    expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
     expect(fs.readFileSync).toHaveBeenCalledWith(path.resolve('tmp/custom-refs.json'), 'utf8');
   });
 
@@ -90,7 +100,11 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST);
     fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/B.jsx', 'client/app/C.jsx'] }));
 
-    expect(rscManifestClientReferences()).toEqual(['client/app/B.jsx', 'client/app/C.jsx']);
+    expect(rscManifestClientReferences()).toEqual([
+      'client/app/B.jsx',
+      'client/app/C.jsx',
+      ...PRO_CLIENT_REFERENCES,
+    ]);
     expect(fs.readFileSync).toHaveBeenCalledWith(DEFAULT_MANIFEST, 'utf8');
   });
 
@@ -120,6 +134,26 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     expect(refs[0].include.source).toBe('\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$');
     expect(refs[0].include.test('Foo.mjs')).toBe(true);
     expect(refs[0].include.test('Foo.cts')).toBe(true);
+    expect(refs.slice(1)).toEqual(PRO_CLIENT_REFERENCES);
+  });
+
+  it('appends the pro package client components to the broad-scan fallback', () => {
+    fs.existsSync.mockReturnValue(false);
+
+    const refs = rscManifestClientReferences();
+    expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
+    expect(refs.slice(1)).toEqual(PRO_CLIENT_REFERENCES);
+  });
+
+  it('does not duplicate a pro client component the discovered manifest already lists', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: [PRO_CLIENT_REFERENCES[0], 'client/app/A.jsx'] }));
+
+    expect(rscManifestClientReferences()).toEqual([
+      PRO_CLIENT_REFERENCES[0],
+      'client/app/A.jsx',
+      ...PRO_CLIENT_REFERENCES.slice(1),
+    ]);
   });
 
   it('bypasses the default manifest during a discovery build even when it exists', () => {
@@ -207,7 +241,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
     } finally {
       warnSpy.mockRestore();
@@ -223,7 +257,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
     } finally {
       warnSpy.mockRestore();
@@ -244,7 +278,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
       expect(fs.statSync).toHaveBeenCalledWith(VALID_OVERRIDE_REGISTRATION_ENTRY);
     } finally {
@@ -264,7 +298,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
       expect(fs.statSync).toHaveBeenCalledWith(REGISTRATION_ENTRY);
     } finally {
@@ -284,7 +318,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
       expect(fs.statSync).toHaveBeenCalledWith(REGISTRATION_ENTRY);
     } finally {
@@ -300,7 +334,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
       expect(fs.statSync).toHaveBeenCalledWith(REGISTRATION_ENTRY);
     } finally {
@@ -318,7 +352,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       warnSpy.mockRestore();
@@ -332,7 +366,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       warnSpy.mockRestore();
@@ -345,7 +379,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).not.toHaveBeenCalled();
       expect(fs.statSync).not.toHaveBeenCalled();
     } finally {
@@ -362,7 +396,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx', ...PRO_CLIENT_REFERENCES]);
       expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       warnSpy.mockRestore();

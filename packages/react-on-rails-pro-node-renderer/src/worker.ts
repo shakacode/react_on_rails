@@ -122,33 +122,31 @@ function isMultipartContentType(contentType: string | undefined) {
 }
 
 // @fastify/multipart bypasses Fastify's returned preParsing payload and pipes
-// req.raw directly to Busboy. Intercept that one pipe so the aggregate limit
-// covers files, fields, and multipart framing before Busboy processes them.
+// req.raw directly to Busboy. Count bytes only once that pipe starts, so files,
+// fields, and multipart framing all contribute to the aggregate limit.
+// Keep the pipe direct: an intermediate Transform can retain bytes after the
+// raw request closes, when @fastify/multipart cleans up its parser.
 function limitMultipartRawPipe(payload: Readable, onLimitExceeded: () => void) {
   const originalPipe = payload.pipe.bind(payload);
   // eslint-disable-next-line no-param-reassign
   payload.pipe = ((destination, options) => {
     let receivedBytes = 0;
-    const limitedPayload = new Transform({
-      transform(chunk, encoding, callback) {
-        const chunkByteLength =
-          typeof chunk === 'string' ? Buffer.byteLength(chunk, encoding) : Buffer.byteLength(chunk);
-        receivedBytes += chunkByteLength;
-        if (receivedBytes > BODY_SIZE_LIMIT) {
-          onLimitExceeded();
-          callback(multipartBodyTooLargeError());
-          return;
-        }
-
-        callback(null, chunk);
-      },
-    });
-    limitedPayload.once('error', (error) => {
-      (destination as typeof destination & { destroy(streamError?: Error): void }).destroy(error);
-    });
-    const pipedDestination = limitedPayload.pipe(destination, options);
-    originalPipe(limitedPayload);
-    return pipedDestination;
+    const countBytes = (chunk: Buffer | string) => {
+      receivedBytes += Buffer.byteLength(chunk);
+      if (receivedBytes > BODY_SIZE_LIMIT) {
+        payload.removeListener('data', countBytes);
+        onLimitExceeded();
+        payload.unpipe(destination);
+        (destination as typeof destination & { destroy(streamError?: Error): void }).destroy(
+          multipartBodyTooLargeError(),
+        );
+      }
+    };
+    // Install before pipe's data listener so an oversized chunk cannot reach
+    // the parser. Both listeners attach synchronously before the stream flows.
+    payload.on('data', countBytes);
+    destination.once('close', () => payload.removeListener('data', countBytes));
+    return originalPipe(destination, options);
   }) as typeof payload.pipe;
 }
 

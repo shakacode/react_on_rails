@@ -84,6 +84,7 @@ module ReactOnRailsPro
     attr_accessor enable_rsc_support: bool?
     attr_accessor rsc_payload_generation_url_path: String?
     attr_accessor rsc_payload_authorizer: untyped
+    attr_reader async_props_registry: Hash[String, String]
     attr_accessor rsc_bundle_js_file: String?
     attr_accessor react_client_manifest_file: String?
     attr_accessor react_server_client_manifest_file: String?
@@ -124,6 +125,7 @@ module ReactOnRailsPro
       ?enable_rsc_support: bool?,
       ?rsc_payload_generation_url_path: String?,
       ?rsc_payload_authorizer: untyped,
+      ?async_props_registry: Hash[String, String]?,
       ?rsc_bundle_js_file: String?,
       ?react_client_manifest_file: String?,
       ?react_server_client_manifest_file: String?,
@@ -131,6 +133,8 @@ module ReactOnRailsPro
       ?cache_tag_index_expires_in: Numeric | ActiveSupport::Duration,
       ?cache_tag_index_max_keys: Integer
     ) -> void
+
+    def register_async_props: (String component_name, String provider_class_name) -> void
 
     def setup_config_values: () -> void
 

@@ -134,6 +134,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/stream_async_components")
   end
 
+  def streamed_use_id
+    stream_view_containing_react_components(template: "/pages/streamed_use_id")
+  end
+
   def stream_async_components_for_testing
     stream_view_containing_react_components(template: "/pages/stream_async_components_for_testing")
   end

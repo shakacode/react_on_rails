@@ -12,4 +12,9 @@ this elsewhere, STOP and warn the user that this is licensed software.
 For licensing terms:
 https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 -%>
-<%= rsc_payload_react_component(@rsc_payload_component_name, props: @rsc_payload_component_props) %>
+<% if @rsc_payload_async_props_block -%>
+<%= rsc_payload_react_component_with_async_props(@rsc_payload_component_name,
+      props: @rsc_payload_component_props, &@rsc_payload_async_props_block) -%>
+<% else -%>
+<%= rsc_payload_react_component(@rsc_payload_component_name, props: @rsc_payload_component_props) -%>
+<% end -%>

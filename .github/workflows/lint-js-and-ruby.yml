@@ -3,6 +3,15 @@ name: Lint JS and Ruby
 permissions:
   contents: read
 
+concurrency:
+  group: >-
+    ${{
+      github.event.pull_request.number &&
+      format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) ||
+      format('{0}-{1}', github.workflow, github.run_id)
+    }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
@@ -219,7 +228,9 @@ jobs:
       - name: Lint JS
         run: pnpm run eslint --report-unused-disable-directives
       - name: Test GitHub Action helpers
-        run: node .github/actions/ensure-main-docs-safety/check-previous-main.test.cjs
+        run: |
+          node .github/actions/ensure-main-docs-safety/check-previous-main.test.cjs
+          node --test .github/actions/claude-review-report/verify.test.cjs
       - name: Test custom ESLint rules
         run: pnpm run test:eslint-rules
       - name: Check formatting
