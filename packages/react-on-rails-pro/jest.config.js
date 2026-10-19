@@ -39,6 +39,9 @@ export default {
   // Inherit all settings from root
   ...rootConfig,
 
+  // Bound concurrent webpack/React tests on high-core developer machines.
+  maxWorkers: 2,
+
   // Override: Package-specific test directory
   testMatch: ['<rootDir>/tests/**/?(*.)+(spec|test).[jt]s?(x)'],
 

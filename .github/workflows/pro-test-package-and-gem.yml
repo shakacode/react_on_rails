@@ -3,6 +3,15 @@ name: React on Rails Pro - Package Tests
 permissions:
   contents: read
 
+concurrency:
+  group: >-
+    ${{
+      github.event.pull_request.number &&
+      format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) ||
+      format('{0}-{1}', github.workflow, github.run_id)
+    }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
@@ -338,7 +347,11 @@ jobs:
     # Redis service container
     services:
       redis:
-        image: public.ecr.aws/docker/library/redis:6.2.6
+        # Docker Hub's official image, pinned by digest. GitHub-hosted runners
+        # are exempt from Docker Hub pull limits. ECR Public allows anonymous
+        # pulls only 500 GB/month per source IP, which shared runner IPs use up.
+        # yamllint disable-line rule:line-length
+        image: docker.io/library/redis:6.2.6@sha256:b7fd1a2c89d09a836f659d72c52d27b9f71202c97014a47639f87c992e8c0f1b
         ports:
           - 6379:6379
         options: >-

@@ -40,5 +40,14 @@ fixtures in `script/shaka_seam_check_test.rb`. The byte-identical legacy doctor
 and test live under `.agents/fixtures/agent-workflows/bin/`, outside this active
 command directory, solely for transitional source-pack drift coverage.
 Human-only React on Rails policy stays in `AGENTS.md`.
+
+Local Shaka must support `review.local_review_count`, introduced in
+[`da95d68`](https://github.com/shakacode/shaka/commit/da95d68fd8215ae9f789a03a8c9588fb6ccf15c9),
+and run with Ruby 3.4 or newer. If an older installation rejects that key, follow
+[Shaka's upgrade procedure](https://github.com/shakacode/shaka/blob/main/docs/migration.md)
+before starting a new task, then run `shaka seam check --root . --local`.
+The older `--ci-review-job` capability probe alone does not establish support for
+this setting; keep the failed check visible until the installation is updated.
+
 Workflow-specific checks such as `actionlint` and `yamllint .github/` stay in the
 PR-processing workflow for `.github/**` changes rather than the general build entrypoint.
