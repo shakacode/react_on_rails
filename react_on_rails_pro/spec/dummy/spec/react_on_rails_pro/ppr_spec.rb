@@ -74,6 +74,21 @@ describe ReactOnRailsPro::Ppr do
           .to eq(ReactOnRailsPro::Ppr::UNKNOWN_REACT_VERSION_CACHE_KEY)
       end
     end
+
+    # Regression this catches: inverting or dropping the memoization guard, so every render
+    # re-reads node_modules/react-dom/package.json from disk (issue #5002). Detection runs
+    # once; the answer is remembered until the test-only reset seam clears it.
+    it "memoizes the detected version until reset_react_version_cache_key! clears it" do
+      first = described_class.react_version_cache_key
+      allow(described_class).to receive(:detect_react_version_cache_key).and_return("react-changed-spec")
+
+      expect(described_class.react_version_cache_key).to eq(first)
+      expect(described_class).not_to have_received(:detect_react_version_cache_key)
+
+      described_class.reset_react_version_cache_key!
+
+      expect(described_class.react_version_cache_key).to eq("react-changed-spec")
+    end
   end
 
   describe ".compute_checksum" do
