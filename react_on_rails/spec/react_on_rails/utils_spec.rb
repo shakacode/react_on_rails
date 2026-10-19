@@ -1129,6 +1129,22 @@ module ReactOnRails
         expect(described_class.sanitize_error_text(text)).to eq(text)
       end
 
+      it "leaves a literal stack-trace URL intact when its own path has an escape" do
+        text = "at file:///Users/me/My%20App/node_modules/@babel/runtime/x.js:1:2"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "strips an encoded at sign after literal slashes" do
+        expect(described_class.sanitize_error_text("see //user:s3cr3t%40host/x")).to eq("see //host/x")
+      end
+
+      it "keeps multibyte text valid around a stripped authority" do
+        result = described_class.sanitize_error_text("échec http:%2F%2Fuser:s3cr3t%40hôte/x ✓")
+        expect(result).to eq("échec http:%2F%2Fhôte/x ✓")
+        expect(result.encoding).to eq(Encoding::UTF_8)
+        expect(result).to be_valid_encoding
+      end
+
       it "stays fast on a large slash-heavy message without an at sign" do
         text = "%2F%2F #{'x %2F/ ' * 50_000}"
         expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error

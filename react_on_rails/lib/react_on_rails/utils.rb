@@ -567,7 +567,7 @@ module ReactOnRails
     private_class_method :append_view_slice
 
     # Returns [from, to) spans of original text holding userinfo, in order.
-    # Authorities spelled entirely with literal characters belong to the literal
+    # Authorities whose slashes and at sign are literal belong to the literal
     # patterns above, so a stack-trace path such as webpack://app/@babel/x.js
     # keeps its text.
     def self.userinfo_spans(decoded, from, to, literal)
@@ -581,14 +581,22 @@ module ReactOnRails
         last_at = decoded[userinfo_start...token_end].rindex("@")
         if last_at
           userinfo_end = userinfo_start + last_at
-          obfuscated = match[0].length > 2 || literal[match.begin(0)..userinfo_end].include?(false)
-          spans << [from[userinfo_start], to[userinfo_end]] if obfuscated
+          spans << [from[userinfo_start], to[userinfo_end]] if obfuscated_authority?(match, literal, userinfo_end)
         end
-        position = [token_end, userinfo_start].max
+        position = token_end
       end
       spans
     end
     private_class_method :userinfo_spans
+
+    # Only the delimiters decide: an escape elsewhere in the token, such as %20 in
+    # file:///My%20App/node_modules/@babel/x.js, leaves a literal URL to the literal patterns.
+    def self.obfuscated_authority?(authority_start, literal, at_index)
+      authority_start[0].length > 2 ||
+        literal[authority_start.begin(0)...authority_start.end(0)].include?(false) ||
+        !literal[at_index]
+    end
+    private_class_method :obfuscated_authority?
 
     # Replaces query values with [REDACTED], keeping keys for diagnostics.
     # Bare components without = (like ?eyJhbGciOi...) are treated as opaque
