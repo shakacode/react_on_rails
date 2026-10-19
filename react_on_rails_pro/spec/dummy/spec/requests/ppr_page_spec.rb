@@ -22,6 +22,7 @@ require "rails_helper"
 # Requires the Pro node renderer to be running: `cd spec/dummy && pnpm run node-renderer`.
 describe "PPR page requests", :caching, :server_rendering do
   let(:cache_key_param) { "ppr-page-spec-#{SecureRandom.hex(4)}" }
+  let(:ppr_event_subscriptions) { [] }
   let(:renderer_stream_js_calls) { [] }
   let(:lookup_outcomes) { [] }
   let(:cache_write_keys) { [] }
@@ -41,21 +42,19 @@ describe "PPR page requests", :caching, :server_rendering do
         original.call(*args, **kwargs)
       end
 
-    @ppr_event_subscriptions = [
-      ActiveSupport::Notifications.subscribe(ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION) do |*, payload|
-        lookup_outcomes << payload[:outcome]
-      end,
-      ActiveSupport::Notifications.subscribe(ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION) do |*, payload|
-        cache_write_keys << payload[:cache_key]
-      end,
-      ActiveSupport::Notifications.subscribe(ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION) do |*, payload|
-        write_refusal_reasons << payload[:reason]
-      end
-    ]
+    ppr_event_subscriptions << ActiveSupport::Notifications.subscribe(
+      ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION
+    ) { |*, payload| lookup_outcomes << payload[:outcome] }
+    ppr_event_subscriptions << ActiveSupport::Notifications.subscribe(
+      ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION
+    ) { |*, payload| cache_write_keys << payload[:cache_key] }
+    ppr_event_subscriptions << ActiveSupport::Notifications.subscribe(
+      ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION
+    ) { |*, payload| write_refusal_reasons << payload[:reason] }
   end
 
   after do
-    @ppr_event_subscriptions.each { |subscription| ActiveSupport::Notifications.unsubscribe(subscription) }
+    ppr_event_subscriptions.each { |subscription| ActiveSupport::Notifications.unsubscribe(subscription) }
   end
 
   def prerender_calls
@@ -115,7 +114,7 @@ describe "PPR page requests", :caching, :server_rendering do
 
     expect(response).to have_http_status(:ok)
     expect(lookup_outcomes).to eq(%i[miss hit])
-    expect(prerender_calls).to eq(1)          # unchanged: no renderer call at all on the warm request
+    expect(prerender_calls).to eq(1) # unchanged: no renderer call at all on the warm request
     expect(resume_calls).to eq(0)
     expect(cache_write_keys.size).to eq(1)
     expect(response.body).to include("Static section rendered in the PPR shell")
