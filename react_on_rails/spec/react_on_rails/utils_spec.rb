@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require "shakapacker"
+require "timeout"
 
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
@@ -1160,8 +1161,18 @@ module ReactOnRails
         expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
       end
 
-      it "keeps an encoded at sign in a literal URL's path" do
+      it "marks the cut when an encoded at sign sits in a literal URL's path" do
         text = "GET http://api.example.com/users/john%40example.com failed"
+        expect(described_class.sanitize_error_text(text)).to eq("GET http://[REDACTED]@example.com failed")
+      end
+
+      it "strips a literal-slash password ahead of an encoded at sign under a non-http scheme" do
+        text = "redis://user:pa/ss%40host:6379"
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@host:6379")
+      end
+
+      it "does not treat a space between two paths as an authority" do
+        text = "searched /app/lib/ /app/node_modules/@babel/core/index.js"
         expect(described_class.sanitize_error_text(text)).to eq(text)
       end
 

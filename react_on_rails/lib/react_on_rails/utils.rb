@@ -518,8 +518,8 @@ module ReactOnRails
 
       result = +"".b
       position = 0
-      removals.each do |from, to|
-        result << bytes[position...from]
+      removals.each do |from, to, replacement|
+        result << bytes[position...from] << replacement
         position = to
       end
       (result << bytes[position..]).force_encoding(text.encoding)
@@ -567,27 +567,63 @@ module ReactOnRails
     end
     private_class_method :append_view_slice
 
-    # Returns [from, to) spans of original text holding userinfo, in order.
+    # Returns [from, to, replacement] edits of the original text, in order.
     # After each authority start, the userinfo runs to the last at sign (literal
     # or decoded) before the authority ends. With literal slashes, the authority
     # ends at the first literal /, ?, # or whitespace, as URI parsing would end it,
     # so webpack://app/node_modules/@babel/x.js keeps its text. With decoded or
     # whitespace-split slashes, it fails closed and runs to the next literal
-    # whitespace, so a literal slash inside an encoded password cannot hide it.
+    # whitespace. Whitespace-split slashes count only after a scheme colon, so a
+    # space-separated list of paths is not an authority. Fails closed for literal
+    # slashes too: a decoded at sign later in the token (a literal slash inside an
+    # encoded password) is cut up to, leaving a visible [REDACTED]@ marker.
     def self.userinfo_spans(decoded, from, to, literal)
       spans = []
       position = 0
+      token = nil
       while (authority_start = AUTHORITY_START.match(decoded, position))
-        userinfo_start = authority_start.end(0)
-        obfuscated = authority_start[0].length > 2 || literal[authority_start.begin(0)...userinfo_start].include?(false)
-        authority_end = next_literal_index(decoded, literal, obfuscated ? TOKEN_END : AUTHORITY_END, userinfo_start)
-        last_at = decoded[userinfo_start...authority_end].rindex("@")
-        spans << [from[userinfo_start], to[userinfo_start + last_at]] if last_at
-        position = authority_end
+        position = authority_start.end(0)
+        next if split_without_scheme?(decoded, authority_start)
+
+        token = token_bounds(decoded, literal, position) unless token && token[0] >= position
+        userinfo_end, replacement, position = userinfo_edit(decoded, literal, authority_start, token)
+        spans << [from[authority_start.end(0)], to[userinfo_end], replacement] if userinfo_end
       end
       spans
     end
     private_class_method :userinfo_spans
+
+    def self.split_without_scheme?(decoded, authority_start)
+      authority_start[0].length > 2 && (authority_start.begin(0).zero? || decoded[authority_start.begin(0) - 1] != ":")
+    end
+    private_class_method :split_without_scheme?
+
+    # Returns [index of the userinfo's last at sign, replacement, next scan position];
+    # the first two are nil when the authority has no userinfo.
+    def self.userinfo_edit(decoded, literal, authority_start, token)
+      userinfo_start = authority_start.end(0)
+      token_end, token_decoded_at = token
+      obfuscated = authority_start[0].length > 2 || literal[authority_start.begin(0)...userinfo_start].include?(false)
+      authority_end = obfuscated ? token_end : next_literal_index(decoded, literal, AUTHORITY_END, userinfo_start)
+      if (last_at = decoded[userinfo_start...authority_end].rindex("@"))
+        [userinfo_start + last_at, "", authority_end]
+      elsif token_decoded_at && token_decoded_at >= authority_end
+        [token_decoded_at, "[REDACTED]@", token_decoded_at + 1]
+      else
+        [nil, nil, authority_end]
+      end
+    end
+    private_class_method :userinfo_edit
+
+    # Returns [end of the token holding start, index of its last decoded at sign or nil].
+    def self.token_bounds(decoded, literal, start)
+      token_end = next_literal_index(decoded, literal, TOKEN_END, start)
+      token = decoded[start...token_end]
+      index = token.length
+      index -= 1 while (index = token.rindex("@", index - 1)) && literal[start + index]
+      [token_end, index && (start + index)]
+    end
+    private_class_method :token_bounds
 
     # Index of the first literal (not decoded) match of pattern at or after start,
     # or the end of the text.
