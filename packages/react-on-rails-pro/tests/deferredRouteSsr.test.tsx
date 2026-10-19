@@ -486,11 +486,15 @@ describe('RSCRoute deferred SSR behavior', () => {
       });
 
       expect(getServerComponent).toHaveBeenCalledTimes(3);
-      expect(getServerComponent).toHaveBeenNthCalledWith(3, {
-        componentName: 'DeferredRoute',
-        componentProps: { id: 1 },
-        enforceRefetch: true,
-      });
+      expect(getServerComponent).toHaveBeenNthCalledWith(
+        3,
+        {
+          componentName: 'DeferredRoute',
+          componentProps: { id: 1 },
+          enforceRefetch: true,
+        },
+        expect.any(Function),
+      );
       expect(container.textContent).toContain('Recovered deferred route');
       expect(container.textContent).not.toContain('Retry deferred route');
     } finally {
@@ -726,11 +730,15 @@ describe('RSCRoute deferred SSR behavior', () => {
       });
 
       expect(getServerComponent).toHaveBeenCalledTimes(3);
-      expect(getServerComponent).toHaveBeenNthCalledWith(3, {
-        componentName: 'DeferredRoute',
-        componentProps: { id: 1 },
-        enforceRefetch: true,
-      });
+      expect(getServerComponent).toHaveBeenNthCalledWith(
+        3,
+        {
+          componentName: 'DeferredRoute',
+          componentProps: { id: 1 },
+          enforceRefetch: true,
+        },
+        expect.any(Function),
+      );
       expect(container.textContent).toContain('Recovered default-provider route');
       expect(container.textContent).not.toContain('Retry deferred route');
     } finally {

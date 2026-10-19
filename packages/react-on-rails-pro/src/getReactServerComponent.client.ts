@@ -25,7 +25,7 @@ import {
   RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
 } from './rscDiagnostics.ts';
 import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
-import { trackRSCStreamCompletion, type RSCStreamState } from './RSCStreamCompletion.ts';
+import type { RSCStreamObserver, RSCStreamState } from './RSCStreamCompletion.ts';
 
 declare global {
   interface Window {
@@ -238,14 +238,17 @@ const defineErrorCause = (error: Error & { cause?: unknown }, cause: unknown) =>
  * network request fails
  * @internal Shared implementation for Pro client helpers; prefer exported package entry points.
  */
-export const fetchRSC = ({
-  componentName,
-  componentProps,
-  rscPayloadGenerationUrlPath,
-  cspNonce,
-  fetchOptions,
-  replayConsoleScripts,
-}: FetchRSCOptions) => {
+export const fetchRSC = (
+  {
+    componentName,
+    componentProps,
+    rscPayloadGenerationUrlPath,
+    cspNonce,
+    fetchOptions,
+    replayConsoleScripts,
+  }: FetchRSCOptions,
+  onStreamState?: RSCStreamObserver,
+) => {
   if (!rscPayloadGenerationUrlPath) {
     return Promise.reject(createMissingRSCPayloadPathError(componentName));
   }
@@ -279,6 +282,7 @@ export const fetchRSC = ({
       replayConsoleScripts,
       sourceDescription,
     });
+    onStreamState?.(streamState);
     const handledRequest = request.catch((error: unknown) => {
       // RSC stream diagnostic errors already carry component/source context — preserve them
       // (including .cause and the merged stack) instead of flattening to a plain Error.
@@ -296,7 +300,7 @@ export const fetchRSC = ({
       }
       throw wrapper;
     });
-    return trackRSCStreamCompletion(handledRequest, streamState);
+    return handledRequest;
   } catch (error: unknown) {
     // JSON.stringify errors and other synchronous preparation failures become
     // rejections so callers stay on the Promise error path (#4372).
@@ -418,7 +422,10 @@ export const createFromPreloadedPayloads = (
  */
 const getReactServerComponent =
   (domNodeId: string, railsContext: RailsContext) =>
-  ({ componentName, componentProps, enforceRefetch = false }: ClientGetReactServerComponentProps) => {
+  (
+    { componentName, componentProps, enforceRefetch = false }: ClientGetReactServerComponentProps,
+    onStreamState?: RSCStreamObserver,
+  ) => {
     if (!enforceRefetch && window.REACT_ON_RAILS_RSC_PAYLOADS) {
       const rscPayloadKey = createEmbeddedPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
@@ -434,13 +441,16 @@ const getReactServerComponent =
       return Promise.reject(createMissingRSCPayloadPathError(componentName));
     }
 
-    return fetchRSC({
-      componentName,
-      componentProps,
-      rscPayloadGenerationUrlPath: railsContext.rscPayloadGenerationUrlPath,
-      cspNonce: railsContext.cspNonce,
-      replayConsoleScripts: true,
-    });
+    return fetchRSC(
+      {
+        componentName,
+        componentProps,
+        rscPayloadGenerationUrlPath: railsContext.rscPayloadGenerationUrlPath,
+        cspNonce: railsContext.cspNonce,
+        replayConsoleScripts: true,
+      },
+      onStreamState,
+    );
   };
 
 export default getReactServerComponent;

@@ -54,7 +54,11 @@ Object.assign(globalThis, {
   __recovery_modules__: { 'recovery-controls': { default: Controls } },
 });
 const Provider = createRSCProvider({
-  getServerComponent: (args) => fetchRSC({ ...args, rscPayloadGenerationUrlPath: '/rsc' }),
+  // Deliberately re-chain the decoder promise: completion travels separately.
+  getServerComponent: async (args, onStreamState) => {
+    await Promise.resolve();
+    return fetchRSC({ ...args, rscPayloadGenerationUrlPath: '/rsc' }, onStreamState).then((root) => root);
+  },
 });
 class OuterBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null };

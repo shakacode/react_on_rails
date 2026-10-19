@@ -13,20 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import type { ReactNode } from 'react';
-
-// Flight resolves its root before the stream completes. Key bookkeeping by
-// request promise so even equal scalar roots retain independent stream health.
-// A failed completion always retains its cause; error-free completion resolves true.
+// Flight resolves its root before the stream completes. A loader reports this
+// request-scoped state before resolving its root. Async wrappers forward the
+// observer; neither promise identity nor the decoded ReactNode carries metadata.
 export type RSCStreamState = { completion: Promise<boolean>; error?: Error };
-const completions = new WeakMap<Promise<ReactNode>, RSCStreamState>();
-
-export const trackRSCStreamCompletion = <T extends Promise<ReactNode>>(
-  request: T,
-  state: RSCStreamState,
-): T => {
-  completions.set(request, state);
-  return request;
-};
-
-export const getRSCStreamState = (request: Promise<ReactNode>) => completions.get(request);
+export type RSCStreamObserver = (state: RSCStreamState) => void;

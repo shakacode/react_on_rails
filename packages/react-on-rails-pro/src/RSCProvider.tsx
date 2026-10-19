@@ -34,7 +34,7 @@ import {
   RSC_PAYLOAD_FAILURE_RETENTION_MS,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
-import { getRSCStreamState } from './RSCStreamCompletion.ts';
+import type { RSCStreamObserver, RSCStreamState } from './RSCStreamCompletion.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type RSCRefetchRecovery = {
@@ -127,7 +127,10 @@ const isRetryableRSCPayloadError = (error: unknown): boolean => {
  * This factory function accepts an environment-specific getServerComponent implementation,
  * allowing it to work correctly in both client and server environments.
  *
- * @param getServerComponent - Environment-specific function for fetching server components
+ * @param getServerComponent - Environment-specific function for fetching server components.
+ * Internal HTTP loaders report stream state through the optional second argument
+ * before resolving the root. Wrappers must forward that observer as well as props;
+ * non-streaming loaders can ignore it and keep returning Promise<ReactNode>.
  * @param domNodeId - Optional root id used to locate embedded browser payloads
  * @param retryRejectedPayloads - Whether to perform and retain the bounded rejected-payload retry.
  * Official wrappers pass this explicitly; the environment check is only a compatibility fallback
@@ -143,7 +146,10 @@ export const createRSCProvider = ({
   domNodeId,
   retryRejectedPayloads = typeof window !== 'undefined',
 }: {
-  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
+  getServerComponent: (
+    props: ClientGetReactServerComponentProps,
+    onStreamState?: RSCStreamObserver,
+  ) => Promise<ReactNode>;
   domNodeId?: string;
   retryRejectedPayloads?: boolean;
 }) => {
@@ -518,8 +524,7 @@ export const createRSCProvider = ({
           renderRecoveries.delete(previousSuccessfulPromise);
         }
         let promise!: Promise<ReactNode>;
-        let streamState: ReturnType<typeof getRSCStreamState>;
-        let request: Promise<ReactNode>;
+        let streamState: RSCStreamState | undefined;
         let active = true;
         let streamCompleted = false;
         const restoreLastSuccessfulPromise = () => {
@@ -565,16 +570,19 @@ export const createRSCProvider = ({
 
         promise = Promise.resolve()
           .then(() => {
-            request = getServerComponent({
-              componentName,
-              componentProps,
-              enforceRefetch: true,
-            });
-            return request;
+            return getServerComponent(
+              {
+                componentName,
+                componentProps,
+                enforceRefetch: true,
+              },
+              (state) => {
+                streamState = state;
+              },
+            );
           })
           .then(
             (payload) => {
-              streamState = getRSCStreamState(request);
               if (payload instanceof Error) {
                 if (recoverOnError) {
                   restoreLastSuccessfulPromise();

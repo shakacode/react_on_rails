@@ -70,14 +70,14 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
     expect(reactElement.props.children).toBe(appElement);
   });
   it('preserves stream health through the registered lazy HTTP loader without wrapping scalar roots', async () => {
-    const { getRSCStreamState, trackRSCStreamCompletion } = require('../src/RSCStreamCompletion.ts');
     let finish;
     const state = {
       completion: new Promise((resolve) => {
         finish = resolve;
       }),
     };
-    const inner = trackRSCStreamCompletion(Promise.resolve('same scalar'), state);
+    const inner = Promise.resolve('same scalar');
+    const observe = jest.fn();
     jest.doMock('../src/RSCProvider.tsx', () => ({
       createRSCProvider: jest.fn(
         () =>
@@ -88,7 +88,12 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
     jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
     jest.doMock('../src/getReactServerComponent.client.ts', () => ({
       __esModule: true,
-      default: jest.fn(() => jest.fn(() => inner)),
+      default: jest.fn(() =>
+        jest.fn((_args, onStreamState) => {
+          onStreamState?.(state);
+          return inner;
+        }),
+      ),
     }));
     const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
     require('../src/registerDefaultRSCProvider.client.tsx');
@@ -99,14 +104,15 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
     );
     const { createRSCProvider } = require('../src/RSCProvider.tsx');
     const { getServerComponent } = createRSCProvider.mock.calls[0][0];
-    const request = getServerComponent({ componentName: 'Card', enforceRefetch: true });
+    const request = getServerComponent({ componentName: 'Card', enforceRefetch: true }, observe);
 
     await expect(request).resolves.toBe('same scalar');
     expect(request).not.toBe(inner);
-    expect(getRSCStreamState(request)).toBe(state);
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(observe).toHaveBeenCalledWith(state);
     state.error = new Error('late descendant failure');
     finish(false);
-    await expect(getRSCStreamState(request).completion).resolves.toBe(false);
-    expect(getRSCStreamState(request).error).toBe(state.error);
+    await expect(observe.mock.calls[0][0].completion).resolves.toBe(false);
+    expect(observe.mock.calls[0][0].error).toBe(state.error);
   });
 });
