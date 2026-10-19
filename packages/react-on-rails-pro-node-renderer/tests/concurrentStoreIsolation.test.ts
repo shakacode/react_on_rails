@@ -296,6 +296,7 @@ test("consumer disconnect cleanup still reads each render's store", async () => 
 
 test.each([
   [true, ['Alice', 'Bob']],
+  [undefined, ['Alice', 'Bob']],
   [false, ['Bob', 'Bob']],
 ] as const)(
   'isolateHydratedStores: %s controls the request store scope',
