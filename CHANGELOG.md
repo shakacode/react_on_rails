@@ -29,9 +29,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Diagnostic credential redaction covers encoded URL spellings**: Error-message redaction now also strips
   credentials from percent-encoded authorities (`%2F%2F`, double-encoded `%252F%252F`, `http%3A%2F%2F`, any
   hex case) and from authorities with a space or tab between the slashes after a scheme (`http:/\t/`). This is
-  defense in depth; no current caller produces these forms. To fail closed, a literal URL whose path holds an
-  encoded at sign (`%40`) is cut up to it and marked `[REDACTED]@`, so its host and path no longer appear. [PR 5217](https://github.com/shakacode/react_on_rails/pull/5217) by
-  [justin808](https://github.com/justin808).
+  defense in depth; no current caller produces these forms. To fail closed, when a `//` authority has no at
+  sign but an encoded at sign (`%40`) appears later in the same whitespace-delimited token, the text is cut up
+  to the last such at sign and marked `[REDACTED]@`, so a URL with `%40` in its path loses its host and path.
+  [PR 5218](https://github.com/shakacode/react_on_rails/pull/5218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
   and RSC Client Component providers now read only their request's stores in a shared Node Renderer
   worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
