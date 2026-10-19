@@ -44,6 +44,8 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  redirect,
+  notFound,
 } from '@tanstack/react-router';
 import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
@@ -144,7 +146,55 @@ const serverDataRoute = createRoute({
   path: '/tanstack_starter/server_data',
   component: ServerDataPage,
 });
-const routeTree = rootRoute.addChildren([homeRoute, aboutRoute, serverDataRoute]);
+// ── Issue #5125 regression routes ──
+// These routes exercise redirect(), notFound(), and loader errors so request
+// specs can assert the HTTP status code and Location header that Rails sends.
+
+const redirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_starter/redirect_target',
+  loader: () => {
+    throw redirect({ to: '/tanstack_starter', statusCode: 307 });
+  },
+  component: () => <p>Should not render (redirect)</p>,
+});
+
+const redirect301Route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_starter/permanent_redirect',
+  loader: () => {
+    throw redirect({ to: '/tanstack_starter/about', statusCode: 301 });
+  },
+  component: () => <p>Should not render (301)</p>,
+});
+
+const notFoundLoaderRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_starter/not_found_loader',
+  loader: () => {
+    throw notFound();
+  },
+  component: () => <p>Should not render (notFound)</p>,
+});
+
+const loaderErrorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_starter/loader_error',
+  loader: () => {
+    throw new Error('Intentional loader error for issue #5125 regression test');
+  },
+  component: () => <p>Should not render (error)</p>,
+});
+
+const routeTree = rootRoute.addChildren([
+  homeRoute,
+  aboutRoute,
+  serverDataRoute,
+  redirectRoute,
+  redirect301Route,
+  notFoundLoaderRoute,
+  loaderErrorRoute,
+]);
 
 const TanStackStarterApp = createTanStackRouterRenderFunction(
   {
