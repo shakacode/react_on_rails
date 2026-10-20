@@ -21,8 +21,8 @@ export function reactOnRailsPageLoaded() {
 // content. Unmounting only after turbo:frame-render leaves components intact when an app pauses or
 // cancels the render (e.g. to animate the frame), and limiting it to the recorded ids leaves alone
 // components elsewhere that happen to be detached at that moment. The Pro package has its own
-// startup (proClientStartup) and does not install these listeners; it mounts frame content through
-// the inline script each component emits.
+// startup (proClientStartup) with its own frame listeners; it mounts frame content through the
+// inline script each component emits.
 const componentIdsBeforeFrameRender = new WeakMap<Element, string[]>();
 
 function turboFrameTarget(event: Event): Element | null {

@@ -288,6 +288,21 @@ class ComponentRenderer {
     return this.domNode === undefined || this.domNode === domNode;
   }
 
+  // The node this component renders into: the one render() mounted into, or, before render() runs
+  // (e.g. while waiting on store dependencies), the node currently holding its DOM id.
+  private currentDomNode(): Element | null {
+    return this.domNode ?? document.getElementById(this.domNodeId);
+  }
+
+  isWithin(container: Element): boolean {
+    const domNode = this.currentDomNode();
+    return domNode !== null && container.contains(domNode);
+  }
+
+  isDetached(): boolean {
+    return !this.currentDomNode()?.isConnected;
+  }
+
   /**
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
@@ -597,6 +612,34 @@ export const renderOrHydrateCompleteComponents = () =>
 
 export const renderOrHydrateAllComponents = () =>
   forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
+
+/**
+ * The DOM ids of the components currently mounted inside `container`, such as a Turbo Frame about
+ * to render new content.
+ */
+export function mountedComponentIdsWithin(container: Element): string[] {
+  const domNodeIds: string[] = [];
+  renderedRoots.forEach((root, domNodeId) => {
+    if (root.isWithin(container)) domNodeIds.push(domNodeId);
+  });
+  return domNodeIds;
+}
+
+/**
+ * Unmount the given components whose DOM nodes are no longer in the document, such as the old
+ * content of a Turbo Frame that was just replaced. A component still in the document stays mounted,
+ * and so does one whose id was mounted again on a new node. Stores are page-wide and stay hydrated.
+ */
+export function unmountDetachedComponents(domNodeIds: string[]): void {
+  domNodeIds.forEach((domNodeId) => {
+    const root = renderedRoots.get(domNodeId);
+    if (!root?.isDetached()) return;
+
+    root.unmount();
+    // Drop the entry so new content with the same DOM id mounts a fresh renderer.
+    renderedRoots.delete(domNodeId);
+  });
+}
 
 function unmountAllComponents(): void {
   renderedRoots.forEach((root) => root.unmount());
