@@ -25,7 +25,13 @@ import type { RailsContext, RendererFunction } from 'react-on-rails/types';
 import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@internal/rootErrorHandlers';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import * as StoreRegistry from '../src/StoreRegistry.ts';
-import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
+import {
+  renderOrHydrateComponent,
+  hydrateStore,
+  mountedComponentIdsWithin,
+  unmountAll,
+  unmountDetachedComponents,
+} from '../src/ClientSideRenderer.ts';
 import { PAGE_UNLOAD_REGISTRY_ERROR_NAME } from '../src/CallbackRegistry.ts';
 import { REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE } from '../src/browserPerformanceMarks.ts';
 import {
@@ -948,6 +954,157 @@ describe('ClientSideRenderer', () => {
     unmountAll();
     expect(teardown).toHaveBeenCalledTimes(1);
     expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+  });
+
+  // Issue #5128: a Turbo Frame navigation replaces only the frame's content. proClientStartup records
+  // the frame's components on turbo:before-frame-render and unmounts the detached ones on
+  // turbo:frame-render; the new content mounts through each component's inline script.
+  describe('Turbo Frame content replacement', () => {
+    function appendComponentDom(parent: Element, domId: string): Element {
+      const componentSpec = document.createElement('div');
+      componentSpec.className = 'js-react-on-rails-component';
+      componentSpec.setAttribute('data-component-name', 'TestComponent');
+      componentSpec.setAttribute('data-dom-id', domId);
+      componentSpec.textContent = JSON.stringify({ greeting: 'hello' });
+      parent.appendChild(componentSpec);
+
+      const mountNode = document.createElement('div');
+      mountNode.id = domId;
+      parent.appendChild(mountNode);
+      return componentSpec;
+    }
+
+    function createFrame(): Element {
+      const frame = document.createElement('turbo-frame');
+      frame.id = 'test-frame';
+      document.body.appendChild(frame);
+      return frame;
+    }
+
+    function registerTeardownRenderer(): { renderer: jest.Mock; teardowns: Map<string, jest.Mock[]> } {
+      const teardowns = new Map<string, jest.Mock[]>();
+      const renderer = jest.fn((_props: unknown, _railsContext: unknown, domNodeId: string) => {
+        const teardown = jest.fn();
+        teardowns.set(domNodeId, [...(teardowns.get(domNodeId) ?? []), teardown]);
+        return { teardown };
+      });
+      ComponentRegistry.register({ TestComponent: renderer as unknown as RendererFunction });
+      return { renderer, teardowns };
+    }
+
+    it('unmounts the replaced frame components and leaves components outside the frame mounted', async () => {
+      const { teardowns } = registerTeardownRenderer();
+      addRailsContext();
+      const frame = createFrame();
+      await renderOrHydrateComponent(appendComponentDom(frame, 'frame-old'));
+      await renderOrHydrateComponent(appendComponentDom(document.body, 'outside-frame'));
+
+      const idsBeforeRender = mountedComponentIdsWithin(frame);
+      expect(idsBeforeRender).toEqual(['frame-old']);
+
+      frame.innerHTML = '';
+      await renderOrHydrateComponent(appendComponentDom(frame, 'frame-new'));
+      unmountDetachedComponents(idsBeforeRender);
+
+      expect(teardowns.get('frame-old')?.[0]).toHaveBeenCalledTimes(1);
+      expect(teardowns.get('frame-new')?.[0]).not.toHaveBeenCalled();
+      expect(teardowns.get('outside-frame')?.[0]).not.toHaveBeenCalled();
+
+      // The unmounted entry is gone, so a later page unload does not tear it down again.
+      unmountAll();
+      expect(teardowns.get('frame-old')?.[0]).toHaveBeenCalledTimes(1);
+      expect(teardowns.get('frame-new')?.[0]).toHaveBeenCalledTimes(1);
+      expect(teardowns.get('outside-frame')?.[0]).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a component the frame still holds when the render is canceled', async () => {
+      const { teardowns } = registerTeardownRenderer();
+      addRailsContext();
+      const frame = createFrame();
+      await renderOrHydrateComponent(appendComponentDom(frame, 'frame-kept'));
+
+      unmountDetachedComponents(mountedComponentIdsWithin(frame));
+
+      expect(teardowns.get('frame-kept')?.[0]).not.toHaveBeenCalled();
+    });
+
+    it('keeps the new mount when the new frame content reuses a DOM id and mounted first', async () => {
+      const { renderer, teardowns } = registerTeardownRenderer();
+      addRailsContext();
+      const frame = createFrame();
+      await renderOrHydrateComponent(appendComponentDom(frame, 'same-id'));
+      const idsBeforeRender = mountedComponentIdsWithin(frame);
+
+      frame.innerHTML = '';
+      await renderOrHydrateComponent(appendComponentDom(frame, 'same-id'));
+      unmountDetachedComponents(idsBeforeRender);
+
+      expect(renderer).toHaveBeenCalledTimes(2);
+      const [oldTeardown, newTeardown] = teardowns.get('same-id') ?? [];
+      expect(oldTeardown).toHaveBeenCalledTimes(1);
+      expect(newTeardown).not.toHaveBeenCalled();
+    });
+
+    it('mounts new content that reuses a DOM id after the old component was unmounted', async () => {
+      const { renderer, teardowns } = registerTeardownRenderer();
+      addRailsContext();
+      const frame = createFrame();
+      await renderOrHydrateComponent(appendComponentDom(frame, 'same-id'));
+      const idsBeforeRender = mountedComponentIdsWithin(frame);
+
+      frame.innerHTML = '';
+      unmountDetachedComponents(idsBeforeRender);
+      await renderOrHydrateComponent(appendComponentDom(frame, 'same-id'));
+
+      expect(renderer).toHaveBeenCalledTimes(2);
+      expect(teardowns.get('same-id')?.[0]).toHaveBeenCalledTimes(1);
+      expect(teardowns.get('same-id')?.[1]).not.toHaveBeenCalled();
+    });
+
+    it('cancels a replaced frame component still waiting on a store dependency', async () => {
+      const { renderer } = registerTeardownRenderer();
+      StoreRegistry.register({ FrameStore: () => ({}) as never });
+      addRailsContext();
+      const frame = createFrame();
+      const componentSpec = appendComponentDom(frame, 'frame-waiting');
+      componentSpec.setAttribute('data-store-dependencies', JSON.stringify(['FrameStore']));
+      const pendingRender = renderOrHydrateComponent(componentSpec);
+
+      const idsBeforeRender = mountedComponentIdsWithin(frame);
+      expect(idsBeforeRender).toEqual(['frame-waiting']);
+
+      frame.innerHTML = '';
+      unmountDetachedComponents(idsBeforeRender);
+      await hydrateStore(setupTestStoreDom('FrameStore'));
+      await pendingRender;
+
+      expect(renderer).not.toHaveBeenCalled();
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    it('mounts new content that reuses the DOM id of a replaced component still waiting on a store', async () => {
+      const { renderer } = registerTeardownRenderer();
+      StoreRegistry.register({ FrameStore: () => ({}) as never });
+      addRailsContext();
+      const frame = createFrame();
+      const oldComponentSpec = appendComponentDom(frame, 'same-id-waiting');
+      oldComponentSpec.setAttribute('data-store-dependencies', JSON.stringify(['FrameStore']));
+      void renderOrHydrateComponent(oldComponentSpec);
+      const idsBeforeRender = mountedComponentIdsWithin(frame);
+
+      frame.innerHTML = '';
+      unmountDetachedComponents(idsBeforeRender);
+      // The canceled renderer never set its DOM node, so if it stayed tracked it would be reused
+      // for the new node with the same id and nothing would mount.
+      const newRender = renderOrHydrateComponent(appendComponentDom(frame, 'same-id-waiting'));
+      await hydrateStore(setupTestStoreDom('FrameStore'));
+      await newRender;
+
+      expect(renderer).toHaveBeenCalledTimes(1);
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
   });
 
   it('clears page-scoped RSC globals before the next page initializes payload state', () => {
