@@ -41,7 +41,7 @@ ReactOnRails.setOptions({
 
 **3. Use Turbo Frames**
 
-With `turbo: true` set, React components inside a Turbo Frame work without extra code:
+With `turbo: true` set, React on Rails mounts and unmounts the components inside a Turbo Frame as it navigates, subject to the requirements below:
 
 ```erb
 <%# app/views/items/index.html.erb %>
@@ -59,7 +59,7 @@ When a frame navigation replaces the frame's content, the `react-on-rails` packa
 
 Nothing is unmounted before the frame renders, so pausing or canceling `turbo:before-frame-render` (for example, to animate the frame) leaves the old components working.
 
-Components outside the frame stay mounted. Redux stores are page-wide: a store the new frame content declares is initialized only if the page does not already have a store with that name.
+Components outside the frame stay mounted. Redux stores are page-wide: each new component initializes only the stores it declares, and a store the page already has keeps its state.
 
 Turbo inserts only the frame's markup from the response, so anything the response renders outside the frame is discarded. That leads to three requirements:
 

@@ -8,6 +8,7 @@ import {
   renderAllComponents,
   reactOnRailsComponentLoaded,
   mountedComponentIdsWithin,
+  renderComponentsWithin,
   unmountDetachedComponents,
 } from '../src/ClientRenderer.ts';
 import { clientStartup, reactOnRailsPageLoaded } from '../src/clientStartup.ts';
@@ -1924,6 +1925,28 @@ describe('ClientRenderer', () => {
       setupComponentIsland('Widget', 'Widget-react-component-0', ['widgetStore']);
 
       await reactOnRailsComponentLoaded('Widget-react-component-0');
+
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
+        document.getElementById('Widget-react-component-0'),
+      );
+      expect(declared.calls()).toBe(1);
+      expect(StoreRegistry.getStore('pendingStore', false)).toBeUndefined();
+    });
+
+    it('mounts Turbo Frame content even when an unrelated store element has no registered generator', () => {
+      // A frame render must use the same dependency-scoped store initialization as an on-demand
+      // render, or one store whose bundle has not loaded would block every component in the frame.
+      const declared = createMiniStoreGenerator();
+      StoreRegistry.register({ widgetStore: declared.generator });
+      setupStoreElement('widgetStore', { items: [] });
+      setupStoreElement('pendingStore', { items: ['bundle-not-loaded'] }); // no generator registered
+
+      const Widget: React.FC = () => React.createElement('div', null, 'Widget');
+      ComponentRegistry.register({ Widget });
+      setupComponentIsland('Widget', 'Widget-react-component-0', ['widgetStore']);
+
+      renderComponentsWithin(document.body);
 
       const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
       expect(mockHydrateOrRender.mock.lastCall?.[0]).toBe(
