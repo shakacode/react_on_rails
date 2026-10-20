@@ -11731,7 +11731,7 @@ Turbo inserts only the frame's markup from the response, so anything the respons
 - **Rails context:** React on Rails writes the `js-react-on-rails-context` element next to the first component a response renders. The page must already have one, or the frame response's first component must be inside the frame.
 - **Stores:** a store a frame component reads must already be on the page or have its hydration data rendered inside the frame. Store data that `redux_store_hydration_data` writes elsewhere in the layout is discarded.
 
-With the `react-on-rails-pro` package, each component's inline script mounts the new frame content as soon as it is inserted. Pro unmounts the components the render removed on `turbo:frame-render`, the same way.
+With the `react-on-rails-pro` package, each component's inline script mounts the new frame content as soon as it is inserted. With `turbo: true`, Pro also unmounts the components the render removed when `turbo:frame-render` fires.
 
 ### Turbo with Auto-Bundling
 

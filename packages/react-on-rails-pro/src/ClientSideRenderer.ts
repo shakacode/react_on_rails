@@ -231,6 +231,11 @@ class ComponentRenderer {
 
   private domNode?: Element;
 
+  // The node holding this component's DOM id when the renderer was created. render() sets `domNode`
+  // only after store dependencies resolve; until then this identifies which node the renderer
+  // belongs to, so a same-id replacement (e.g. a Turbo Frame render) is not mistaken for it.
+  private initialDomNode: Element | null;
+
   private ssrIdentifierPrefix?: string;
 
   private state: 'unmounted' | 'rendering' | 'rendered';
@@ -253,6 +258,7 @@ class ComponentRenderer {
     const domId = getDomId(domIdOrElement);
     this.domNodeId = domId;
     this.state = 'rendering';
+    this.initialDomNode = document.getElementById(domId);
     const el =
       typeof domIdOrElement === 'string'
         ? document.querySelector(`[data-dom-id="${CSS.escape(domId)}"]`)
@@ -283,15 +289,18 @@ class ComponentRenderer {
   }
 
   isRenderingDomNode(domNode: Element | null): boolean {
-    // `this.domNode` is undefined until render() sets it; treat "not yet known" as a match so a
-    // concurrent second call does not prematurely unmount a still-starting render.
-    return this.domNode === undefined || this.domNode === domNode;
+    // Before render() sets `this.domNode`, compare against the node seen at construction. If no node
+    // was known then, treat "not yet known" as a match so a concurrent second call does not
+    // prematurely unmount a still-starting render.
+    const knownDomNode = this.domNode ?? this.initialDomNode;
+    return knownDomNode === null || knownDomNode === domNode;
   }
 
   // The node this component renders into: the one render() mounted into, or, before render() runs
-  // (e.g. while waiting on store dependencies), the node currently holding its DOM id.
+  // (e.g. while waiting on store dependencies), the node seen at construction, falling back to the
+  // node currently holding its DOM id.
   private currentDomNode(): Element | null {
-    return this.domNode ?? document.getElementById(this.domNodeId);
+    return this.domNode ?? this.initialDomNode ?? document.getElementById(this.domNodeId);
   }
 
   isWithin(container: Element): boolean {
@@ -614,8 +623,8 @@ export const renderOrHydrateAllComponents = () =>
   forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
 
 /**
- * The DOM ids of the components currently mounted inside `container`, such as a Turbo Frame about
- * to render new content.
+ * The DOM ids of the components inside `container` that are mounted or still waiting to render, such
+ * as the components of a Turbo Frame about to render new content.
  */
 export function mountedComponentIdsWithin(container: Element): string[] {
   const domNodeIds: string[] = [];

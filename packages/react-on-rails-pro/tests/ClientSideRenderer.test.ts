@@ -960,12 +960,12 @@ describe('ClientSideRenderer', () => {
   // the frame's components on turbo:before-frame-render and unmounts the detached ones on
   // turbo:frame-render; the new content mounts through each component's inline script.
   describe('Turbo Frame content replacement', () => {
-    function appendComponentDom(parent: Element, domId: string): Element {
+    function appendComponentDom(parent: Element, domId: string, greeting = 'hello'): Element {
       const componentSpec = document.createElement('div');
       componentSpec.className = 'js-react-on-rails-component';
       componentSpec.setAttribute('data-component-name', 'TestComponent');
       componentSpec.setAttribute('data-dom-id', domId);
-      componentSpec.textContent = JSON.stringify({ greeting: 'hello' });
+      componentSpec.textContent = JSON.stringify({ greeting });
       parent.appendChild(componentSpec);
 
       const mountNode = document.createElement('div');
@@ -1079,6 +1079,31 @@ describe('ClientSideRenderer', () => {
       await pendingRender;
 
       expect(renderer).not.toHaveBeenCalled();
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    it('renders the new props when same-id content mounts before a waiting component is cleaned up', async () => {
+      const { renderer } = registerTeardownRenderer();
+      StoreRegistry.register({ FrameStore: () => ({}) as never });
+      addRailsContext();
+      const frame = createFrame();
+      const oldComponentSpec = appendComponentDom(frame, 'same-id-waiting', 'old');
+      oldComponentSpec.setAttribute('data-store-dependencies', JSON.stringify(['FrameStore']));
+      void renderOrHydrateComponent(oldComponentSpec);
+      const idsBeforeRender = mountedComponentIdsWithin(frame);
+
+      // Turbo's order: insert the new content, run its inline mount script, then fire turbo:frame-render.
+      frame.innerHTML = '';
+      const newComponentSpec = appendComponentDom(frame, 'same-id-waiting', 'new');
+      newComponentSpec.setAttribute('data-store-dependencies', JSON.stringify(['FrameStore']));
+      const newRender = renderOrHydrateComponent(newComponentSpec);
+      unmountDetachedComponents(idsBeforeRender);
+      await hydrateStore(setupTestStoreDom('FrameStore'));
+      await newRender;
+
+      expect(renderer).toHaveBeenCalledTimes(1);
+      expect(renderer.mock.calls[0]?.[0]).toEqual({ greeting: 'new' });
       StoreRegistry.clearHydratedStores();
       StoreRegistry.clearStoreGenerators();
     });
