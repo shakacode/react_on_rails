@@ -25,7 +25,7 @@ files:
     agent-workflows doctor.
   consumer_mode: '100644'
   source_sha256: 509b333b461cded9f7f05498567aa454240af62f63697d66e4ebf41e6499555f
-  consumer_sha256: 2f57ad7b82f21294627926e598f8fa109e38353c93c246ad8aff76c6cdb98e84
+  consumer_sha256: b5c8f6d5299807cbb4a022d9f909cfee0407c729a474cd58dc7c1d7b38bb7600
 - source: docs/coordination-backend.md
   consumer: ".agents/docs/coordination-backend.md"
   mode: overlay
