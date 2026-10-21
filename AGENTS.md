@@ -218,8 +218,7 @@ shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
 
 This trusted-ref check establishes workflow policy. Candidate CI validation uses
 the separately pinned Shaka checkout with `--local`, which grants neither policy
-nor merge authority. The old doctor lives under `.agents/fixtures/` only for
-legacy `agent-workflows` tests; it is not an active repository command.
+nor merge authority.
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` file, it should
 be a repo-specific local skill such as `stress-test` or

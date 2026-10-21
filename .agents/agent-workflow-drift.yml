@@ -63,7 +63,7 @@ files:
     agent-workflows only as transitional pinned content.
   consumer_mode: '100644'
   source_sha256: 39b1afb441b0b77f26c31daa043c51d0665c22190efa6454fff2882aa6ab4f05
-  consumer_sha256: fb34499a6210c7c43ab070cc4fbd181a70df1ff475d5cdf35e4fb8c63fab3435
+  consumer_sha256: edf5a6d88dcba508d19f0ae6055e0058dd540bb4f2a782e21c32ec292037b4ef
 - source: docs/security-posture.md
   consumer: ".agents/docs/security-posture.md"
   mode: overlay

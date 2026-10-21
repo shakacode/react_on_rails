@@ -121,8 +121,8 @@ resolution uses `.agents/bin/`; Shaka typed policy uses `.agents/agent-workflow.
 
 ## Seam Initialization
 
-New and migrated consumers use `shaka seam init`. The legacy doctor is fixture
-data and must never be run with `--init` against this repository.
+New and migrated consumers use `shaka seam init`. Never run the legacy
+agent-workflows doctor with `--init` against this repository.
 
 ## Seam Validation
 
