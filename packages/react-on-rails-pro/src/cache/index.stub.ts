@@ -29,20 +29,25 @@ import type { CacheHandler, CacheEntry } from './CacheHandler.ts';
 
 export type { CacheHandler, CacheEntry };
 
-export interface UnstableCacheOptions {
+export interface UnstableCacheOptions<TArgs extends unknown[] = unknown[]> {
   id: string;
   revalidate?: number;
   kind?: string;
+  tags?: string[] | ((...args: TArgs) => string[]);
 }
 
 const STUB_ERROR =
   'unstable_cache is only available in the react-server bundle. ' +
   'It should not be called from the SSR server bundle or client bundle.';
 
+const STUB_ERROR_REVALIDATE =
+  'unstable_revalidateTag is only available in the react-server bundle. ' +
+  'It should not be called from the SSR server bundle or client bundle.';
+
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
 export function unstable_cache<TArgs extends unknown[]>(
   originalFn: (...args: TArgs) => Promise<ReactNode> | ReactNode,
-  options: UnstableCacheOptions,
+  options: UnstableCacheOptions<TArgs>,
 ): (...args: TArgs) => Promise<ReactNode> {
   return () => {
     throw new Error(STUB_ERROR);
@@ -51,6 +56,13 @@ export function unstable_cache<TArgs extends unknown[]>(
 
 export function registerCacheHandler(kind: string, handler: CacheHandler): void {
   throw new Error(STUB_ERROR);
+}
+
+// The stub installs NO global revalidation hook — the hook exists only where
+// handlers exist (the react-server entry point).
+// eslint-disable-next-line camelcase, @typescript-eslint/require-await -- Next.js naming; async so the stub REJECTS like its siblings
+export async function unstable_revalidateTag(_tags: string | string[]): Promise<void> {
+  throw new Error(STUB_ERROR_REVALIDATE);
 }
 
 export type { RedisCacheHandlerOptions } from './RedisCacheHandler.ts';

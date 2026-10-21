@@ -14,7 +14,7 @@
     "test:streaming": "node scripts/run-react19-jest.mjs tests/streamServerRenderedReactComponent.test.jsx tests/streamBackpressure.e2e.test.tsx tests/rscSsrSynchrony.e2e.test.tsx tests/injectRSCPayload.test.ts tests/SuspenseHydration.test.tsx tests/parseLengthPrefixedStream.test.ts tests/registerServerComponent.client.test.jsx --runInBand",
     "test:rsc": "NODE_CONDITIONS=react-server node scripts/run-react19-jest.mjs --require-react-server tests/*.rsc.test.*",
     "test:packed-react-compatibility": "node --test scripts/packed-react-compatibility-manifest.test.mjs && node --test scripts/packed-react-compatibility-cases.test.mjs && node scripts/packed-react-compatibility-smoke.mjs",
-    "type-check": "tsc --noEmit --noErrorTruncation",
+    "type-check": "tsc --noEmit --noErrorTruncation && tsc --noEmit --noErrorTruncation --project type-tests/tsconfig.json",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
     "prepublishOnly": "pnpm run build"
   },
