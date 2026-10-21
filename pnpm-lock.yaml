@@ -11,16 +11,17 @@ overrides:
   app>react-dom: ^18.3.1
   react_on_rails>react: ^19.2.0
   react_on_rails>react-dom: ^19.2.0
-  react-on-rails-pro-node-renderer>react: 19.3.0
-  react-on-rails-pro-node-renderer>react-dom: 19.3.0
+  react-on-rails-pro-node-renderer>react: 19.3.1
+  react-on-rails-pro-node-renderer>react-dom: 19.3.1
   react-on-rails-pro-node-renderer>react-on-rails-rsc: 19.3.1
-  react-on-rails-pro>react: 19.3.0
-  react-on-rails-pro>react-dom: 19.3.0
+  react-on-rails-pro>react: 19.3.1
+  react-on-rails-pro>react-dom: 19.3.1
   react-on-rails-pro>react-on-rails-rsc: 19.3.1
-  react_on_rails_pro_dummy>react: 19.3.0
-  react_on_rails_pro_dummy>react-dom: 19.3.0
+  react_on_rails_pro_dummy>react: 19.3.1
+  react_on_rails_pro_dummy>react-dom: 19.3.1
   react_on_rails_pro_dummy>react-on-rails-rsc: 19.3.1
-  react_on_rails_pro_dummy>react-server-dom-webpack: 19.3.0
+  react_on_rails_pro_dummy>react-server-dom-webpack: 19.3.1
+  react-server-dom-webpack@>=19.3.0 <19.3.1: 19.3.1
   sentry-testkit>body-parser: npm:empty-npm-package@1.0.0
   sentry-testkit>express: npm:empty-npm-package@1.0.0
   lodash@>=4.0.0 <=4.17.22: '>=4.17.23 <5'
@@ -268,7 +269,7 @@ importers:
     devDependencies:
       '@tanstack/react-router':
         specifier: 1.163.3
-        version: 1.163.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 1.163.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tanstack/store':
         specifier: 0.9.1
         version: 0.9.1
@@ -282,14 +283,14 @@ importers:
         specifier: ^5.5.0
         version: 5.5.0
       react:
-        specifier: 19.3.0
-        version: 19.3.0
+        specifier: 19.3.1
+        version: 19.3.1
       react-dom:
-        specifier: 19.3.0
-        version: 19.3.0(react@19.3.0)
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
       react-on-rails-rsc:
         specifier: 19.3.1
-        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
+        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -397,20 +398,20 @@ importers:
         specifier: ^13.0.0
         version: 13.1.2
       react:
-        specifier: 19.3.0
-        version: 19.3.0
+        specifier: 19.3.1
+        version: 19.3.1
       react-dom:
-        specifier: 19.3.0
-        version: 19.3.0(react@19.3.0)
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
       react-on-rails:
         specifier: workspace:*
         version: link:../react-on-rails
       react-on-rails-rsc:
         specifier: 19.3.1
-        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
+        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
       react-redux:
         specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.2.7)(react@19.3.0)(redux@5.0.1)
+        version: 9.2.0(@types/react@19.2.7)(react@19.3.1)(redux@5.0.1)
       redis:
         specifier: ^5.0.1
         version: 5.10.0
@@ -624,7 +625,7 @@ importers:
     dependencies:
       '@apollo/client':
         specifier: ^3.6.9
-        version: 3.14.0(@types/react@19.2.7)(graphql@16.12.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 3.14.0(@types/react@19.2.7)(graphql@16.12.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@babel/core':
         specifier: '7'
         version: 7.29.6
@@ -645,7 +646,7 @@ importers:
         version: 7.28.4
       '@dr.pogodin/react-helmet':
         specifier: ^3.0.4
-        version: 3.0.6(react@19.3.0)
+        version: 3.0.6(react@19.3.1)
       '@honeybadger-io/js':
         specifier: ^4.3.1
         version: 4.9.3
@@ -654,10 +655,10 @@ importers:
         version: 5.16.1(@babel/core@7.29.6)
       '@loadable/component':
         specifier: ^5.16.3
-        version: 5.16.7(react@19.3.0)
+        version: 5.16.7(react@19.3.1)
       '@loadable/server':
         specifier: ^5.16.2
-        version: 5.16.7(@loadable/component@5.16.7(react@19.3.0))(react@19.3.0)
+        version: 5.16.7(@loadable/component@5.16.7(react@19.3.1))(react@19.3.1)
       '@loadable/webpack-plugin':
         specifier: ^5.15.2
         version: 5.15.2(webpack@5.104.1)
@@ -675,13 +676,13 @@ importers:
         version: 7.120.4
       '@shakacode/use-ssr-computation.macro':
         specifier: ^1.2.4
-        version: 1.2.4(react@19.3.0)
+        version: 1.2.4(react@19.3.1)
       '@shakacode/use-ssr-computation.runtime':
         specifier: ^2.0.0
-        version: 2.0.0(react@19.3.0)
+        version: 2.0.0(react@19.3.1)
       '@tanstack/react-router':
         specifier: ^1.139.0
-        version: 1.163.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 1.163.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       autoprefixer:
         specifier: ^10.4.14
         version: 10.4.24(postcss@8.5.31)
@@ -761,17 +762,17 @@ importers:
         specifier: ^15.7.2
         version: 15.8.1
       react:
-        specifier: 19.3.0
-        version: 19.3.0
+        specifier: 19.3.1
+        version: 19.3.1
       react-dom:
-        specifier: 19.3.0
-        version: 19.3.0(react@19.3.0)
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
       react-error-boundary:
         specifier: ^4.1.2
-        version: 4.1.2(react@19.3.0)
+        version: 4.1.2(react@19.3.1)
       react-intl:
         specifier: ^10
-        version: 10.1.13(@types/react@19.2.7)(react@19.3.0)
+        version: 10.1.13(@types/react@19.2.7)(react@19.3.1)
       react-on-rails-pro:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro
@@ -780,22 +781,22 @@ importers:
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
         specifier: 19.3.1
-        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1)
+        version: 19.3.1(@rspack/core@2.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
       react-redux:
         specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.2.7)(react@19.3.0)(redux@5.0.1)
+        version: 9.2.0(@types/react@19.2.7)(react@19.3.1)(redux@5.0.1)
       react-refresh:
         specifier: ^0.11.0
         version: 0.11.0
       react-router-dom:
         specifier: ^6.30.5
-        version: 6.30.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 6.30.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react-server-dom-webpack:
-        specifier: 19.3.0
-        version: 19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1)
+        specifier: 19.3.1
+        version: 19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.104.1)
       redis:
         specifier: ^5.0.1
         version: 5.10.0
@@ -8584,8 +8585,8 @@ packages:
     peerDependencies:
       react: ~19.0.4
 
-  react-dom@19.3.0:
-    resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
+  react-dom@19.3.1:
+    resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
       react: ~19.0.4
 
@@ -8669,8 +8670,8 @@ packages:
     peerDependencies:
       react: ~19.0.4
 
-  react-server-dom-webpack@19.3.0:
-    resolution: {integrity: sha512-ymt9RkvWtW4OpIhWf1wj4u5CxnBaVbDCkz/bw3/QFmOE7+/wg8C30uiJ/QqkEdWn/UqT5c7/rOUW/eWYMwceCg==}
+  react-server-dom-webpack@19.3.1:
+    resolution: {integrity: sha512-I1Smf6Yc+389rFWPwyYjvCQVK1XFWpb2M9gvgYgfpbZ+LPqkZtb0tT9Fwdk0K+wknK2E+ns82lC0DCYLnXCVGA==}
     engines: {node: '>=0.10.0'}
     peerDependencies:
       react: ~19.0.4
@@ -8689,8 +8690,8 @@ packages:
     resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
     engines: {node: '>=0.10.0'}
 
-  react@19.3.0:
-    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+  react@19.3.1:
+    resolution: {integrity: sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==}
     engines: {node: '>=0.10.0'}
 
   read-cache@1.0.0:
@@ -10592,7 +10593,7 @@ snapshots:
 
   '@andrewbranch/untar.js@1.0.3': {}
 
-  '@apollo/client@3.14.0(@types/react@19.2.7)(graphql@16.12.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@apollo/client@3.14.0(@types/react@19.2.7)(graphql@16.12.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.12.0)
       '@wry/caches': 1.0.1
@@ -10603,14 +10604,14 @@ snapshots:
       hoist-non-react-statics: 3.3.2
       optimism: 0.18.1
       prop-types: 15.8.1
-      rehackt: 0.1.0(@types/react@19.2.7)(react@19.3.0)
+      rehackt: 0.1.0(@types/react@19.2.7)(react@19.3.1)
       symbol-observable: 4.0.0
       ts-invariant: 0.10.3
       tslib: 2.8.1
       zen-observable-ts: 1.2.5
     optionalDependencies:
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
     transitivePeerDependencies:
       - '@types/react'
 
@@ -11557,10 +11558,10 @@ snapshots:
       '@babel/runtime': 7.28.6
       react: 19.2.7
 
-  '@dr.pogodin/react-helmet@3.0.6(react@19.3.0)':
+  '@dr.pogodin/react-helmet@3.0.6(react@19.3.1)':
     dependencies:
       '@babel/runtime': 7.28.6
-      react: 19.3.0
+      react: 19.3.1
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
@@ -12306,18 +12307,18 @@ snapshots:
       '@babel/core': 7.29.6
       '@babel/plugin-syntax-dynamic-import': 7.8.3(@babel/core@7.29.6)
 
-  '@loadable/component@5.16.7(react@19.3.0)':
+  '@loadable/component@5.16.7(react@19.3.1)':
     dependencies:
       '@babel/runtime': 7.28.4
       hoist-non-react-statics: 3.3.2
-      react: 19.3.0
+      react: 19.3.1
       react-is: 16.13.1
 
-  '@loadable/server@5.16.7(@loadable/component@5.16.7(react@19.3.0))(react@19.3.0)':
+  '@loadable/server@5.16.7(@loadable/component@5.16.7(react@19.3.1))(react@19.3.1)':
     dependencies:
-      '@loadable/component': 5.16.7(react@19.3.0)
+      '@loadable/component': 5.16.7(react@19.3.1)
       lodash: 4.18.1
-      react: 19.3.0
+      react: 19.3.1
 
   '@loadable/webpack-plugin@5.15.2(webpack@5.104.1)':
     dependencies:
@@ -13299,16 +13300,16 @@ snapshots:
     dependencies:
       '@sentry/types': 7.120.4
 
-  '@shakacode/use-ssr-computation.macro@1.2.4(react@19.3.0)':
+  '@shakacode/use-ssr-computation.macro@1.2.4(react@19.3.1)':
     dependencies:
-      '@shakacode/use-ssr-computation.runtime': 2.0.0(react@19.3.0)
+      '@shakacode/use-ssr-computation.runtime': 2.0.0(react@19.3.1)
       babel-plugin-macros: 3.1.0
     transitivePeerDependencies:
       - react
 
-  '@shakacode/use-ssr-computation.runtime@2.0.0(react@19.3.0)':
+  '@shakacode/use-ssr-computation.runtime@2.0.0(react@19.3.1)':
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
 
   '@sinclair/typebox@0.27.8': {}
 
@@ -13425,23 +13426,23 @@ snapshots:
 
   '@tanstack/history@1.161.4': {}
 
-  '@tanstack/react-router@1.163.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@tanstack/react-router@1.163.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@tanstack/history': 1.161.4
-      '@tanstack/react-store': 0.9.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-store': 0.9.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tanstack/router-core': 1.163.3
       isbot: 5.1.35
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
 
-  '@tanstack/react-store@0.9.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@tanstack/react-store@0.9.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@tanstack/store': 0.9.1
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      use-sync-external-store: 1.6.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      use-sync-external-store: 1.6.0(react@19.3.1)
 
   '@tanstack/router-core@1.163.3':
     dependencies:
@@ -19369,23 +19370,23 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
-  react-dom@19.3.0(react@19.3.0):
+  react-dom@19.3.1(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
       scheduler: 0.28.0
 
-  react-error-boundary@4.1.2(react@19.3.0):
+  react-error-boundary@4.1.2(react@19.3.1):
     dependencies:
       '@babel/runtime': 7.28.4
-      react: 19.3.0
+      react: 19.3.1
 
-  react-intl@10.1.13(@types/react@19.2.7)(react@19.3.0):
+  react-intl@10.1.13(@types/react@19.2.7)(react@19.3.1):
     dependencies:
       '@formatjs/icu-messageformat-parser': 3.5.11
       '@formatjs/intl': 4.1.13
       '@types/react': 19.2.7
       intl-messageformat: 11.2.8
-      react: 19.3.0
+      react: 19.3.1
 
   react-is@16.13.1: {}
 
@@ -19402,40 +19403,40 @@ snapshots:
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1):
+  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.104.1):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      react-server-dom-webpack: 19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      react-server-dom-webpack: 19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-sources: 3.3.3
     optionalDependencies:
       '@rspack/core': 2.2.1
 
-  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
+  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      react-server-dom-webpack: 19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      react-server-dom-webpack: 19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0))
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)
       webpack-sources: 3.3.3
     optionalDependencies:
       '@rspack/core': 2.2.1
 
-  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.3.1(@rspack/core@2.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       '@babel/parser': 7.29.7
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      react-server-dom-webpack: 19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3))
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      react-server-dom-webpack: 19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3))
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
     optionalDependencies:
@@ -19459,11 +19460,11 @@ snapshots:
       '@types/react': 19.2.7
       redux: 5.0.1
 
-  react-redux@9.2.0(@types/react@19.2.7)(react@19.3.0)(redux@5.0.1):
+  react-redux@9.2.0(@types/react@19.2.7)(react@19.3.1)(redux@5.0.1):
     dependencies:
       '@types/use-sync-external-store': 0.0.6
-      react: 19.3.0
-      use-sync-external-store: 1.6.0(react@19.3.0)
+      react: 19.3.1
+      use-sync-external-store: 1.6.0(react@19.3.1)
     optionalDependencies:
       '@types/react': 19.2.7
       redux: 5.0.1
@@ -19479,47 +19480,47 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
       react-router: 6.30.6(react@19.2.7)
 
-  react-router-dom@6.30.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  react-router-dom@6.30.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       '@remix-run/router': 1.23.4
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      react-router: 6.30.6(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      react-router: 6.30.6(react@19.3.1)
 
   react-router@6.30.6(react@19.2.7):
     dependencies:
       '@remix-run/router': 1.23.4
       react: 19.2.7
 
-  react-router@6.30.6(react@19.3.0):
+  react-router@6.30.6(react@19.3.1):
     dependencies:
       '@remix-run/router': 1.23.4
-      react: 19.3.0
+      react: 19.3.1
 
-  react-server-dom-webpack@19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.104.1):
+  react-server-dom-webpack@19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.104.1):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-sources: 3.3.3
 
-  react-server-dom-webpack@19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
+  react-server-dom-webpack@19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)
       webpack-sources: 3.3.3
 
-  react-server-dom-webpack@19.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-server-dom-webpack@19.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
@@ -19531,7 +19532,7 @@ snapshots:
 
   react@19.2.7: {}
 
-  react@19.3.0: {}
+  react@19.3.1: {}
 
   read-cache@1.0.0:
     dependencies:
@@ -19653,10 +19654,10 @@ snapshots:
     dependencies:
       jsesc: 3.1.0
 
-  rehackt@0.1.0(@types/react@19.2.7)(react@19.3.0):
+  rehackt@0.1.0(@types/react@19.2.7)(react@19.3.1):
     optionalDependencies:
       '@types/react': 19.2.7
-      react: 19.3.0
+      react: 19.3.1
 
   relateurl@0.2.7: {}
 
@@ -21451,9 +21452,9 @@ snapshots:
     dependencies:
       react: 19.2.7
 
-  use-sync-external-store@1.6.0(react@19.3.0):
+  use-sync-external-store@1.6.0(react@19.3.1):
     dependencies:
-      react: 19.3.0
+      react: 19.3.1
 
   util-deprecate@1.0.2: {}
 

@@ -116,8 +116,8 @@
     "@tanstack/store": "0.9.1",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "react-on-rails-rsc": "19.3.1",
     "ioredis": "5.11.1"
   }
