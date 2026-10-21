@@ -11589,11 +11589,14 @@ To test RSC with Rspack in your project:
 
 1. **React on Rails does not use Rspack's native RSC system**:
    As of Rspack v2, Rspack ships its own [built-in RSC
-   support](https://rspack.rs/guide/integrations/rsc), which its docs describe as full
-   support rather than experimental (the API is still namespaced under `experiments.rsc`
-   and `rspackExperiments.reactServerComponents`, with `builtin:swc-loader` applying the
-   directive transform, and it renders through React's separate `react-server-dom-rspack`
-   bindings). React on Rails Pro does **not** use that path. Its RSC integration is built
+   support](https://rspack.rs/guide/integrations/rsc). The
+   [Rspack 2.0 announcement](https://rspack.rs/blog/announcing-2-0) calls it experimental
+   low-level build support, and the API is namespaced under `experiments.rsc` and
+   `rspackExperiments.reactServerComponents`, with `builtin:swc-loader` applying the
+   directive transform. It renders through the
+   [`react-server-dom-rspack`](https://www.npmjs.com/package/react-server-dom-rspack)
+   runtime, which is built from a fork of React and published outside React's own releases.
+   React on Rails Pro does **not** use that path. Its RSC integration is built
    on the `react-on-rails-rsc` package:
    manifest generation uses the native **`RSCRspackPlugin`** (standard rspack public APIs,
    not Rspack's webpack-compatibility layer), while the RSC bundle still uses the
@@ -11605,9 +11608,17 @@ To test RSC with Rspack in your project:
    node loader) under both bundlers. This loader is compatible with rspack.
 
 3. **No official React Rspack support**: The React team has not officially tested or
-   endorsed the `react-server-dom-webpack` runtime with Rspack; the React repo ships a
-   separate, still pre-1.0 `react-server-dom-rspack` binding for Rspack's own RSC path.
-   The native `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
+   endorsed the `react-server-dom-webpack` runtime with Rspack. React does not publish an
+   Rspack binding either: `react-server-dom-rspack`, used by Rspack's own RSC path, is a
+   pre-1.0 package built outside React's releases. Because React on Rails Pro uses React's
+   official `react-server-dom-webpack` runtime, React's security fixes ship in that package
+   rather than in a fork. An app is protected only once its lockfile resolves a patched
+   version, including the copy `react-on-rails-rsc` depends on. For example, the
+   [October 2026 RSC advisory](https://github.com/facebook/react/security/advisories/GHSA-xqc2-xf4c-x3h3)
+   is fixed in `react-server-dom-webpack` 19.0.9, 19.1.10, 19.2.9, and 19.3.1. Check with
+   your package manager (for example `pnpm why react-server-dom-webpack`), and update or
+   override that transitive dependency if it still resolves a vulnerable release. The native
+   `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
 
 ## CSS / FOUC Status
 

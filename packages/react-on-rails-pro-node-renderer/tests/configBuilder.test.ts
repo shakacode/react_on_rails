@@ -682,6 +682,66 @@ describe('configBuilder', () => {
     });
   });
 
+  describe('isolateHydratedStores', () => {
+    it('defaults to true', () => {
+      delete process.env.RENDERER_ISOLATE_HYDRATED_STORES;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().isolateHydratedStores).toBe(true);
+    });
+
+    it.each(['false', 'FALSE', ' no ', '0'])('turns off for RENDERER_ISOLATE_HYDRATED_STORES=%p', (value) => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = value;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().isolateHydratedStores).toBe(false);
+    });
+
+    it.each(['true', '1', '', 'on', 'True'])('stays on for RENDERER_ISOLATE_HYDRATED_STORES=%p', (value) => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = value;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig().isolateHydratedStores).toBe(true);
+    });
+
+    it.each([undefined, null])('keeps the environment default for an unset config value (%p)', (value) => {
+      delete process.env.RENDERER_ISOLATE_HYDRATED_STORES;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: value as unknown as boolean }).isolateHydratedStores).toBe(
+        true,
+      );
+    });
+
+    it.each(['', 0, 'false'])('stays on for a non-boolean config value (%p)', (value) => {
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: value as unknown as boolean }).isolateHydratedStores).toBe(
+        true,
+      );
+    });
+
+    it('lets an explicit false config value turn isolation off despite the environment', () => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'true';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: false }).isolateHydratedStores).toBe(false);
+    });
+
+    it('prefers the explicit config value over the environment variable', () => {
+      process.env.RENDERER_ISOLATE_HYDRATED_STORES = 'false';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ isolateHydratedStores: true }).isolateHydratedStores).toBe(true);
+    });
+  });
+
   describe('replayServerAsyncOperationLogs defaults', () => {
     it('defaults to true when NODE_ENV is development', () => {
       process.env.NODE_ENV = 'development';
