@@ -624,8 +624,8 @@ export function renderAllComponents(): void {
 
 /**
  * Render the components inside `container`, such as a Turbo Frame that just received new content.
- * Each island initializes only the stores it declares, as an on-demand render does; stores that
- * already exist keep their state.
+ * Each island initializes its stores as an on-demand render does: only its declared dependencies,
+ * or every store when it declares none. Stores that already exist keep their state.
  */
 export function renderComponentsWithin(container: Element): void {
   const railsContext = getRailsContext();

@@ -59,7 +59,7 @@ When a frame navigation replaces the frame's content, the `react-on-rails` packa
 
 Nothing is unmounted before the frame renders, so pausing or canceling `turbo:before-frame-render` (for example, to animate the frame) leaves the old components working.
 
-Components outside the frame stay mounted. Redux stores are page-wide: each new component initializes only the stores it declares, and a store the page already has keeps its state.
+Components outside the frame stay mounted. Redux stores are page-wide: a new component rendered with declared store dependencies initializes only those stores, and one without them initializes every store on the page. A store the page already has keeps its state.
 
 Turbo inserts only the frame's markup from the response, so anything the response renders outside the frame is discarded. That leads to three requirements:
 
