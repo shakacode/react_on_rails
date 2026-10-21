@@ -23,7 +23,8 @@ export function getBuildId(): string {
   if (!buildId) {
     throw new Error(
       'BUILD_ID not set. Ensure unstable_cache is used within a React Server Component render context. ' +
-        'The BUILD_ID is initialized from rscBundleHash during the first render request.',
+        'The BUILD_ID is initialized from railsContext.serverSideRSCPayloadParameters.rscBundleHash, ' +
+        'which must be present on both page-render and payload-endpoint paths.',
     );
   }
   return buildId;
