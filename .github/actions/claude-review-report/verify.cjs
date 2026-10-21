@@ -51,13 +51,17 @@ function assertReviewCompleted(result, comments, { headSha, startedAt, runId, ru
     if (comment?.user?.login !== 'claude[bot]' || typeof comment.body !== 'string') return false;
     const updated = Date.parse(comment.updated_at);
     const lines = comment.body.split('\n').map((line) => line.trim());
+    // Claude sometimes appends links after the run marker; whitespace must end the attempt.
+    const hasRunMarker = lines.some(
+      (line) => line === runMarker || (line.startsWith(runMarker) && /\s/.test(line[runMarker.length])),
+    );
     return (
       Number.isFinite(updated) &&
       updated >= started &&
       Number.isSafeInteger(comment.id) &&
       comment.id > 0 &&
       lines.includes(marker) &&
-      lines.includes(runMarker)
+      hasRunMarker
     );
   });
   if (!report)
