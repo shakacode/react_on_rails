@@ -15,8 +15,6 @@ module AgentWorkflowDriftManifest
 
   REQUIRED_EXPLICIT_PATHS = %w[
     .rubocop.yml
-    bin/agent-workflow-seam-doctor
-    bin/agent-workflow-seam-doctor-test.rb
     bin/validate
     docs/adoption.md
     docs/coordination-backend.md
@@ -49,13 +47,6 @@ module AgentWorkflowDriftManifest
       "Source-pack contract test validates packaged model-routing guidance that remains installed-skill-owned.",
     "skills/pr-batch/bin/single_target_entrypoint_test.rb" =>
       "Source-pack contract test validates installed single-target entrypoints and is not vendored here."
-  }.freeze
-
-  CONSUMER_PATH_OVERRIDES = {
-    "bin/agent-workflow-seam-doctor" =>
-      ".agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor",
-    "bin/agent-workflow-seam-doctor-test.rb" =>
-      ".agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor-test.rb"
   }.freeze
 
   def run(manifest_path:, source_root:, consumer_root:, output: $stdout)
@@ -145,7 +136,7 @@ module AgentWorkflowDriftManifest
         next
       end
 
-      expected_consumer = CONSUMER_PATH_OVERRIDES.fetch(source, ".agents/#{source}")
+      expected_consumer = ".agents/#{source}"
       if consumer != expected_consumer
         errors << "manifest consumer path is invalid: #{source} -> #{consumer}; expected #{expected_consumer}"
       end
@@ -228,14 +219,8 @@ module AgentWorkflowDriftManifest
     append_set_differences(errors, "required governed source is not mapped", expected_sources - mapped_sources)
     append_set_differences(errors, "manifest maps source outside the governed inventory", mapped_sources - expected_sources)
     append_set_differences(errors, "same-path consumer source is not mapped", same_path_intersection - mapped_sources)
-    CONSUMER_PATH_OVERRIDES.each_key.sort.each do |source|
-      next unless consumer_files.include?(source)
-
-      errors << "active consumer copy conflicts with fixture-only override: .agents/#{source}"
-    end
     mappings.sort.each do |source, consumer|
-      expected_consumer = CONSUMER_PATH_OVERRIDES.fetch(source, ".agents/#{source}")
-      next unless consumer == expected_consumer
+      next unless consumer == ".agents/#{source}"
 
       relative_consumer = consumer.delete_prefix(".agents/")
       errors << "mapped consumer file is missing: #{source} -> #{consumer}" unless consumer_files.include?(relative_consumer)

@@ -25,17 +25,13 @@ Do not copy Shaka's schema, key lists, or defaults into this repository.
 
 The repo still pins selected `shakacode/agent-workflows` files for checkout-only
 sessions. `.agents/agent-workflow-drift.yml` and its completeness test govern
-those copies. The byte-identical legacy doctor and its test live under
-`.agents/fixtures/agent-workflows/bin/` only for legacy fixtures; they are not
-active repository commands or validators for the Shaka typed seam. Retirement
-of that source-pack content belongs to
+those copies. Retirement of that source-pack content belongs to
 [`shakacode/agent-workflows#857`](https://github.com/shakacode/agent-workflows/issues/857).
 
 ## Validation
 
 - `shaka seam check --root . --local`
 - `SHAKA_COMMAND=<pinned-shaka>/skills/shaka/scripts/shaka ruby script/shaka_seam_check_test.rb`
-- `ruby .agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor-test.rb`
 - `ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
 - `<pinned-agent-workflows>/bin/check-agent-workflow-drift --manifest .agents/agent-workflow-drift.yml --source-root <pinned-agent-workflows> --consumer-root .`
 - Markdown formatting and link checks for edited documentation
