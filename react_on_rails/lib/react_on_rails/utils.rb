@@ -487,18 +487,24 @@ module ReactOnRails
       # The obfuscated pass runs first: the literal patterns below could otherwise consume
       # the at sign it needs, as in http:%2F%2Fuser:secret//suffix@host.
       strip_obfuscated_userinfo(text.to_s)
-        .gsub(LITERAL_USERINFO, "//")
+        .gsub(LITERAL_USERINFO) { |match| match.start_with?(REDACTED_USERINFO) ? REDACTED_USERINFO : "//" }
         .gsub(%r{https?://[^\s]+}) do |match|
         trimmed = match.sub(/[).,;:'">\]]+\z/, "")
         sanitize_url_for_display(trimmed) + match[trimmed.length..]
       end
     end
 
-    # Leaves the obfuscated pass's [REDACTED]@ marker in place so the cut stays visible.
-    LITERAL_USERINFO = %r{//(?!\[REDACTED\]@)[^/?#]*@}
-    private_constant :LITERAL_USERINFO
+    # Strips through the last at sign as before, but keeps a leading [REDACTED]@ marker from
+    # the obfuscated pass so the cut stays visible. Text that already holds the marker still
+    # loses any userinfo after it.
+    LITERAL_USERINFO = %r{//[^/?#]*@}
+    REDACTED_USERINFO = "//[REDACTED]@"
+    private_constant :LITERAL_USERINFO, :REDACTED_USERINFO
 
     OBFUSCATED_AUTHORITY_HINT = %r{%[0-7]\h|/[ \t]+/}
+    # A whitespace-delimited token, also joining a space or tab between two slashes.
+    CANDIDATE_TOKEN = %r{(?:\S|(?<=/)[ \t]+(?=/))+}
+    CHUNK_GAP = 65_536
     PERCENT_ESCAPE = /%[0-7]\h/
     AUTHORITY_START = %r{/[ \t]*/}
     AUTHORITY_END = %r{[/?#\s]}
@@ -507,7 +513,8 @@ module ReactOnRails
     HOSTNAME_AUTHORITY = /\A(?:localhost|[a-z0-9-]+(?:\.[a-z0-9-]+)+|\[[0-9a-f:.]+\])(?::\d*)?\z/i
     TOKEN_END = /\s/
     MAX_DECODE_PASSES = 3
-    private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :AUTHORITY_END,
+    private_constant :OBFUSCATED_AUTHORITY_HINT, :CANDIDATE_TOKEN, :CHUNK_GAP, :PERCENT_ESCAPE,
+                     :AUTHORITY_START, :AUTHORITY_END,
                      :LITERAL_HTTP_SCHEME, :HOSTNAME_AUTHORITY, :TOKEN_END, :MAX_DECODE_PASSES
 
     # Catches userinfo the literal patterns above cannot see: percent-encoded
@@ -516,12 +523,14 @@ module ReactOnRails
     # maps each character back to its span of original text and records whether
     # it was literal, then runs one scan over that view (see userinfo_spans).
     # Works on bytes: every delimiter it looks for is ASCII, and byte offsets
-    # keep the scan linear for multibyte text.
+    # keep the scan linear for multibyte text. Every rule in the scan stops at
+    # literal whitespace, so the view is built only for tokens that hold an escape
+    # or a split, keeping memory proportional to those tokens.
     def self.strip_obfuscated_userinfo(text)
       bytes = text.b
       return text unless bytes.match?(OBFUSCATED_AUTHORITY_HINT)
 
-      removals = userinfo_spans(*percent_decoded_view(bytes))
+      removals = obfuscated_token_edits(bytes)
       return text if removals.empty?
 
       result = +"".b
@@ -533,6 +542,62 @@ module ReactOnRails
       (result << bytes[position..]).force_encoding(text.encoding)
     end
     private_class_method :strip_obfuscated_userinfo
+
+    # Builds the view only for chunks of tokens that hold a hint. Hint tokens closer than
+    # CHUNK_GAP share one chunk, so dense text pays for one view instead of one per token.
+    def self.obfuscated_token_edits(bytes)
+      edits = []
+      candidate_chunks(bytes).each do |chunk_start, chunk_end|
+        userinfo_spans(*percent_decoded_view(bytes[chunk_start...chunk_end])).each do |from, to, replacement|
+          edits << [from + chunk_start, to + chunk_start, replacement]
+        end
+      end
+      edits
+    end
+    private_class_method :obfuscated_token_edits
+
+    def self.candidate_chunks(bytes)
+      chunks = []
+      position = 0
+      while (hint = OBFUSCATED_AUTHORITY_HINT.match(bytes, position))
+        token = CANDIDATE_TOKEN.match(bytes, candidate_token_start(bytes, hint.begin(0)))
+        if chunks.any? && token.begin(0) - chunks.last[1] <= CHUNK_GAP
+          chunks.last[1] = token.end(0)
+        else
+          chunks << [token.begin(0), token.end(0)]
+        end
+        position = [token.end(0), hint.end(0)].max
+      end
+      chunks
+    end
+    private_class_method :candidate_chunks
+
+    # Walks left from index to the start of its token, crossing a space or tab run only
+    # when it sits between two slashes, as CANDIDATE_TOKEN does.
+    def self.candidate_token_start(bytes, index)
+      start = index
+      # rindex counts a negative start position from the end, so stop at offset 0.
+      while start.positive? && (space = bytes.rindex(/\s/, start - 1))
+        slash_before_run = slash_before_split(bytes, space)
+        return space + 1 unless slash_before_run
+
+        start = slash_before_run
+      end
+      0
+    end
+
+    # When the whitespace run ending at space sits between two slashes, returns the index
+    # of the slash before it.
+    def self.slash_before_split(bytes, space)
+      return unless " \t".include?(bytes[space]) && bytes[space + 1] == "/"
+
+      run_start = space
+      run_start -= 1 while run_start.positive? && " \t".include?(bytes[run_start - 1])
+      run_start - 1 if run_start.positive? && bytes[run_start - 1] == "/"
+    end
+    private_class_method :slash_before_split
+    private_class_method :candidate_token_start
+    private_class_method :obfuscated_token_edits
 
     # Returns [decoded, from, to, literal]: decoded[i] came from text[from[i]...to[i]],
     # and literal[i] is false when it was percent-decoded.

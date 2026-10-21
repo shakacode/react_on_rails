@@ -1192,6 +1192,16 @@ module ReactOnRails
         expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
       end
 
+      it "still strips userinfo after a [REDACTED]@ marker already in the text" do
+        text = "redis://[REDACTED]@x:secret@host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@host/x")
+      end
+
+      it "documents the dotted-username ambiguity: a host-shaped authority keeps its path" do
+        text = "GET http://john.doe:2024/Secret%40db.example.com/x"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
       it "cuts to the last at sign in the token, literal or decoded" do
         expect(described_class.sanitize_error_text("ftp://u:pa/ss%40mid@host")).to eq("ftp://[REDACTED]@host")
       end
@@ -1230,6 +1240,16 @@ module ReactOnRails
       it "still strips an authority right after a skipped scheme-less split" do
         text = "dir/ //user:s3cr3t%40host/x"
         expect(described_class.sanitize_error_text(text)).to eq("dir/ //host/x")
+      end
+
+      it "strips encoded authorities far apart in a large message" do
+        filler = "lorem ipsum " * 10_000
+        text = "a %2F%2Fu1:p1%40h1 #{filler} b http:/\t/u2:p2@h2 #{filler}c"
+        expect(described_class.sanitize_error_text(text)).to eq("a %2F%2Fh1 #{filler} b http:/\t/h2 #{filler}c")
+      end
+
+      it "finds a split authority whose spaces and tabs come before its escape" do
+        expect(described_class.sanitize_error_text("pre http:/ \t /user:s3%40h x")).to eq("pre http:/ \t /h x")
       end
 
       it "stays fast on a large slash-heavy message without an at sign" do

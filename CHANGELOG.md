@@ -43,8 +43,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   hex case) and from authorities with a space or tab between the slashes after a scheme (`http:/\t/`). This is
   defense in depth; no current caller produces these forms. To fail closed, when a `//` authority has no at
   sign but an encoded at sign (`%40`) appears later in the same whitespace-delimited token, the text is cut up
-  to the token's last at sign and marked `[REDACTED]@`. A literal `http://` or `https://` URL whose host is
-  dotted, `localhost` or an IP literal keeps its host and path, such as an email address in a REST path.
+  to the token's last at sign and marked `[REDACTED]@`; a literal `http(s)` URL cut this way shows as
+  `[unparseable URL redacted]`. A literal `http://` or `https://` URL whose host is dotted, `localhost` or an
+  IP literal keeps its host and path, such as an email address in a REST path.
   [PR 5218](https://github.com/shakacode/react_on_rails/pull/5218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
   and RSC Client Component providers now read only their request's stores in a shared Node Renderer
