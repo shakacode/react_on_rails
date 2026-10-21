@@ -432,6 +432,12 @@ for (const workflowFile of hostedWorkflowFiles) {
     detectorStep,
     /EVENT_BASE_REF: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.merge_group\.base_sha \|\| github\.event\.before \|\| 'origin\/main' \}\}/,
   );
+  // Push runs after a force-push need this flag to skip the replaced before SHA (#5119).
+  assertMatches(
+    `${workflowFile} forced-push helper input`,
+    detectorStep,
+    /EVENT_FORCED: \$\{\{ github\.event\.forced \|\| false \}\}/,
+  );
   assertDoesNotMatch(
     `${workflowFile} direct changed-files detector wiring`,
     detectorStep,
