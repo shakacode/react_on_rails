@@ -497,10 +497,11 @@ module ReactOnRails
     PERCENT_ESCAPE = /%[0-7]\h/
     AUTHORITY_START = %r{/[ \t]*/}
     AUTHORITY_END = %r{[/?#\s]}
+    LITERAL_HTTP_SCHEME = %r{\Ahttps?://\z}
     TOKEN_END = /\s/
     MAX_DECODE_PASSES = 3
-    private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :AUTHORITY_END, :TOKEN_END,
-                     :MAX_DECODE_PASSES
+    private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :AUTHORITY_END,
+                     :LITERAL_HTTP_SCHEME, :TOKEN_END, :MAX_DECODE_PASSES
 
     # Catches userinfo the literal patterns above cannot see: percent-encoded
     # (including double-encoded and mixed-case) slashes and at signs, and a space
@@ -576,7 +577,9 @@ module ReactOnRails
     # whitespace. Whitespace-split slashes count only after a scheme colon, so a
     # space-separated list of paths is not an authority. Fails closed for literal
     # slashes too: a decoded at sign later in the token (a literal slash inside an
-    # encoded password) is cut up to, leaving a visible [REDACTED]@ marker.
+    # encoded password) is cut up to, leaving a visible [REDACTED]@ marker. Literal
+    # http(s):// URLs skip that cut: the URI.parse pass above already owns them, and
+    # an email address in a REST path (/users/john%40example.com) keeps its host.
     def self.userinfo_spans(decoded, from, to, literal)
       spans = []
       position = 0
@@ -608,13 +611,26 @@ module ReactOnRails
       authority_end = obfuscated ? token_end : next_literal_index(decoded, literal, AUTHORITY_END, userinfo_start)
       if (last_at = decoded[userinfo_start...authority_end].rindex("@"))
         [userinfo_start + last_at, "", authority_end]
-      elsif token_decoded_at && token_decoded_at >= authority_end
+      elsif token_decoded_at && token_decoded_at >= authority_end &&
+            !literal_http_authority?(decoded, literal, authority_start)
         [token_decoded_at, "[REDACTED]@", token_decoded_at + 1]
       else
         [nil, nil, authority_end]
       end
     end
     private_class_method :userinfo_edit
+
+    # True for a literal http:// or https:// start, the spelling the URI.parse pass handles.
+    def self.literal_http_authority?(decoded, literal, authority_start)
+      return false if authority_start[0].length > 2
+
+      [5, 6].any? do |scheme_length|
+        scheme_start = authority_start.begin(0) - scheme_length
+        scheme_start >= 0 && LITERAL_HTTP_SCHEME.match?(decoded[scheme_start...authority_start.end(0)]) &&
+          literal[scheme_start...authority_start.end(0)].all?
+      end
+    end
+    private_class_method :literal_http_authority?
 
     # Returns [end of the token holding start, index of its last decoded at sign or nil].
     def self.token_bounds(decoded, literal, start)

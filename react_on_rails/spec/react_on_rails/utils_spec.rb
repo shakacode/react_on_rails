@@ -1161,9 +1161,23 @@ module ReactOnRails
         expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
       end
 
-      it "marks the cut when an encoded at sign sits in a literal URL's path" do
-        text = "GET http://api.example.com/users/john%40example.com failed"
-        expect(described_class.sanitize_error_text(text)).to eq("GET http://[REDACTED]@example.com failed")
+      it "keeps a literal http URL whose path holds an encoded at sign" do
+        text = "GET http://api.example.com/users/john%40example.com and https://h/u/a%40b.c failed"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "marks the cut when an encoded at sign follows a literal non-http authority" do
+        text = "GET ftp://files.example.com/users/john%40example.com failed"
+        expect(described_class.sanitize_error_text(text)).to eq("GET ftp://[REDACTED]@example.com failed")
+      end
+
+      it "still cuts a bare authority path that holds an encoded at sign" do
+        expect(described_class.sanitize_error_text("at //user:pa/ss%40host")).to eq("at //[REDACTED]@host")
+      end
+
+      it "treats an uppercase or encoded http scheme as unhandled by URI parsing" do
+        expect(described_class.sanitize_error_text("HTTP://user:pa/ss%40host")).to eq("HTTP://[REDACTED]@host")
+        expect(described_class.sanitize_error_text("http:%2F%2Fuser:pa/ss%40host")).to eq("http:%2F%2Fhost")
       end
 
       it "strips a literal-slash password ahead of an encoded at sign under a non-http scheme" do
