@@ -1162,7 +1162,7 @@ module ReactOnRails
       end
 
       it "keeps a literal http URL whose path holds an encoded at sign" do
-        text = "GET http://api.example.com/users/john%40example.com and https://h/u/a%40b.c failed"
+        text = "GET http://api.example.com/users/john%40example.com and https://h.example/u/a%40b.c failed"
         expect(described_class.sanitize_error_text(text)).to eq(text)
       end
 
@@ -1173,6 +1173,27 @@ module ReactOnRails
 
       it "still cuts a bare authority path that holds an encoded at sign" do
         expect(described_class.sanitize_error_text("at //user:pa/ss%40host")).to eq("at //[REDACTED]@host")
+      end
+
+      it "cuts a literal http URL whose authority reads as user:password, not a host" do
+        %w[http://user:1234/5678%40host/x https://tok/en%40host http://user:pa/ss%40host].each do |url|
+          result = described_class.sanitize_error_text("GET #{url} failed")
+          expect(result).to eq("GET [unparseable URL redacted] failed")
+        end
+      end
+
+      it "keeps localhost, IP and ported hosts with an encoded at sign in the path" do
+        text = "http://localhost:3000/u/a%40b http://10.0.0.1:8080/u/a%40b http://api.example.com:443/u/a%40b"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "strips an encoded authority whose password holds a literal //...@" do
+        text = "http:%2F%2Fuser:secret//suffix@host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
+      end
+
+      it "cuts to the last at sign in the token, literal or decoded" do
+        expect(described_class.sanitize_error_text("ftp://u:pa/ss%40mid@host")).to eq("ftp://[REDACTED]@host")
       end
 
       it "treats an uppercase or encoded http scheme as unhandled by URI parsing" do
@@ -1203,7 +1224,7 @@ module ReactOnRails
 
       it "finds an encoded at sign directly before a literal one" do
         text = "redis://user:pa/ss%40@host"
-        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@@host")
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@host")
       end
 
       it "still strips an authority right after a skipped scheme-less split" do

@@ -484,24 +484,31 @@ module ReactOnRails
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
-      sanitized = text.to_s
-                      .gsub(%r{//[^/?#]*@}, "//")
-                      .gsub(%r{https?://[^\s]+}) do |match|
+      # The obfuscated pass runs first: the literal patterns below could otherwise consume
+      # the at sign it needs, as in http:%2F%2Fuser:secret//suffix@host.
+      strip_obfuscated_userinfo(text.to_s)
+        .gsub(LITERAL_USERINFO, "//")
+        .gsub(%r{https?://[^\s]+}) do |match|
         trimmed = match.sub(/[).,;:'">\]]+\z/, "")
         sanitize_url_for_display(trimmed) + match[trimmed.length..]
       end
-      strip_obfuscated_userinfo(sanitized)
     end
 
-    OBFUSCATED_AUTHORITY_HINT = %r{%\h\h|/[ \t]+/}
+    # Leaves the obfuscated pass's [REDACTED]@ marker in place so the cut stays visible.
+    LITERAL_USERINFO = %r{//(?!\[REDACTED\]@)[^/?#]*@}
+    private_constant :LITERAL_USERINFO
+
+    OBFUSCATED_AUTHORITY_HINT = %r{%[0-7]\h|/[ \t]+/}
     PERCENT_ESCAPE = /%[0-7]\h/
     AUTHORITY_START = %r{/[ \t]*/}
     AUTHORITY_END = %r{[/?#\s]}
     LITERAL_HTTP_SCHEME = %r{\Ahttps?://\z}
+    # A host[:port] that reads as a real host, not as user:password.
+    HOSTNAME_AUTHORITY = /\A(?:localhost|[a-z0-9-]+(?:\.[a-z0-9-]+)+|\[[0-9a-f:.]+\])(?::\d*)?\z/i
     TOKEN_END = /\s/
     MAX_DECODE_PASSES = 3
     private_constant :OBFUSCATED_AUTHORITY_HINT, :PERCENT_ESCAPE, :AUTHORITY_START, :AUTHORITY_END,
-                     :LITERAL_HTTP_SCHEME, :TOKEN_END, :MAX_DECODE_PASSES
+                     :LITERAL_HTTP_SCHEME, :HOSTNAME_AUTHORITY, :TOKEN_END, :MAX_DECODE_PASSES
 
     # Catches userinfo the literal patterns above cannot see: percent-encoded
     # (including double-encoded and mixed-case) slashes and at signs, and a space
@@ -577,9 +584,11 @@ module ReactOnRails
     # whitespace. Whitespace-split slashes count only after a scheme colon, so a
     # space-separated list of paths is not an authority. Fails closed for literal
     # slashes too: a decoded at sign later in the token (a literal slash inside an
-    # encoded password) is cut up to, leaving a visible [REDACTED]@ marker. Literal
-    # http(s):// URLs skip that cut: the URI.parse pass above already owns them, and
-    # an email address in a REST path (/users/john%40example.com) keeps its host.
+    # encoded password) is cut up to the token's last at sign, leaving a visible
+    # [REDACTED]@ marker. A literal http(s):// URL whose authority reads as a real
+    # host (a dotted name, localhost or an IP literal) skips that cut, so an email
+    # address in a REST path (/users/john%40example.com) keeps its host. URI.parse
+    # in the literal pass still sees those URLs.
     def self.userinfo_spans(decoded, from, to, literal)
       spans = []
       position = 0
@@ -606,23 +615,24 @@ module ReactOnRails
     # the first two are nil when the authority has no userinfo.
     def self.userinfo_edit(decoded, literal, authority_start, token)
       userinfo_start = authority_start.end(0)
-      token_end, token_decoded_at = token
+      token_end, token_decoded_at, token_last_at = token
       obfuscated = authority_start[0].length > 2 || literal[authority_start.begin(0)...userinfo_start].include?(false)
       authority_end = obfuscated ? token_end : next_literal_index(decoded, literal, AUTHORITY_END, userinfo_start)
       if (last_at = decoded[userinfo_start...authority_end].rindex("@"))
         [userinfo_start + last_at, "", authority_end]
       elsif token_decoded_at && token_decoded_at >= authority_end &&
-            !literal_http_authority?(decoded, literal, authority_start)
-        [token_decoded_at, "[REDACTED]@", token_decoded_at + 1]
+            !http_hostname_authority?(decoded, literal, authority_start, authority_end)
+        [token_last_at, "[REDACTED]@", token_last_at + 1]
       else
         [nil, nil, authority_end]
       end
     end
     private_class_method :userinfo_edit
 
-    # True for a literal http:// or https:// start, the spelling the URI.parse pass handles.
-    def self.literal_http_authority?(decoded, literal, authority_start)
+    # True for a literal http:// or https:// start whose authority reads as a real host.
+    def self.http_hostname_authority?(decoded, literal, authority_start, authority_end)
       return false if authority_start[0].length > 2
+      return false unless HOSTNAME_AUTHORITY.match?(decoded[authority_start.end(0)...authority_end])
 
       [5, 6].any? do |scheme_length|
         scheme_start = authority_start.begin(0) - scheme_length
@@ -630,18 +640,20 @@ module ReactOnRails
           literal[scheme_start...authority_start.end(0)].all?
       end
     end
-    private_class_method :literal_http_authority?
+    private_class_method :http_hostname_authority?
 
-    # Returns [end of the token holding start, index of its last decoded at sign or nil].
+    # Returns [end of the token holding start, index of its last decoded at sign or nil,
+    # index of its last at sign of any kind or nil].
     def self.token_bounds(decoded, literal, start)
       token_end = next_literal_index(decoded, literal, TOKEN_END, start)
       token = decoded[start...token_end]
+      last_at = token.rindex("@")&.+(start)
       index = token.length
       # Stop at offset 0: rindex with a negative position counts from the end.
       while index.positive? && (index = token.rindex("@", index - 1))
-        return [token_end, start + index] unless literal[start + index]
+        return [token_end, start + index, last_at] unless literal[start + index]
       end
-      [token_end, nil]
+      [token_end, nil, last_at]
     end
     private_class_method :token_bounds
 
