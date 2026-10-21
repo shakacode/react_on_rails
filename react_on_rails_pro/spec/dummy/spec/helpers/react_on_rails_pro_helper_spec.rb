@@ -38,8 +38,9 @@ module StreamingTestHelpers
     "rorp-v2-r-#{'b' * 64}"
   end
 
+  # The last segment is a cache digest or, for uncached renders, a Component-pid-counter id.
   def test_server_render_url_pattern
-    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render/[a-f0-9]{32}\z}
+    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render/[^/]+\z}
   end
 end
 
