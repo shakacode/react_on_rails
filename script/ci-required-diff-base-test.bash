@@ -116,8 +116,21 @@ mkdir -p "$REPO/script"
 
 cat > "$REPO/script/ci-changes-detector" <<'STUB'
 #!/usr/bin/env bash
-# Stub standing in for the real detector: record the base ref it was handed.
+# Stub standing in for the real detector: record the base ref it was handed,
+# and write a narrow docs-only selection like the real one would.
 echo "DETECTOR_BASE=$1"
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "docs_only=true"
+    echo "non_runtime_only=true"
+    echo "run_ruby_tests=false"
+    echo "run_generators=false"
+    echo "run_core_benchmarks=false"
+    echo "changed_files<<EOF_FILES"
+    echo "docs.md"
+    echo "EOF_FILES"
+  } >> "$GITHUB_OUTPUT"
+fi
 STUB
 chmod +x "$REPO/script/ci-changes-detector"
 
@@ -301,6 +314,155 @@ printed_files="$(printf '%s\n' "$LAST_OUTPUT" | grep -c "bigdir/${long_name}-")"
 if [ "$printed_files" -ne 50 ]; then
   fail "large changed-file list: expected 50 printed paths, got $printed_files"
 fi
+
+# Push events on release/** after a force-push (#5119). github.event.before names
+# the replaced tip, which no remote branch holds any more, so the real deepen
+# loop can never fetch it. These cases run in a shallow clone of a bare remote so
+# the helper's real fetch, deepen, and unshallow paths run against that SHA.
+BARE="$WORKDIR/origin.git"
+git init -q --bare "$BARE"
+git -C "$REPO" push -q "$BARE" main:main
+
+PUSHER="$WORKDIR/pusher"
+git clone -q "file://$BARE" "$PUSHER"
+pusher_commit() {
+  git -C "$PUSHER" -c user.name=ci-test -c user.email=ci-test@example.com \
+    commit -q --no-verify "$@"
+}
+git -C "$PUSHER" checkout -q -b release/test origin/main
+echo "release" > "$PUSHER/release.txt"
+git -C "$PUSHER" add release.txt
+pusher_commit -m "Release branch commit"
+RELEASE_BASE="$(git -C "$PUSHER" rev-parse HEAD)"
+echo "replaced" > "$PUSHER/replaced.txt"
+git -C "$PUSHER" add replaced.txt
+pusher_commit -m "Commit the force-push replaces"
+REPLACED_TIP="$(git -C "$PUSHER" rev-parse HEAD)"
+git -C "$PUSHER" push -q origin release/test
+
+# Review-driven rewrite: drop the tip, commit again, force-push.
+git -C "$PUSHER" reset -q --hard "$RELEASE_BASE"
+echo "rewritten" > "$PUSHER/rewritten.txt"
+git -C "$PUSHER" add rewritten.txt
+pusher_commit -m "Rewritten commit"
+git -C "$PUSHER" push -q --force origin release/test
+
+CLONE="$WORKDIR/shallow"
+
+run_push_case() {
+  local name="$1"
+  local forced="$2"
+  local event_base_ref="$3"
+
+  TESTS_RUN=$((TESTS_RUN + 1))
+  echo "-> $name"
+
+  # Each case starts from a fresh shallow clone so an earlier case's deepening
+  # cannot make the base reachable for a later one.
+  rm -rf "$CLONE"
+  git clone -q --depth 1 --branch release/test "file://$BARE" "$CLONE"
+  mkdir -p "$CLONE/script"
+  cp "$REPO/script/ci-changes-detector" "$CLONE/script/ci-changes-detector"
+
+  : > "$WORKDIR/github-output.txt"
+  LAST_OUTPUT="$(
+    cd "$CLONE" || exit 1
+    CI=1 \
+      GITHUB_EVENT_NAME=push \
+      GITHUB_REF_TYPE=branch \
+      GITHUB_REF_NAME=release/test \
+      GITHUB_OUTPUT="$WORKDIR/github-output.txt" \
+      GIT_DIFF_BASE_FETCH_DEPTH=1 \
+      GIT_DIFF_BASE_MAX_ATTEMPTS=1 \
+      PULL_REQUEST_BASE_SHA="" \
+      PULL_REQUEST_HEAD_SHA="" \
+      EVENT_BASE_REF="$event_base_ref" \
+      EVENT_FORCED="$forced" \
+      bash --noprofile --norc -eo pipefail "$DIFF_BASE_SCRIPT" 2>&1
+  )"
+  LAST_RC=$?
+}
+
+assert_outputs() {
+  local expected="$1"
+  local label="$2"
+  local actual
+
+  actual="$(cat "$WORKDIR/github-output.txt")"
+  if [ "$actual" != "$expected" ]; then
+    fail "$label: expected GITHUB_OUTPUT:
+$expected
+got:
+$actual"
+  fi
+}
+
+# A multi-line output block must pass through untouched.
+ALL_SUITES_OUTPUT="docs_only=false
+non_runtime_only=false
+run_ruby_tests=true
+run_generators=true
+run_core_benchmarks=false
+changed_files<<EOF_FILES
+docs.md
+EOF_FILES"
+
+NARROW_OUTPUT="docs_only=true
+non_runtime_only=true
+run_ruby_tests=false
+run_generators=false
+run_core_benchmarks=false
+changed_files<<EOF_FILES
+docs.md
+EOF_FILES"
+
+# The case from the issue: a force-push, so the before SHA is gone. The step must
+# not spend fetches on it. No base reproduces the pushed changes (origin/main
+# misses files the force-push reverted), so every test suite runs.
+run_push_case "forced push with an unreachable before SHA runs every test suite" \
+  true "$REPLACED_TIP"
+assert_rc 0 "forced unreachable push"
+assert_contains "$LAST_OUTPUT" "::warning::Force-push replaced $REPLACED_TIP, so the pushed changes cannot be listed. Running every test suite." "forced unreachable push"
+assert_contains "$LAST_OUTPUT" "Diff base: origin/main (source: force-push fallback)" "forced unreachable push"
+assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=origin/main" "forced unreachable push"
+assert_not_contains "$LAST_OUTPUT" "Deepening shallow history" "forced unreachable push"
+assert_outputs "$ALL_SUITES_OUTPUT" "forced unreachable push"
+assert_contains "$LAST_OUTPUT" "Overriding the selection above: every test suite runs" "forced unreachable push"
+
+# Without the forced flag the step tries the real deepen and unshallow paths
+# first, and runs every suite only once the SHA is still missing.
+run_push_case "unforced push with an unreachable before SHA runs every suite after deepening" \
+  false "$REPLACED_TIP"
+assert_rc 0 "unforced unreachable push"
+assert_contains "$LAST_OUTPUT" "Deepening shallow history" "unforced unreachable push"
+assert_contains "$LAST_OUTPUT" "::warning::Push base $REPLACED_TIP is still unreachable after fetching more history" "unforced unreachable push"
+assert_contains "$LAST_OUTPUT" "Diff base: origin/main (source: unreachable push base fallback)" "unforced unreachable push"
+assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=origin/main" "unforced unreachable push"
+assert_outputs "$ALL_SUITES_OUTPUT" "unforced unreachable push"
+
+# A forced push runs every suite even when the old tip is still fetchable: the
+# rewritten branch does not descend from it, so before..HEAD is not the push.
+run_push_case "forced push with a reachable before SHA still runs every suite" \
+  true "$RELEASE_BASE"
+assert_rc 0 "forced reachable push"
+assert_contains "$LAST_OUTPUT" "Diff base: origin/main (source: force-push fallback)" "forced reachable push"
+assert_outputs "$ALL_SUITES_OUTPUT" "forced reachable push"
+
+# Regression guard: an ordinary push whose before SHA deepening can reach keeps
+# the event base, with no fallback warning.
+run_push_case "unforced push with a reachable before SHA keeps the event base" \
+  false "$RELEASE_BASE"
+assert_rc 0 "unforced reachable push"
+assert_contains "$LAST_OUTPUT" "Diff base: $RELEASE_BASE (source: event payload)" "unforced reachable push"
+assert_contains "$LAST_OUTPUT" "DETECTOR_BASE=$RELEASE_BASE" "unforced reachable push"
+assert_not_contains "$LAST_OUTPUT" "::warning::" "unforced reachable push"
+assert_outputs "$NARROW_OUTPUT" "unforced reachable push"
+
+# The forced flag must not leak into pull_request or merge_group runs.
+EVENT_FORCED=true run_case "merge_group ignores a forced flag" \
+  "$MERGE_REF" merge_group "" "" "$OLD_MAIN"
+assert_rc 0 "merge_group forced flag"
+assert_contains "$LAST_OUTPUT" "Diff base: $OLD_MAIN (source: event payload)" "merge_group forced flag"
 
 echo
 if [ "$TESTS_FAILED" -ne 0 ]; then

@@ -24,6 +24,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Improved
+
+- **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
+  request digest over `js_code` and its serialized props only when prerender caching needs it as a
+  cache key. Uncached renders send the Node Renderer a cheap `Component-pid-counter` id in the same
+  URL segment, which the renderer does not use. The route shape is unchanged.
+  `NodeRenderingPool.prepare_render_path` and `.prepare_incremental_render_path` now take only
+  `render_options`; drop the `js_code` argument if you call or override them.
+  [PR 5223](https://github.com/shakacode/react_on_rails/pull/5223) by
+  [justin808](https://github.com/justin808). Fixes
+  [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
+
 #### Fixed
 
 - **Diagnostic credential redaction covers encoded URL spellings**: Error-message redaction now also strips
