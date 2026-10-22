@@ -44,7 +44,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Previously the open-source package never mounted frame content loaded by navigation and leaked the
   replaced frame's React roots. Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
   [PR 5220](https://github.com/shakacode/react_on_rails/pull/5220) by [justin808](https://github.com/justin808).
-
+- **Diagnostic credential redaction covers encoded URL spellings**: Error-message redaction now also strips
+  credentials from percent-encoded authorities (`%2F%2F`, double-encoded `%252F%252F`, `http%3A%2F%2F`, any
+  hex case) and from authorities with a space or tab between the slashes after a scheme (`http:/\t/`). This is
+  defense in depth; no current caller produces these forms. To fail closed, when a `//` authority has no at
+  sign but an encoded at sign (`%40`) appears later in the same whitespace-delimited token, the text is cut up
+  to the token's last at sign and marked `[REDACTED]@`; a literal `http(s)` URL cut this way shows as
+  `[unparseable URL redacted]`. A literal `http://` or `https://` URL whose host is dotted, `localhost` or an
+  IP literal keeps its host and path, such as an email address in a REST path.
+  [PR 5218](https://github.com/shakacode/react_on_rails/pull/5218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
   and RSC Client Component providers now read only their request's stores in a shared Node Renderer
   worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store

@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require "shakapacker"
+require "timeout"
 
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
@@ -1092,6 +1093,168 @@ module ReactOnRails
       it "passes through error text with no URL unchanged" do
         text = "Connection refused - connect(2) for host:3800"
         expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      # Defense in depth: no current caller produces these spellings, but an
+      # encoded or whitespace-split authority must not carry credentials through.
+      {
+        "encoded slashes" => ["failed: http:%2F%2Fuser:s3cr3t%40host/x", "failed: http:%2F%2Fhost/x"],
+        "encoded scheme colon" => ["http%3A%2F%2Fuser:s3cr3t%40host/x", "http%3A%2F%2Fhost/x"],
+        "bare encoded authority" => ["%2F%2Fuser:s3cr3t%40host/x", "%2F%2Fhost/x"],
+        "mixed literal and encoded slashes" => ["http:/%2Fuser:s3cr3t%40host/x", "http:/%2Fhost/x"],
+        "mixed-case percent hex" => ["http:%2f%2Fuser:s3cr3t%40host/x", "http:%2f%2Fhost/x"],
+        "double-encoded authority" => ["http:%252F%252Fuser:s3cr3t%2540host/x", "http:%252F%252Fhost/x"],
+        "tab between slashes" => ["http:/\t/user:s3cr3t@host/x", "http:/\t/host/x"],
+        "encoded tab between slashes" => ["http:/%09/user:s3cr3t@host/x", "http:/%09/host/x"],
+        "encoded at sign inside the password" => ["http:%2F%2Fuser:s3%40cr3t%40host/x", "http:%2F%2Fhost/x"],
+        "encoded slash inside the password" => ["http:%2F%2Fuser:s3%2Fcr3t%40host/x", "http:%2F%2Fhost/x"],
+        "all-numeric password before a port" => ["http:%2F%2Fuser:12345%40host:3800/x", "http:%2F%2Fhost:3800/x"]
+      }.each do |spelling, (text, expected)|
+        it "strips credentials from an authority with #{spelling}" do
+          expect(described_class.sanitize_error_text(text)).to eq(expected)
+        end
+      end
+
+      it "strips each encoded authority in a message with several URLs" do
+        text = "a http:%2F%2Fu1:p1%40h1/x and b %2F%2Fu2:p2%40h2 done"
+        expect(described_class.sanitize_error_text(text)).to eq("a http:%2F%2Fh1/x and b %2F%2Fh2 done")
+      end
+
+      it "leaves encoded text without an authority credential unchanged" do
+        text = "GET /search?q=a%2Fb%40c and path %2F%2Fhost/x failed"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "leaves literal stack-trace paths intact when the message also has encoded text" do
+        text = "at webpack://app/node_modules/@babel/x.js (query a%2Fb)"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "leaves a literal stack-trace URL intact when its own path has an escape" do
+        text = "at file:///Users/me/My%20App/node_modules/@babel/runtime/x.js:1:2"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "strips an encoded at sign after literal slashes" do
+        expect(described_class.sanitize_error_text("see //user:s3cr3t%40host/x")).to eq("see //host/x")
+      end
+
+      it "keeps multibyte text valid around a stripped authority" do
+        result = described_class.sanitize_error_text("échec http:%2F%2Fuser:s3cr3t%40hôte/x ✓")
+        expect(result).to eq("échec http:%2F%2Fhôte/x ✓")
+        expect(result.encoding).to eq(Encoding::UTF_8)
+        expect(result).to be_valid_encoding
+      end
+
+      it "strips an encoded at sign before a literal at sign later in the path" do
+        text = "at //user:s3cr3t%40host/@babel/x.js"
+        expect(described_class.sanitize_error_text(text)).to eq("at //host/@babel/x.js")
+      end
+
+      it "strips an encoded authority that follows a literal one in the same token" do
+        text = "webpack://app/x,http:%2F%2Fuser:s3cr3t@host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("webpack://app/x,http:%2F%2Fhost/x")
+      end
+
+      it "strips an encoded authority whose password has a literal slash" do
+        text = "http:%2F%2Fuser:pa/ss%40host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
+      end
+
+      it "keeps a literal http URL whose path holds an encoded at sign" do
+        text = "GET http://api.example.com/users/john%40example.com and https://h.example/u/a%40b.c failed"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "marks the cut when an encoded at sign follows a literal non-http authority" do
+        text = "GET ftp://files.example.com/users/john%40example.com failed"
+        expect(described_class.sanitize_error_text(text)).to eq("GET ftp://[REDACTED]@example.com failed")
+      end
+
+      it "still cuts a bare authority path that holds an encoded at sign" do
+        expect(described_class.sanitize_error_text("at //user:pa/ss%40host")).to eq("at //[REDACTED]@host")
+      end
+
+      it "cuts a literal http URL whose authority reads as user:password, not a host" do
+        %w[http://user:1234/5678%40host/x https://tok/en%40host http://user:pa/ss%40host].each do |url|
+          result = described_class.sanitize_error_text("GET #{url} failed")
+          expect(result).to eq("GET [unparseable URL redacted] failed")
+        end
+      end
+
+      it "keeps localhost, IP and ported hosts with an encoded at sign in the path" do
+        text = "http://localhost:3000/u/a%40b http://10.0.0.1:8080/u/a%40b http://api.example.com:443/u/a%40b"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "strips an encoded authority whose password holds a literal //...@" do
+        text = "http:%2F%2Fuser:secret//suffix@host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("http:%2F%2Fhost/x")
+      end
+
+      it "still strips userinfo after a [REDACTED]@ marker already in the text" do
+        text = "redis://[REDACTED]@x:secret@host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@host/x")
+      end
+
+      it "documents the dotted-username ambiguity: a host-shaped authority keeps its path" do
+        text = "GET http://john.doe:2024/Secret%40db.example.com/x"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "cuts to the last at sign in the token, literal or decoded" do
+        expect(described_class.sanitize_error_text("ftp://u:pa/ss%40mid@host")).to eq("ftp://[REDACTED]@host")
+      end
+
+      it "treats an uppercase or encoded http scheme as unhandled by URI parsing" do
+        expect(described_class.sanitize_error_text("HTTP://user:pa/ss%40host")).to eq("HTTP://[REDACTED]@host")
+        expect(described_class.sanitize_error_text("http:%2F%2Fuser:pa/ss%40host")).to eq("http:%2F%2Fhost")
+      end
+
+      it "strips a literal-slash password ahead of an encoded at sign under a non-http scheme" do
+        text = "redis://user:pa/ss%40host:6379"
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@host:6379")
+      end
+
+      it "does not treat a space between two paths as an authority" do
+        text = "searched /app/lib/ /app/node_modules/@babel/core/index.js"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "does not treat a line break between two paths as an authority" do
+        text = "cwd: /srv/app/\n/srv/app/node_modules/@babel/core/lib/index.js (a%20b)"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "finishes when a literal at sign opens the token after an encoded authority start" do
+        text = "%2F%2F@ab and %2F%2Fa@b and http:/\t/a@b"
+        result = Timeout.timeout(2) { described_class.sanitize_error_text(text) }
+        expect(result).to eq("%2F%2Fab and %2F%2Fb and http:/\t/b")
+      end
+
+      it "finds an encoded at sign directly before a literal one" do
+        text = "redis://user:pa/ss%40@host"
+        expect(described_class.sanitize_error_text(text)).to eq("redis://[REDACTED]@host")
+      end
+
+      it "still strips an authority right after a skipped scheme-less split" do
+        text = "dir/ //user:s3cr3t%40host/x"
+        expect(described_class.sanitize_error_text(text)).to eq("dir/ //host/x")
+      end
+
+      it "strips encoded authorities far apart in a large message" do
+        filler = "lorem ipsum " * 10_000
+        text = "a %2F%2Fu1:p1%40h1 #{filler} b http:/\t/u2:p2@h2 #{filler}c"
+        expect(described_class.sanitize_error_text(text)).to eq("a %2F%2Fh1 #{filler} b http:/\t/h2 #{filler}c")
+      end
+
+      it "finds a split authority whose spaces and tabs come before its escape" do
+        expect(described_class.sanitize_error_text("pre http:/ \t /user:s3%40h x")).to eq("pre http:/ \t /h x")
+      end
+
+      it "stays fast on a large slash-heavy message without an at sign" do
+        text = "%2F%2F #{'x %2F/ ' * 50_000}"
+        expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error
       end
     end
   end

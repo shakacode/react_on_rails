@@ -484,13 +484,252 @@ module ReactOnRails
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
-      text.to_s
-          .gsub(%r{//[^/?#]*@}, "//")
-          .gsub(%r{https?://[^\s]+}) do |match|
+      # The obfuscated pass runs first: the literal patterns below could otherwise consume
+      # the at sign it needs, as in http:%2F%2Fuser:secret//suffix@host.
+      strip_obfuscated_userinfo(text.to_s)
+        .gsub(LITERAL_USERINFO) { |match| match.start_with?(REDACTED_USERINFO) ? REDACTED_USERINFO : "//" }
+        .gsub(%r{https?://[^\s]+}) do |match|
         trimmed = match.sub(/[).,;:'">\]]+\z/, "")
         sanitize_url_for_display(trimmed) + match[trimmed.length..]
       end
     end
+
+    # Strips through the last at sign as before, but keeps a leading [REDACTED]@ marker from
+    # the obfuscated pass so the cut stays visible. Text that already holds the marker still
+    # loses any userinfo after it.
+    LITERAL_USERINFO = %r{//[^/?#]*@}
+    REDACTED_USERINFO = "//[REDACTED]@"
+    private_constant :LITERAL_USERINFO, :REDACTED_USERINFO
+
+    OBFUSCATED_AUTHORITY_HINT = %r{%[0-7]\h|/[ \t]+/}
+    # A whitespace-delimited token, also joining a space or tab between two slashes.
+    CANDIDATE_TOKEN = %r{(?:\S|(?<=/)[ \t]+(?=/))+}
+    CHUNK_GAP = 65_536
+    PERCENT_ESCAPE = /%[0-7]\h/
+    AUTHORITY_START = %r{/[ \t]*/}
+    AUTHORITY_END = %r{[/?#\s]}
+    LITERAL_HTTP_SCHEME = %r{\Ahttps?://\z}
+    # A host[:port] that reads as a real host, not as user:password.
+    HOSTNAME_AUTHORITY = /\A(?:localhost|[a-z0-9-]+(?:\.[a-z0-9-]+)+|\[[0-9a-f:.]+\])(?::\d*)?\z/i
+    TOKEN_END = /\s/
+    MAX_DECODE_PASSES = 3
+    private_constant :OBFUSCATED_AUTHORITY_HINT, :CANDIDATE_TOKEN, :CHUNK_GAP, :PERCENT_ESCAPE,
+                     :AUTHORITY_START, :AUTHORITY_END,
+                     :LITERAL_HTTP_SCHEME, :HOSTNAME_AUTHORITY, :TOKEN_END, :MAX_DECODE_PASSES
+
+    # Catches userinfo the literal patterns above cannot see: percent-encoded
+    # (including double-encoded and mixed-case) slashes and at signs, and a space
+    # or tab between the authority slashes. Decodes the text into a view that
+    # maps each character back to its span of original text and records whether
+    # it was literal, then runs one scan over that view (see userinfo_spans).
+    # Works on bytes: every delimiter it looks for is ASCII, and byte offsets
+    # keep the scan linear for multibyte text. Every rule in the scan stops at
+    # literal whitespace, so the view is built only for tokens that hold an escape
+    # or a split, keeping memory proportional to those tokens.
+    def self.strip_obfuscated_userinfo(text)
+      bytes = text.b
+      return text unless bytes.match?(OBFUSCATED_AUTHORITY_HINT)
+
+      removals = obfuscated_token_edits(bytes)
+      return text if removals.empty?
+
+      result = +"".b
+      position = 0
+      removals.each do |from, to, replacement|
+        result << bytes[position...from] << replacement
+        position = to
+      end
+      (result << bytes[position..]).force_encoding(text.encoding)
+    end
+    private_class_method :strip_obfuscated_userinfo
+
+    # Builds the view only for chunks of tokens that hold a hint. Hint tokens closer than
+    # CHUNK_GAP share one chunk, so dense text pays for one view instead of one per token.
+    def self.obfuscated_token_edits(bytes)
+      edits = []
+      candidate_chunks(bytes).each do |chunk_start, chunk_end|
+        userinfo_spans(*percent_decoded_view(bytes[chunk_start...chunk_end])).each do |from, to, replacement|
+          edits << [from + chunk_start, to + chunk_start, replacement]
+        end
+      end
+      edits
+    end
+    private_class_method :obfuscated_token_edits
+
+    def self.candidate_chunks(bytes)
+      chunks = []
+      position = 0
+      while (hint = OBFUSCATED_AUTHORITY_HINT.match(bytes, position))
+        token = CANDIDATE_TOKEN.match(bytes, candidate_token_start(bytes, hint.begin(0)))
+        if chunks.any? && token.begin(0) - chunks.last[1] <= CHUNK_GAP
+          chunks.last[1] = token.end(0)
+        else
+          chunks << [token.begin(0), token.end(0)]
+        end
+        position = [token.end(0), hint.end(0)].max
+      end
+      chunks
+    end
+    private_class_method :candidate_chunks
+
+    # Walks left from index to the start of its token, crossing a space or tab run only
+    # when it sits between two slashes, as CANDIDATE_TOKEN does.
+    def self.candidate_token_start(bytes, index)
+      start = index
+      # rindex counts a negative start position from the end, so stop at offset 0.
+      while start.positive? && (space = bytes.rindex(/\s/, start - 1))
+        slash_before_run = slash_before_split(bytes, space)
+        return space + 1 unless slash_before_run
+
+        start = slash_before_run
+      end
+      0
+    end
+
+    # When the whitespace run ending at space sits between two slashes, returns the index
+    # of the slash before it.
+    def self.slash_before_split(bytes, space)
+      return unless " \t".include?(bytes[space]) && bytes[space + 1] == "/"
+
+      run_start = space
+      run_start -= 1 while run_start.positive? && " \t".include?(bytes[run_start - 1])
+      run_start - 1 if run_start.positive? && bytes[run_start - 1] == "/"
+    end
+    private_class_method :slash_before_split
+    private_class_method :candidate_token_start
+    private_class_method :obfuscated_token_edits
+
+    # Returns [decoded, from, to, literal]: decoded[i] came from text[from[i]...to[i]],
+    # and literal[i] is false when it was percent-decoded.
+    def self.percent_decoded_view(text)
+      view = [text, (0...text.length).to_a, (1..text.length).to_a, Array.new(text.length, true)]
+      MAX_DECODE_PASSES.times do
+        decoded_view = decode_percent_escapes(*view)
+        break unless decoded_view
+
+        view = decoded_view
+      end
+      view
+    end
+    private_class_method :percent_decoded_view
+
+    # Decodes ASCII %XX escapes only; other bytes cannot form URL delimiters.
+    # Returns nil when there is nothing left to decode.
+    def self.decode_percent_escapes(decoded, from, to, literal)
+      escapes = []
+      decoded.scan(PERCENT_ESCAPE) { escapes << Regexp.last_match.begin(0) }
+      return if escapes.empty?
+
+      next_view = [+"".b, [], [], []]
+      position = 0
+      escapes.each do |escape|
+        append_view_slice(next_view, [decoded, from, to, literal], position...escape)
+        next_view[0] << decoded[escape + 1, 2].hex.chr
+        next_view[1] << from[escape]
+        next_view[2] << to[escape + 2]
+        next_view[3] << false
+        position = escape + 3
+      end
+      append_view_slice(next_view, [decoded, from, to, literal], position...decoded.length)
+      next_view
+    end
+    private_class_method :decode_percent_escapes
+
+    def self.append_view_slice(target, source, range)
+      target.zip(source) { |target_part, source_part| target_part.concat(source_part[range]) }
+    end
+    private_class_method :append_view_slice
+
+    # Returns [from, to, replacement] edits of the original text, in order.
+    # After each authority start, the userinfo runs to the last at sign (literal
+    # or decoded) before the authority ends. With literal slashes, the authority
+    # ends at the first literal /, ?, # or whitespace, as URI parsing would end it,
+    # so webpack://app/node_modules/@babel/x.js keeps its text. With decoded or
+    # whitespace-split slashes, it fails closed and runs to the next literal
+    # whitespace. Whitespace-split slashes count only after a scheme colon, so a
+    # space-separated list of paths is not an authority. Fails closed for literal
+    # slashes too: a decoded at sign later in the token (a literal slash inside an
+    # encoded password) is cut up to the token's last at sign, leaving a visible
+    # [REDACTED]@ marker. A literal http(s):// URL whose authority reads as a real
+    # host (a dotted name, localhost or an IP literal) skips that cut, so an email
+    # address in a REST path (/users/john%40example.com) keeps its host. URI.parse
+    # in the literal pass still sees those URLs.
+    def self.userinfo_spans(decoded, from, to, literal)
+      spans = []
+      position = 0
+      token = nil
+      while (authority_start = AUTHORITY_START.match(decoded, position))
+        position = authority_start.begin(0) + 1
+        next if split_without_scheme?(decoded, authority_start)
+
+        position = authority_start.end(0)
+        token = token_bounds(decoded, literal, position) unless token && token[0] >= position
+        userinfo_end, replacement, position = userinfo_edit(decoded, literal, authority_start, token)
+        spans << [from[authority_start.end(0)], to[userinfo_end], replacement] if userinfo_end
+      end
+      spans
+    end
+    private_class_method :userinfo_spans
+
+    def self.split_without_scheme?(decoded, authority_start)
+      authority_start[0].length > 2 && (authority_start.begin(0).zero? || decoded[authority_start.begin(0) - 1] != ":")
+    end
+    private_class_method :split_without_scheme?
+
+    # Returns [index of the userinfo's last at sign, replacement, next scan position];
+    # the first two are nil when the authority has no userinfo.
+    def self.userinfo_edit(decoded, literal, authority_start, token)
+      userinfo_start = authority_start.end(0)
+      token_end, token_decoded_at, token_last_at = token
+      obfuscated = authority_start[0].length > 2 || literal[authority_start.begin(0)...userinfo_start].include?(false)
+      authority_end = obfuscated ? token_end : next_literal_index(decoded, literal, AUTHORITY_END, userinfo_start)
+      if (last_at = decoded[userinfo_start...authority_end].rindex("@"))
+        [userinfo_start + last_at, "", authority_end]
+      elsif token_decoded_at && token_decoded_at >= authority_end &&
+            !http_hostname_authority?(decoded, literal, authority_start, authority_end)
+        [token_last_at, "[REDACTED]@", token_last_at + 1]
+      else
+        [nil, nil, authority_end]
+      end
+    end
+    private_class_method :userinfo_edit
+
+    # True for a literal http:// or https:// start whose authority reads as a real host.
+    def self.http_hostname_authority?(decoded, literal, authority_start, authority_end)
+      return false if authority_start[0].length > 2
+      return false unless HOSTNAME_AUTHORITY.match?(decoded[authority_start.end(0)...authority_end])
+
+      [5, 6].any? do |scheme_length|
+        scheme_start = authority_start.begin(0) - scheme_length
+        scheme_start >= 0 && LITERAL_HTTP_SCHEME.match?(decoded[scheme_start...authority_start.end(0)]) &&
+          literal[scheme_start...authority_start.end(0)].all?
+      end
+    end
+    private_class_method :http_hostname_authority?
+
+    # Returns [end of the token holding start, index of its last decoded at sign or nil,
+    # index of its last at sign of any kind or nil].
+    def self.token_bounds(decoded, literal, start)
+      token_end = next_literal_index(decoded, literal, TOKEN_END, start)
+      token = decoded[start...token_end]
+      last_at = token.rindex("@")&.+(start)
+      index = token.length
+      # Stop at offset 0: rindex with a negative position counts from the end.
+      while index.positive? && (index = token.rindex("@", index - 1))
+        return [token_end, start + index, last_at] unless literal[start + index]
+      end
+      [token_end, nil, last_at]
+    end
+    private_class_method :token_bounds
+
+    # Index of the first literal (not decoded) match of pattern at or after start,
+    # or the end of the text.
+    def self.next_literal_index(decoded, literal, pattern, start)
+      index = start
+      index += 1 while (index = decoded.index(pattern, index)) && !literal[index]
+      index || decoded.length
+    end
+    private_class_method :next_literal_index
 
     # Replaces query values with [REDACTED], keeping keys for diagnostics.
     # Bare components without = (like ?eyJhbGciOi...) are treated as opaque
