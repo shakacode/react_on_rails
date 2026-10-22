@@ -500,7 +500,8 @@ module ReactOnRails
     # encoded spaces and tabs. Matched after ESCAPED_ESCAPE is decoded.
     AUTHORITY_START = %r{(?:/|%2f)(?:[ \t]|%09|%20)*(?:/|%2f)}i
     SCHEME_COLON = /(?::|%3a)\z/i
-    # A character that can sit inside a URL path, so slashes after it continue that path.
+    # Common URL path characters: encoded slashes after one continue that path. Rarer path
+    # punctuation (such as ! or ,) counts as a boundary, which over-redacts and never leaks.
     PATH_CHARACTER = %r{[A-Za-z0-9._~/-]}
     AT_SIGN = /@|%40/
     REDACTED_URL = "[REDACTED URL]"
@@ -600,11 +601,11 @@ module ReactOnRails
     private_class_method :token_start
 
     def self.split_run?(bytes, run_start, run_end)
-      return false unless bytes[run_start...run_end].delete(" \t").empty?
+      return false unless run_start.positive? && bytes[run_start...run_end].delete(" \t").empty?
 
       slash_before = bytes[run_start - 1] == "/" || bytes[[run_start - 3, 0].max...run_start].casecmp?("%2f")
       slash_after = bytes[run_end] == "/" || bytes[run_end, 3].to_s.casecmp?("%2f")
-      run_start.positive? && slash_before && slash_after
+      slash_before && slash_after
     end
     private_class_method :split_run?
 

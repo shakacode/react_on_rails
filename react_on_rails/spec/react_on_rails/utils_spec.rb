@@ -1142,7 +1142,9 @@ module ReactOnRails
         "a webpack path with an escape in the same token" => "at webpack://app/node_modules/@babel/x.js?a%2Fb",
         "an npm scoped-package URL" => "GET https://registry.npmjs.org/@babel%2Fcore/-/core-7.26.0.tgz 404",
         "an encoded path slash before a path at sign" => "GET http://api.example.com/a%2Fb/john@example.com failed",
-        "encoded double slashes inside a path" => "GET https://api.example.com/a%2F%2Fb/john@example.com failed"
+        "encoded double slashes inside a path" => "GET https://api.example.com/a%2F%2Fb/john@example.com failed",
+        "a mixed encoded and literal split inside a path" => "searched dir%2F /home/@user and done",
+        "a CRLF between two paths" => "cwd: /srv/app/\r\n/srv/app/node_modules/@babel/x.js (a%20b)"
       }.each do |shape, text|
         it "leaves #{shape} unchanged" do
           expect(described_class.sanitize_error_text(text)).to eq(text)
@@ -1157,6 +1159,11 @@ module ReactOnRails
       it "documents the literal-slash password gap it leaves to the literal patterns" do
         text = "redis://user:pa/ss%40host:6379"
         expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "replaces a token at the very start or end of the message" do
+        expect(described_class.sanitize_error_text("%2F%2Fu:p%40h/x failed")).to eq("[REDACTED URL] failed")
+        expect(described_class.sanitize_error_text("failed %2F%2Fu:p%40h/x")).to eq("failed [REDACTED URL]")
       end
 
       it "keeps multibyte text valid around a replaced token" do

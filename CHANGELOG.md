@@ -39,10 +39,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **Diagnostic credential redaction covers encoded URL spellings**: Error-message redaction now replaces a
-  whitespace-delimited token with `[REDACTED URL]` when a URL authority in it hides its credentials: its
+  whitespace-delimited token with `[REDACTED URL]` when a URL authority in it hides its credentials. Either its
   slashes are percent-encoded (`%2F%2F`, double-encoded `%252F%252F`, escaped hex digits, any hex case) or split
-  by a space or tab after a scheme, and an at sign follows; or its slashes are literal and its last at sign is
-  encoded (`%40`).
+  by a space or tab, the authority starts at a URL boundary (the token start, a scheme colon, or a character a
+  path rarely holds), and an at sign follows. Or its slashes are literal and its last at sign is encoded (`%40`).
   Those tokens lose their host and path; other URLs are handled as before. This is defense in depth; no current
   caller produces these forms. [PR 5235](https://github.com/shakacode/react_on_rails/pull/5235) by
   [justin808](https://github.com/justin808).
