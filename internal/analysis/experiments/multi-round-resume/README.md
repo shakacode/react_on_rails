@@ -52,8 +52,3 @@ npx tsx multi-resume-test.jsx    # the naive approach — crashes by design
 | `multi-resume-test.jsx` | The naive chain (round 2 aborts with a carried-over hole still pending) — **crashes by design** with the root-postpone error |
 | `carryover-test.jsx` | Postponed-state surgery (prune/graft) that keeps an unready hole across rounds without crashing |
 | `parallel-test.jsx` | Parallel fan-out: two holes resumed independently off the same base state, preludes concatenated |
-| `render-in-rounds.jsx` | `renderAppInRounds(App, n, {outDir})` — generic N-round driver; writes `round-*.html` + `assembled.html` |
-| `ten-sections-app.jsx` | Demo app for the driver: 10 sibling sections, section *i* gated on round *i* |
-| `rerender-count-test.jsx` | Which components re-execute on each round (replay cost) |
-| `scale-test.jsx` | 50 holes in one pause; a 6-round chain via nesting |
-| `timing-test.jsx` | When `resume()` hands you HTML: promise resolution vs stream close |
