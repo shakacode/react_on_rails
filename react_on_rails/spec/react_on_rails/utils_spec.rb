@@ -1144,7 +1144,10 @@ module ReactOnRails
         "an encoded path slash before a path at sign" => "GET http://api.example.com/a%2Fb/john@example.com failed",
         "encoded double slashes inside a path" => "GET https://api.example.com/a%2F%2Fb/john@example.com failed",
         "a mixed encoded and literal split inside a path" => "searched dir%2F /home/@user and done",
-        "a CRLF between two paths" => "cwd: /srv/app/\r\n/srv/app/node_modules/@babel/x.js (a%20b)"
+        "a CRLF between two paths" => "cwd: /srv/a%2F\r\n/srv/@x failed",
+        "a line break right after an encoded slash" => "cwd: /srv/a%2F\n/srv/@x failed",
+        "a double slash inside a literal path" => "GET https://api.example.com/users//john%40example.com failed",
+        "an empty file authority before an encoded at sign" => "at file:///foo%40bar.js:1:2"
       }.each do |shape, text|
         it "leaves #{shape} unchanged" do
           expect(described_class.sanitize_error_text(text)).to eq(text)

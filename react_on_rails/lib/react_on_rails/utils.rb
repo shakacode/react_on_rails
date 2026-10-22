@@ -549,14 +549,11 @@ module ReactOnRails
     private_class_method :credential_url_token?
 
     def self.credential_authority?(token, authority_start, last_at)
-      unless authority_start[0] == "//"
-        # Encoded or split slashes start an authority only at the token start, after a scheme
-        # colon (literal or encoded) or after a character a path cannot hold, so
-        # /a%2F%2Fb/ and a space-separated list of paths stay paths.
-        return false unless authority_boundary?(token, authority_start.begin(0))
-
-        return last_at >= authority_start.end(0)
-      end
+      # Slashes start an authority only at the token start, after a scheme colon (literal or
+      # encoded) or after a character a path rarely holds, so /a%2F%2Fb/, /users//x and a
+      # space-separated list of paths stay paths.
+      return false unless authority_boundary?(token, authority_start.begin(0))
+      return last_at >= authority_start.end(0) unless authority_start[0] == "//"
 
       authority_end = token.index(%r{[/?#]}, authority_start.end(0)) || token.length
       authority = token[authority_start.end(0)...authority_end]
