@@ -587,11 +587,14 @@ describe('RSCRoute successful-version error reset', () => {
     // Refetch forces a fresh fetch (enforceRefetch) and the UI updates.
     await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('id":7}#2'));
     expect(getServerComponent).toHaveBeenCalledTimes(2);
-    expect(getServerComponent).toHaveBeenLastCalledWith({
-      componentName: 'Card',
-      componentProps: { id: 7 },
-      enforceRefetch: true,
-    });
+    expect(getServerComponent).toHaveBeenLastCalledWith(
+      {
+        componentName: 'Card',
+        componentProps: { id: 7 },
+        enforceRefetch: true,
+      },
+      expect.any(Function),
+    );
   });
 
   it('e. recoverOnError restore still works with the LRU in place', async () => {
