@@ -495,16 +495,17 @@ module ReactOnRails
     OBFUSCATION_HINT = %r{%[0-7]\h|/[ \t]+/}
     # Escapes that decode to a hex digit or %, so they only spell other escapes
     # (%2540, %25%34%30, %%34%30); decoding them keeps literal and encoded delimiters apart.
-    ESCAPED_ESCAPE = /%(25|3[0-9]|4[1-6]|6[1-6])/i
+    ESCAPED_ESCAPE = /%(25|3[0-9]|4[1-6]|6[1-6])/
     # Two slashes, either of them percent-encoded, optionally separated by literal or
     # encoded spaces and tabs. Matched after ESCAPED_ESCAPE is decoded.
     AUTHORITY_START = %r{(?:/|%2f)(?:[ \t]|%09|%20)*(?:/|%2f)}i
     SCHEME_COLON = /(?::|%3a)\z/i
+    # A character that can sit inside a URL path, so slashes after it continue that path.
+    PATH_CHARACTER = %r{[A-Za-z0-9._~/-]}
     AT_SIGN = /@|%40/
-    ENCODED_AT_SIGN = /%40/
     REDACTED_URL = "[REDACTED URL]"
-    private_constant :OBFUSCATION_HINT, :ESCAPED_ESCAPE, :AUTHORITY_START, :SCHEME_COLON,
-                     :AT_SIGN, :ENCODED_AT_SIGN, :REDACTED_URL
+    private_constant :OBFUSCATION_HINT, :ESCAPED_ESCAPE, :AUTHORITY_START, :SCHEME_COLON, :PATH_CHARACTER,
+                     :AT_SIGN, :REDACTED_URL
 
     # Replaces a whole whitespace-delimited token when one of its URL authorities hides
     # userinfo from the literal patterns below: the authority's slashes are encoded or split
@@ -548,24 +549,31 @@ module ReactOnRails
 
     def self.credential_authority?(token, authority_start, last_at)
       unless authority_start[0] == "//"
-        # Literal slashes split by a space or tab count only after a scheme colon (literal
-        # or encoded), so a space-separated list of paths is not an authority.
-        literal_split = authority_start[0].start_with?("/") && authority_start[0].end_with?("/")
-        before = token[[authority_start.begin(0) - 3, 0].max...authority_start.begin(0)]
-        return false if literal_split && !before.match?(SCHEME_COLON)
+        # Encoded or split slashes start an authority only at the token start, after a scheme
+        # colon (literal or encoded) or after a character a path cannot hold, so
+        # /a%2F%2Fb/ and a space-separated list of paths stay paths.
+        return false unless authority_boundary?(token, authority_start.begin(0))
 
         return last_at >= authority_start.end(0)
       end
 
       authority_end = token.index(%r{[/?#]}, authority_start.end(0)) || token.length
       authority = token[authority_start.end(0)...authority_end]
-      last_encoded = authority.rindex(ENCODED_AT_SIGN)
+      last_encoded = authority.rindex("%40")
       last_literal = authority.rindex("@")
       !last_encoded.nil? && (last_literal.nil? || last_encoded > last_literal)
     end
     private_class_method :credential_authority?
 
-    # A token ends at whitespace, except a space or tab run between two slashes.
+    def self.authority_boundary?(token, index)
+      return true if index.zero?
+
+      token[[index - 3, 0].max...index].match?(SCHEME_COLON) || !token[index - 1].match?(PATH_CHARACTER)
+    end
+    private_class_method :authority_boundary?
+
+    # A token ends at whitespace, except a space or tab run between two slashes, either of
+    # which may be percent-encoded.
     def self.token_end(bytes, index)
       while (space = bytes.index(/\s/, index))
         run_end = space
@@ -592,8 +600,11 @@ module ReactOnRails
     private_class_method :token_start
 
     def self.split_run?(bytes, run_start, run_end)
-      run_start.positive? && bytes[run_start - 1] == "/" && bytes[run_end] == "/" &&
-        bytes[run_start...run_end].delete(" \t").empty?
+      return false unless bytes[run_start...run_end].delete(" \t").empty?
+
+      slash_before = bytes[run_start - 1] == "/" || bytes[[run_start - 3, 0].max...run_start].casecmp?("%2f")
+      slash_after = bytes[run_end] == "/" || bytes[run_end, 3].to_s.casecmp?("%2f")
+      run_start.positive? && slash_before && slash_after
     end
     private_class_method :split_run?
 

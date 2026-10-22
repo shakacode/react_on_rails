@@ -1115,7 +1115,11 @@ module ReactOnRails
         "literal slashes split after an encoded colon" => "http%3A/ /user:s3cr3t@host/x",
         "escaped hex digits in an at sign" => "//user:s3cr3t%25%34%30host/x",
         "a bare percent before escaped hex digits" => "//user:s3cr3t%%34%30host/x",
-        "escaped hex digits in a slash" => "http:%25%32%66%25%32%66user:s3cr3t@host/x"
+        "escaped hex digits in a slash" => "http:%25%32%66%25%32%66user:s3cr3t@host/x",
+        "a literal slash, a space, then an encoded slash" => "http:/ %2Fuser:s3cr3t@host/x",
+        "an encoded slash, a space, then an encoded slash" => "http:%2F %2Fuser:s3cr3t@host/x",
+        "an encoded space between literal slashes" => "/%20/user:s3cr3t@host/x",
+        "an encoded authority after a key" => "url=%2F%2Fuser:s3cr3t%40host/x"
       }.each do |spelling, url|
         it "replaces a URL token with #{spelling}" do
           expect(described_class.sanitize_error_text("failed: #{url} (retrying)"))
@@ -1137,7 +1141,8 @@ module ReactOnRails
         "a webpack path with an escape elsewhere" => "at webpack://app/node_modules/@babel/x.js (query a%2Fb)",
         "a webpack path with an escape in the same token" => "at webpack://app/node_modules/@babel/x.js?a%2Fb",
         "an npm scoped-package URL" => "GET https://registry.npmjs.org/@babel%2Fcore/-/core-7.26.0.tgz 404",
-        "an encoded path slash before a path at sign" => "GET http://api.example.com/a%2Fb/john@example.com failed"
+        "an encoded path slash before a path at sign" => "GET http://api.example.com/a%2Fb/john@example.com failed",
+        "encoded double slashes inside a path" => "GET https://api.example.com/a%2F%2Fb/john@example.com failed"
       }.each do |shape, text|
         it "leaves #{shape} unchanged" do
           expect(described_class.sanitize_error_text(text)).to eq(text)
