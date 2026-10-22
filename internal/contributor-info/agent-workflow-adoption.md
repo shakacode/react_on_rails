@@ -28,8 +28,9 @@ drift manifest and its pinned-pack CI check are gone. The vendored workflow and
 doc copies are gone. The two helpers React on Rails still needs are repo-owned:
 `.agents/bin/agent-coord-bounded` and
 `.agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs`. The
-remaining vendored helper scripts under `.agents/skills/` are unused and a
-follow-up PR deletes them.
+remaining vendored helper scripts under `.agents/skills/` have no callers
+apart from the `pr-ci-readiness` test that required CI still runs; a follow-up
+PR deletes them together with that CI line.
 
 ## What Retires And What Replaces It
 
