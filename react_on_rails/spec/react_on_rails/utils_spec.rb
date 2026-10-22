@@ -1110,7 +1110,12 @@ module ReactOnRails
         "encoded at sign after literal slashes" => "//user:s3cr3t%40host/x",
         "encoded slash inside the password" => "http:%2F%2Fuser:s3%2Fcr3t%40host/x",
         "literal //...@ inside an encoded password" => "http:%2F%2Fuser:s3cr3t//suffix@host/x",
-        "all-numeric password before a port" => "http:%2F%2Fuser:12345%40host:3800/x"
+        "all-numeric password before a port" => "http:%2F%2Fuser:12345%40host:3800/x",
+        "encoded colon before a split" => "http%3A%2F%20%2Fuser:s3cr3t@host/x",
+        "literal slashes split after an encoded colon" => "http%3A/ /user:s3cr3t@host/x",
+        "escaped hex digits in an at sign" => "//user:s3cr3t%25%34%30host/x",
+        "a bare percent before escaped hex digits" => "//user:s3cr3t%%34%30host/x",
+        "escaped hex digits in a slash" => "http:%25%32%66%25%32%66user:s3cr3t@host/x"
       }.each do |spelling, url|
         it "replaces a URL token with #{spelling}" do
           expect(described_class.sanitize_error_text("failed: #{url} (retrying)"))

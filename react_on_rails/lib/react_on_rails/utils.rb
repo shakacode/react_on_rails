@@ -493,14 +493,18 @@ module ReactOnRails
     end
 
     OBFUSCATION_HINT = %r{%[0-7]\h|/[ \t]+/}
-    # Two slashes, either of them percent-encoded (up to 3 levels of %25 nesting), optionally
-    # separated by literal or encoded spaces and tabs.
-    AUTHORITY_START = %r{(?:/|%(?:25){0,2}2f)(?:[ \t]|%(?:25){0,2}(?:09|20))*(?:/|%(?:25){0,2}2f)}i
-    SPLIT_SPACE = /[ \t]|%(?:25){0,2}(?:09|20)/i
-    AT_SIGN = /@|%(?:25){0,2}40/
-    ENCODED_AT_SIGN = /%(?:25){0,2}40/
+    # Escapes that decode to a hex digit or %, so they only spell other escapes
+    # (%2540, %25%34%30, %%34%30); decoding them keeps literal and encoded delimiters apart.
+    ESCAPED_ESCAPE = /%(25|3[0-9]|4[1-6]|6[1-6])/i
+    # Two slashes, either of them percent-encoded, optionally separated by literal or
+    # encoded spaces and tabs. Matched after ESCAPED_ESCAPE is decoded.
+    AUTHORITY_START = %r{(?:/|%2f)(?:[ \t]|%09|%20)*(?:/|%2f)}i
+    SCHEME_COLON = /(?::|%3a)\z/i
+    AT_SIGN = /@|%40/
+    ENCODED_AT_SIGN = /%40/
     REDACTED_URL = "[REDACTED URL]"
-    private_constant :OBFUSCATION_HINT, :AUTHORITY_START, :SPLIT_SPACE, :AT_SIGN, :ENCODED_AT_SIGN, :REDACTED_URL
+    private_constant :OBFUSCATION_HINT, :ESCAPED_ESCAPE, :AUTHORITY_START, :SCHEME_COLON,
+                     :AT_SIGN, :ENCODED_AT_SIGN, :REDACTED_URL
 
     # Replaces a whole whitespace-delimited token when one of its URL authorities hides
     # userinfo from the literal patterns below: the authority's slashes are encoded or split
@@ -526,6 +530,8 @@ module ReactOnRails
     private_class_method :redact_obfuscated_url_tokens
 
     def self.credential_url_token?(token)
+      # Up to 3 levels of nesting, matching the decode depth URL encoders produce.
+      3.times { token = token.gsub(ESCAPED_ESCAPE) { Regexp.last_match(1).hex.chr } }
       # Found once so each authority start checks it in constant time.
       last_at = token.rindex(AT_SIGN)
       return false unless last_at
@@ -542,9 +548,11 @@ module ReactOnRails
 
     def self.credential_authority?(token, authority_start, last_at)
       unless authority_start[0] == "//"
-        # A split counts only after a scheme colon, so a list of paths is not an authority.
-        split = authority_start[0].match?(SPLIT_SPACE)
-        return false if split && (authority_start.begin(0).zero? || token[authority_start.begin(0) - 1] != ":")
+        # Literal slashes split by a space or tab count only after a scheme colon (literal
+        # or encoded), so a space-separated list of paths is not an authority.
+        literal_split = authority_start[0].start_with?("/") && authority_start[0].end_with?("/")
+        before = token[[authority_start.begin(0) - 3, 0].max...authority_start.begin(0)]
+        return false if literal_split && !before.match?(SCHEME_COLON)
 
         return last_at >= authority_start.end(0)
       end
