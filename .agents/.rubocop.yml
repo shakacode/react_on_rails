@@ -1,6 +1,5 @@
-# RuboCop settings for repo-local copies of shared agent workflow tools.
-# Keep this aligned with shakacode/agent-workflows/.rubocop.yml so copied
-# workflow scripts are linted as workflow assets, not product code.
+# RuboCop settings for repo-owned agent helper scripts under .agents/, linted as
+# workflow assets, not product code.
 
 AllCops:
   NewCops: disable
@@ -12,8 +11,6 @@ Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Style/HashSyntax:
-  # Shared copies must stay byte-identical even when this repo's older RuboCop
-  # has a different shorthand preference from the source pack toolchain.
   EnforcedShorthandSyntax: either
 
 Layout/EmptyLinesAroundBlockBody:

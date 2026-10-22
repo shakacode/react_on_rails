@@ -21,17 +21,15 @@ commit, runs the candidate validator, and exercises
 `script/shaka_seam_check_test.rb` against valid and invalid consumer fixtures.
 Do not copy Shaka's schema, key lists, or defaults into this repository.
 
-## Transitional Agent Workflows Content
+## Retired Agent Workflows Content
 
-The repo still pins selected `shakacode/agent-workflows` files for checkout-only
-sessions. `.agents/agent-workflow-drift.yml` and its completeness test govern
-those copies. Retirement of that source-pack content belongs to
-[`shakacode/agent-workflows#857`](https://github.com/shakacode/agent-workflows/issues/857).
+React on Rails no longer syncs files from `shakacode/agent-workflows`. The
+drift manifest and its pinned-pack CI check are gone. Vendored pack copies still
+in `.agents/` are no longer verified against upstream; follow-up PRs remove
+them together with their remaining callers.
 
 ## Validation
 
 - `shaka seam check --root . --local`
 - `SHAKA_COMMAND=<pinned-shaka>/skills/shaka/scripts/shaka ruby script/shaka_seam_check_test.rb`
-- `ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
-- `<pinned-agent-workflows>/bin/check-agent-workflow-drift --manifest .agents/agent-workflow-drift.yml --source-root <pinned-agent-workflows> --consumer-root .`
 - Markdown formatting and link checks for edited documentation
