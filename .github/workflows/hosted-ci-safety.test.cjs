@@ -307,11 +307,6 @@ assertMatches(
   agentLint,
   /ruby \.agents\/bin\/agent_workflow_drift_manifest_test_test\.rb/,
 );
-assertMatches(
-  'local lint fails when the legacy fixture is incomplete',
-  agentLint,
-  /legacy agent-workflows fixture is incomplete/,
-);
 assertMatches('agent workflow pointer heading', agentInstructions, /^## Agent Workflow Configuration$/m);
 assertMatches(
   'agent workflow trusted Shaka pointer',

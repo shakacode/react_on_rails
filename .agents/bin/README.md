@@ -36,9 +36,7 @@ Additional helper:
 Shaka typed policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
 Installed Shaka is the seam validator; required CI checks out an immutable
 Shaka Git revision and runs `seam check --local` plus the consumer regression
-fixtures in `script/shaka_seam_check_test.rb`. The byte-identical legacy doctor
-and test live under `.agents/fixtures/agent-workflows/bin/`, outside this active
-command directory, solely for transitional source-pack drift coverage.
+fixtures in `script/shaka_seam_check_test.rb`.
 Human-only React on Rails policy stays in `AGENTS.md`.
 
 Local Shaka must support `review.local_review_count`, introduced in

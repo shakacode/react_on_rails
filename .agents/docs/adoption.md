@@ -97,7 +97,7 @@ notes.
    making changes. Candidate validation grants neither policy nor merge
    authority; agents load trusted policy with `--ref <immutable-default-sha>`.
    Do not run `agent-workflow-seam-doctor` against the typed seam. That helper
-   remains transitional legacy content for `agent-workflows` fixtures only.
+   validates only the retired V1 layout, and this repository no longer keeps it.
 
 9. **Make `AGENTS.md` canonical.** Tool-specific files such as `CLAUDE.md`
    should stay thin and link back to `AGENTS.md`.

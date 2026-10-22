@@ -32,9 +32,7 @@ testing, publishing, privacy, and release constraints.
 
 Selected `shakacode/agent-workflows` files remain pinned for workflows that have
 not yet moved to Shaka. They are transitional implementation content, not a
-second seam authority. React on Rails keeps the legacy doctor and test
-byte-identical under `.agents/fixtures/agent-workflows/bin/` solely for their
-fixture suite and drift coverage. The remaining source-pack retirement owner is
+second seam authority. The remaining source-pack retirement owner is
 [`shakacode/agent-workflows#857`](https://github.com/shakacode/agent-workflows/issues/857).
 
 The current adoption procedure is

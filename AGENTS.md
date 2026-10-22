@@ -55,13 +55,9 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
   keeps a local copy/override.
-- `.agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor`: a
-  byte-identical legacy
-  `agent-workflows` helper retained only for that pack's transitional fixture
-  suite. It is not the React on Rails seam validator and does not accept the
-  Shaka typed contract. Installed Shaka validates `.agents/agent-workflow.yml`;
-  required CI pins the reviewed Shaka Git revision and runs candidate-only
-  validation. Pack management helpers such as `agent-workflows-status`,
+- Installed Shaka is the only seam validator. It validates
+  `.agents/agent-workflow.yml`; required CI pins the reviewed Shaka Git revision
+  and runs candidate-only validation. Pack management helpers such as `agent-workflows-status`,
   `install-agent-workflows`, `upgrade-agent-workflows`, and `bin/validate`
   remain transitional installed/shared-pack tools.
 - `.agents/bin/agent-workflow-drift-manifest-test.rb`: the consumer-owned
@@ -222,8 +218,7 @@ shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
 
 This trusted-ref check establishes workflow policy. Candidate CI validation uses
 the separately pinned Shaka checkout with `--local`, which grants neither policy
-nor merge authority. The old doctor lives under `.agents/fixtures/` only for
-legacy `agent-workflows` tests; it is not an active repository command.
+nor merge authority.
 
 If a workflow explicitly needs a repo-local `.agents/skills/...` file, it should
 be a repo-specific local skill such as `stress-test` or

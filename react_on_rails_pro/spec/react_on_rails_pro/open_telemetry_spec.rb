@@ -491,6 +491,23 @@ RSpec.describe ReactOnRailsPro::OpenTelemetry do
       client&.close
     end
 
+    it "normalizes per-render request ids in render paths like cache digests" do
+      span = install_open_telemetry(provider)
+      async_client = double
+      allow(async_client).to receive(:post).and_raise(Errno::ECONNREFUSED, "renderer unavailable")
+      client = build_client(async_client)
+
+      %w[render incremental-render].each do |endpoint|
+        expect do
+          client.post("/bundles/private-bundle/#{endpoint}/App_Header-4242-17", json: { renderingRequest: "x" })
+        end.to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError)
+
+        expect(span.attributes["url.path"]).to eq("/bundles/{hash}/#{endpoint}/{digest}")
+      end
+    ensure
+      client&.close
+    end
+
     it "does not mark the bundle-upload protocol status as an error" do
       span = install_open_telemetry(provider)
       trace = described_class.start_client_span(:post, "/render", parent_context: nil)
