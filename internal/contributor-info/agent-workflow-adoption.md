@@ -1,8 +1,8 @@
 # Agent Workflow Adoption
 
-React on Rails uses Shaka's versioned repository contract. The detailed,
-current adoption guide is [`.agents/docs/adoption.md`](../../.agents/docs/adoption.md),
-and the contract lives in [`.agents/agent-workflow.yml`](../../.agents/agent-workflow.yml).
+React on Rails uses [Shaka](https://github.com/shakacode/shaka)'s versioned
+repository contract, which lives in
+[`.agents/agent-workflow.yml`](../../.agents/agent-workflow.yml).
 
 ## Current Boundary
 
@@ -27,6 +27,11 @@ React on Rails no longer syncs files from `shakacode/agent-workflows`. The
 drift manifest and its pinned-pack CI check are gone. Vendored pack copies still
 in `.agents/` are no longer verified against upstream; follow-up PRs remove
 them together with their remaining callers.
+
+Until then, treat `.agents/docs/*.md` and `.agents/workflows/*.md` as historical.
+Their instructions to run `.agents/bin/agent-workflow-drift-manifest-test.rb`,
+`check-agent-workflow-drift`, or `.agents/agent-workflow-drift.yml` describe the
+retired drift check and no longer apply.
 
 ## Validation
 
