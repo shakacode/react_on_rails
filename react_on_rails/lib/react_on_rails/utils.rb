@@ -484,13 +484,85 @@ module ReactOnRails
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
-      text.to_s
-          .gsub(%r{//[^/?#]*@}, "//")
-          .gsub(%r{https?://[^\s]+}) do |match|
+      redact_obfuscated_url_tokens(text.to_s)
+        .gsub(%r{//[^/?#]*@}, "//")
+        .gsub(%r{https?://[^\s]+}) do |match|
         trimmed = match.sub(/[).,;:'">\]]+\z/, "")
         sanitize_url_for_display(trimmed) + match[trimmed.length..]
       end
     end
+
+    OBFUSCATION_HINT = %r{%[0-7]\h|/[ \t]+/}
+    # An encoded slash, a literal or encoded space or tab between a scheme's slashes, or an
+    # encoded at sign inside a literal authority (up to 3 levels of %25 nesting).
+    OBFUSCATED_AUTHORITY = %r{%(?:25){0,2}2f|:/(?:[ \t]|%(?:25){0,2}(?:09|20))+/|//[^/?#\s]*%(?:25){0,2}40}i
+    REDACTED_URL = "[REDACTED URL]"
+    private_constant :OBFUSCATION_HINT, :OBFUSCATED_AUTHORITY, :REDACTED_URL
+
+    # Replaces a whole whitespace-delimited token when its URL authority is percent-encoded
+    # or split by spaces or tabs and an at sign follows it once decoded. The literal patterns
+    # above never see these spellings. Runs first so they cannot consume the at sign first.
+    # Defense in depth: no current caller produces these forms. Works on bytes so index
+    # arithmetic stays linear for multibyte text.
+    def self.redact_obfuscated_url_tokens(text)
+      bytes = text.b
+      return text unless bytes.match?(OBFUSCATION_HINT)
+
+      result = +"".b
+      position = 0
+      while (hint = OBFUSCATION_HINT.match(bytes, position))
+        start = token_start(bytes, hint.begin(0))
+        finish = token_end(bytes, hint.end(0))
+        token = bytes[start...finish]
+        result << bytes[position...start] << (credential_url_token?(token) ? REDACTED_URL : token)
+        position = finish
+      end
+      (result << bytes[position..]).force_encoding(text.encoding)
+    end
+    private_class_method :redact_obfuscated_url_tokens
+
+    def self.credential_url_token?(token)
+      return false unless token.match?(OBFUSCATED_AUTHORITY)
+
+      decoded = token
+      3.times { decoded = decoded.gsub(/%([0-7]\h)/) { Regexp.last_match(1).hex.chr } }
+      last_at = decoded.rindex("@")
+      authority_start = %r{/[ \t]*/}.match(decoded)
+      !last_at.nil? && !authority_start.nil? && authority_start.end(0) <= last_at
+    end
+    private_class_method :credential_url_token?
+
+    # A token ends at whitespace, except a space or tab run between two slashes.
+    def self.token_end(bytes, index)
+      while (space = bytes.index(/\s/, index))
+        run_end = space
+        run_end += 1 while run_end < bytes.length && " \t".include?(bytes[run_end])
+        return space unless split_run?(bytes, space, run_end)
+
+        index = run_end
+      end
+      bytes.length
+    end
+    private_class_method :token_end
+
+    def self.token_start(bytes, index)
+      # rindex counts a negative start position from the end, so stop at offset 0.
+      while index.positive? && (space = bytes.rindex(/\s/, index - 1))
+        run_start = space
+        run_start -= 1 while run_start.positive? && " \t".include?(bytes[run_start - 1])
+        return space + 1 unless split_run?(bytes, run_start, space + 1)
+
+        index = run_start
+      end
+      0
+    end
+    private_class_method :token_start
+
+    def self.split_run?(bytes, run_start, run_end)
+      run_start.positive? && bytes[run_start - 1] == "/" && bytes[run_end] == "/" &&
+        bytes[run_start...run_end].delete(" \t").empty?
+    end
+    private_class_method :split_run?
 
     # Replaces query values with [REDACTED], keeping keys for diagnostics.
     # Bare components without = (like ?eyJhbGciOi...) are treated as opaque
