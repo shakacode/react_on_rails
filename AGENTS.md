@@ -43,14 +43,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `script/pr-merge-ledger <PR> --strict`, followed by the applicable phase and
   merge-authority gates in this `AGENTS.md`. Shaka merge preference is `ask`;
   GitHub remains authoritative for merge queue and required checks.
-- `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
-  aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
-  toolchain compatibility adjustments such as this repo's supported Ruby target.
-- `.agents/agent-workflow-drift.yml`: immutable source revision and reviewed
-  exact/overlay mapping for repo-pinned shared workflow files. Required CI checks
-  out that revision, runs the consumer-owned completeness test, then runs the
-  source pack's read-only drift checker. Update the manifest and hashes only as
-  part of a reviewed shared-workflow reconciliation.
+- `.agents/.rubocop.yml`: repo-owned lint config for agent helper scripts under
+  `.agents/`.
 - If a tool or skill picker only exposes installed/global skills, treat those
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
@@ -60,10 +54,6 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   and runs candidate-only validation. Pack management helpers such as `agent-workflows-status`,
   `install-agent-workflows`, `upgrade-agent-workflows`, and `bin/validate`
   remain transitional installed/shared-pack tools.
-- `.agents/bin/agent-workflow-drift-manifest-test.rb`: the consumer-owned
-  completeness boundary for pinned shared files. It governs explicit files and
-  whole source-pack prefixes, including reviewed source-only exclusions, so a
-  new upstream helper cannot silently escape the drift manifest.
 - `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
   current Shaka seam boundary, transitional source-pack content, and validation
 - `internal/contributor-info/portable-agent-workflows-seam-design.md`: current
