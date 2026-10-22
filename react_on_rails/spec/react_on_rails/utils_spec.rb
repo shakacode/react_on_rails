@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require "shakapacker"
+require "timeout"
 
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
@@ -1092,6 +1093,94 @@ module ReactOnRails
       it "passes through error text with no URL unchanged" do
         text = "Connection refused - connect(2) for host:3800"
         expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      # Defense in depth: no current caller produces these spellings. A token whose
+      # authority is encoded or split is replaced whole, credentials and all.
+      {
+        "encoded slashes" => "http:%2F%2Fuser:s3cr3t%40host/x",
+        "encoded scheme colon" => "http%3A%2F%2Fuser:s3cr3t%40host/x",
+        "bare encoded authority" => "%2F%2Fuser:s3cr3t%40host/x",
+        "mixed literal and encoded slashes" => "http:/%2Fuser:s3cr3t%40host/x",
+        "mixed-case percent hex" => "http:%2f%2Fuser:s3cr3t%40host/x",
+        "double-encoded authority" => "http:%252F%252Fuser:s3cr3t%2540host/x",
+        "tab between slashes" => "http:/\t/user:s3cr3t@host/x",
+        "space and tab between slashes" => "http:/ \t /user:s3cr3t@host/x",
+        "encoded tab between slashes" => "http:/%09/user:s3cr3t@host/x",
+        "encoded at sign after literal slashes" => "//user:s3cr3t%40host/x",
+        "encoded slash inside the password" => "http:%2F%2Fuser:s3%2Fcr3t%40host/x",
+        "literal //...@ inside an encoded password" => "http:%2F%2Fuser:s3cr3t//suffix@host/x",
+        "all-numeric password before a port" => "http:%2F%2Fuser:12345%40host:3800/x",
+        "encoded colon before a split" => "http%3A%2F%20%2Fuser:s3cr3t@host/x",
+        "literal slashes split after an encoded colon" => "http%3A/ /user:s3cr3t@host/x",
+        "escaped hex digits in an at sign" => "//user:s3cr3t%25%34%30host/x",
+        "a bare percent before escaped hex digits" => "//user:s3cr3t%%34%30host/x",
+        "escaped hex digits in a slash" => "http:%25%32%66%25%32%66user:s3cr3t@host/x",
+        "a literal slash, a space, then an encoded slash" => "http:/ %2Fuser:s3cr3t@host/x",
+        "an encoded slash, a space, then an encoded slash" => "http:%2F %2Fuser:s3cr3t@host/x",
+        "an encoded space between literal slashes" => "/%20/user:s3cr3t@host/x",
+        "an encoded authority after a key" => "url=%2F%2Fuser:s3cr3t%40host/x"
+      }.each do |spelling, url|
+        it "replaces a URL token with #{spelling}" do
+          expect(described_class.sanitize_error_text("failed: #{url} (retrying)"))
+            .to eq("failed: [REDACTED URL] (retrying)")
+        end
+      end
+
+      it "replaces each obfuscated URL token in a message with several URLs" do
+        text = "a http:%2F%2Fu1:p1%40h1/x and b %2F%2Fu2:p2%40h2 done"
+        expect(described_class.sanitize_error_text(text)).to eq("a [REDACTED URL] and b [REDACTED URL] done")
+      end
+
+      {
+        "an encoded query without an authority" => "GET /search?q=a%2Fb%40c and path %2F%2Fhost/x failed",
+        "a literal stack-trace path with an escape" => "at file:///app/My%20App/node_modules/@babel/x.js:1:2",
+        "an encoded at sign in a literal URL's path" => "GET http://api.example.com/users/john%40example.com failed",
+        "a space between two paths" => "searched /app/lib/ /app/node_modules/@babel/core/index.js (a%20b)",
+        "a line break between two paths" => "cwd: /srv/app/\n/srv/app/node_modules/@babel/core/lib/index.js (a%20b)",
+        "a webpack path with an escape elsewhere" => "at webpack://app/node_modules/@babel/x.js (query a%2Fb)",
+        "a webpack path with an escape in the same token" => "at webpack://app/node_modules/@babel/x.js?a%2Fb",
+        "an npm scoped-package URL" => "GET https://registry.npmjs.org/@babel%2Fcore/-/core-7.26.0.tgz 404",
+        "an encoded path slash before a path at sign" => "GET http://api.example.com/a%2Fb/john@example.com failed",
+        "encoded double slashes inside a path" => "GET https://api.example.com/a%2F%2Fb/john@example.com failed",
+        "a mixed encoded and literal split inside a path" => "searched dir%2F /home/@user and done",
+        "a CRLF between two paths" => "cwd: /srv/a%2F\r\n/srv/@x failed",
+        "a line break right after an encoded slash" => "cwd: /srv/a%2F\n/srv/@x failed",
+        "a double slash inside a literal path" => "GET https://api.example.com/users//john%40example.com failed",
+        "an empty file authority before an encoded at sign" => "at file:///foo%40bar.js:1:2"
+      }.each do |shape, text|
+        it "leaves #{shape} unchanged" do
+          expect(described_class.sanitize_error_text(text)).to eq(text)
+        end
+      end
+
+      it "leaves an encoded password before a literal at sign to the literal patterns" do
+        text = "connect to http://user:p%40ss@renderer:3800/x failed"
+        expect(described_class.sanitize_error_text(text)).to eq("connect to http://renderer:3800/x failed")
+      end
+
+      it "documents the literal-slash password gap it leaves to the literal patterns" do
+        text = "redis://user:pa/ss%40host:6379"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
+      end
+
+      it "replaces a token at the very start or end of the message" do
+        expect(described_class.sanitize_error_text("%2F%2Fu:p%40h/x failed")).to eq("[REDACTED URL] failed")
+        expect(described_class.sanitize_error_text("failed %2F%2Fu:p%40h/x")).to eq("failed [REDACTED URL]")
+      end
+
+      it "keeps multibyte text valid around a replaced token" do
+        result = described_class.sanitize_error_text("échec http:%2F%2Fuser:s3cr3t%40hôte/x ✓")
+        expect(result).to eq("échec [REDACTED URL] ✓")
+        expect(result).to be_valid_encoding
+      end
+
+      it "stays fast on large messages" do
+        texts = ["%2F%2F #{'x %2F/ ' * 50_000}", "#{'lorem ipsum ' * 400_000}a%20b",
+                 "%41 x/#{"\t" * 300_000}x", "%41 #{'/' * 300_000}", "%2F" * 100_000]
+        texts.each do |text|
+          expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error
+        end
       end
     end
   end

@@ -484,13 +484,127 @@ module ReactOnRails
     def self.sanitize_error_text(text)
       return text if text.nil? || text.empty?
 
-      text.to_s
-          .gsub(%r{//[^/?#]*@}, "//")
-          .gsub(%r{https?://[^\s]+}) do |match|
+      redact_obfuscated_url_tokens(text.to_s)
+        .gsub(%r{//[^/?#]*@}, "//")
+        .gsub(%r{https?://[^\s]+}) do |match|
         trimmed = match.sub(/[).,;:'">\]]+\z/, "")
         sanitize_url_for_display(trimmed) + match[trimmed.length..]
       end
     end
+
+    OBFUSCATION_HINT = %r{%[0-7]\h|/[ \t]+/}
+    # Escapes that decode to a hex digit or %, so they only spell other escapes
+    # (%2540, %25%34%30, %%34%30); decoding them keeps literal and encoded delimiters apart.
+    ESCAPED_ESCAPE = /%(25|3[0-9]|4[1-6]|6[1-6])/
+    # Two slashes, either of them percent-encoded, optionally separated by literal or
+    # encoded spaces and tabs. Matched after ESCAPED_ESCAPE is decoded.
+    AUTHORITY_START = %r{(?:/|%2f)(?:[ \t]|%09|%20)*(?:/|%2f)}i
+    SCHEME_COLON = /(?::|%3a)\z/i
+    # Common URL path characters: encoded slashes after one continue that path. Rarer path
+    # punctuation (such as ! or ,) counts as a boundary, which over-redacts and never leaks.
+    PATH_CHARACTER = %r{[A-Za-z0-9._~/-]}
+    AT_SIGN = /@|%40/
+    REDACTED_URL = "[REDACTED URL]"
+    private_constant :OBFUSCATION_HINT, :ESCAPED_ESCAPE, :AUTHORITY_START, :SCHEME_COLON, :PATH_CHARACTER,
+                     :AT_SIGN, :REDACTED_URL
+
+    # Replaces a whole whitespace-delimited token when one of its URL authorities hides
+    # userinfo from the literal patterns below: the authority's slashes are encoded or split
+    # by spaces or tabs and an at sign follows, or its slashes are literal and its last at
+    # sign is encoded. Runs first so the literal patterns cannot consume that at sign.
+    # Defense in depth: no current caller produces these forms. Works on bytes so index
+    # arithmetic stays linear for multibyte text.
+    def self.redact_obfuscated_url_tokens(text)
+      bytes = text.b
+      return text unless bytes.match?(OBFUSCATION_HINT)
+
+      result = +"".b
+      position = 0
+      while (hint = OBFUSCATION_HINT.match(bytes, position))
+        start = token_start(bytes, hint.begin(0))
+        finish = token_end(bytes, hint.end(0))
+        token = bytes[start...finish]
+        result << bytes[position...start] << (credential_url_token?(token) ? REDACTED_URL : token)
+        position = finish
+      end
+      (result << bytes[position..]).force_encoding(text.encoding)
+    end
+    private_class_method :redact_obfuscated_url_tokens
+
+    def self.credential_url_token?(token)
+      # Up to 3 levels of nesting, matching the decode depth URL encoders produce.
+      3.times { token = token.gsub(ESCAPED_ESCAPE) { Regexp.last_match(1).hex.chr } }
+      # Found once so each authority start checks it in constant time.
+      last_at = token.rindex(AT_SIGN)
+      return false unless last_at
+
+      position = 0
+      while (authority_start = AUTHORITY_START.match(token, position))
+        return true if credential_authority?(token, authority_start, last_at)
+
+        position = authority_start.begin(0) + 1
+      end
+      false
+    end
+    private_class_method :credential_url_token?
+
+    def self.credential_authority?(token, authority_start, last_at)
+      # Slashes start an authority only at the token start, after a scheme colon (literal or
+      # encoded) or after a character a path rarely holds, so /a%2F%2Fb/, /users//x and a
+      # space-separated list of paths stay paths.
+      return false unless authority_boundary?(token, authority_start.begin(0))
+      return last_at >= authority_start.end(0) unless authority_start[0] == "//"
+
+      authority_end = token.index(%r{[/?#]}, authority_start.end(0)) || token.length
+      authority = token[authority_start.end(0)...authority_end]
+      last_encoded = authority.rindex("%40")
+      last_literal = authority.rindex("@")
+      !last_encoded.nil? && (last_literal.nil? || last_encoded > last_literal)
+    end
+    private_class_method :credential_authority?
+
+    def self.authority_boundary?(token, index)
+      return true if index.zero?
+
+      token[[index - 3, 0].max...index].match?(SCHEME_COLON) || !token[index - 1].match?(PATH_CHARACTER)
+    end
+    private_class_method :authority_boundary?
+
+    # A token ends at whitespace, except a space or tab run between two slashes, either of
+    # which may be percent-encoded.
+    def self.token_end(bytes, index)
+      while (space = bytes.index(/\s/, index))
+        run_end = space
+        run_end += 1 while run_end < bytes.length && " \t".include?(bytes[run_end])
+        return space unless split_run?(bytes, space, run_end)
+
+        index = run_end
+      end
+      bytes.length
+    end
+    private_class_method :token_end
+
+    def self.token_start(bytes, index)
+      # rindex counts a negative start position from the end, so stop at offset 0.
+      while index.positive? && (space = bytes.rindex(/\s/, index - 1))
+        run_start = space
+        run_start -= 1 while run_start.positive? && " \t".include?(bytes[run_start - 1])
+        return space + 1 unless split_run?(bytes, run_start, space + 1)
+
+        index = run_start
+      end
+      0
+    end
+    private_class_method :token_start
+
+    def self.split_run?(bytes, run_start, run_end)
+      return false unless run_start.positive? && bytes[run_start...run_end].delete(" \t").empty?
+
+      slash_before = bytes[run_start - 1] == "/" || bytes[[run_start - 3, 0].max...run_start].casecmp?("%2f")
+      slash_after = bytes[run_end] == "/" || bytes[run_end, 3].to_s.casecmp?("%2f")
+      slash_before && slash_after
+    end
+    private_class_method :split_run?
 
     # Replaces query values with [REDACTED], keeping keys for diagnostics.
     # Bare components without = (like ?eyJhbGciOi...) are treated as opaque
