@@ -513,3 +513,29 @@ describe "React Router Sixth Page", :js do
   it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
                   "#ServerComponentRouter-react-component-0"
 end
+
+# Issue #5128: a Turbo Frame navigation replaces only the frame's content. The Pro client mounts the
+# new content through each component's inline script and must unmount the replaced frame's roots.
+describe "Turbo Frame navigation", :js do
+  def probe_events(test_id, event)
+    events = page.evaluate_script("window.__TURBO_FRAME_PROBE_EVENTS__ || []")
+    events.count { |entry| entry["testId"] == test_id && entry["event"] == event }
+  end
+
+  it "mounts the incoming frame's component and unmounts only the replaced frame's root" do
+    visit "/turbo_frame_navigation"
+    expect(page).to have_css("[data-testid='frame-first'][data-mounted='true']")
+    expect(page).to have_css("[data-testid='outside-frame'][data-mounted='true']")
+    # Survives only if the frame navigation does not reload the whole page.
+    page.execute_script("window.__TURBO_FRAME_NAVIGATION_MARKER__ = true")
+
+    click_on "Load next frame"
+
+    expect(page).to have_css("[data-testid='frame-second'][data-mounted='true']")
+    expect(page).to have_no_css("[data-testid='frame-first']")
+    expect(page.evaluate_script("window.__TURBO_FRAME_NAVIGATION_MARKER__")).to be(true)
+    expect(probe_events("frame-first", "unmounted")).to eq(1)
+    expect(probe_events("frame-second", "mounted")).to eq(1)
+    expect(probe_events("outside-frame", "unmounted")).to eq(0)
+  end
+end

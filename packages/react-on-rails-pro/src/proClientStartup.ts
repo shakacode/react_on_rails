@@ -17,17 +17,45 @@
 
 import { getRailsContext } from 'react-on-rails/context';
 import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
-import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
+import { debugTurbolinks, turboInstalled } from 'react-on-rails/turbolinksUtils';
 import {
   renderOrHydrateCompleteComponents,
   hydrateCompleteStores,
+  mountedComponentIdsWithin,
   unmountAll,
+  unmountDetachedComponents,
 } from './ClientSideRenderer.ts';
 import { reactOnRailsPageLoaded } from './capabilities/proLifecycle.ts';
 
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded [PRO]');
   unmountAll();
+}
+
+// A Turbo Frame navigation replaces only the frame's content and fires frame events instead of
+// turbo:before-render/turbo:render, so the page lifecycle never sees it. The new content mounts
+// through the inline script each component emits. Before the render, record which components the
+// frame holds; after it, unmount those the render removed. Unmounting only after turbo:frame-render
+// leaves components intact when an app pauses or cancels the render (e.g. to animate the frame), and
+// limiting it to the recorded ids leaves alone components elsewhere that happen to be detached.
+const componentIdsBeforeFrameRender = new WeakMap<Element, string[]>();
+
+function turboFrameTarget(event: Event): Element | null {
+  if (!turboInstalled() || !(event.target instanceof Element)) return null;
+  debugTurbolinks(`${event.type} [PRO]: frame #${event.target.id}`);
+  return event.target;
+}
+
+function onTurboBeforeFrameRender(event: Event): void {
+  const frame = turboFrameTarget(event);
+  if (frame) componentIdsBeforeFrameRender.set(frame, mountedComponentIdsWithin(frame));
+}
+
+function onTurboFrameRender(event: Event): void {
+  const frame = turboFrameTarget(event);
+  if (!frame) return;
+  unmountDetachedComponents(componentIdsBeforeFrameRender.get(frame) ?? []);
+  componentIdsBeforeFrameRender.delete(frame);
 }
 
 export function proClientStartup() {
@@ -61,4 +89,6 @@ export function proClientStartup() {
 
   onPageLoaded(reactOnRailsPageLoaded);
   onPageUnloaded(reactOnRailsPageUnloaded);
+  document.addEventListener('turbo:before-frame-render', onTurboBeforeFrameRender);
+  document.addEventListener('turbo:frame-render', onTurboFrameRender);
 }

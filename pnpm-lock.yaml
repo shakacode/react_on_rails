@@ -649,6 +649,9 @@ importers:
       '@honeybadger-io/js':
         specifier: ^4.3.1
         version: 4.9.3
+      '@hotwired/turbo-rails':
+        specifier: ^8.0.4
+        version: 8.0.23
       '@loadable/babel-plugin':
         specifier: ^5.16.1
         version: 5.16.1(@babel/core@7.29.6)

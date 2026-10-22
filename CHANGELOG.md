@@ -45,6 +45,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   replaced frame's React roots. Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
   [PR 5220](https://github.com/shakacode/react_on_rails/pull/5220) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Turbo Frame navigation releases the replaced frame's React roots**: With `turbo: true`, the
+  `react-on-rails-pro` package now handles `turbo:frame-render` and unmounts the components the frame render removed.
+  Components outside the frame stay mounted, and the new frame content still mounts through each component's inline
+  script. Previously the replaced roots stayed mounted until the next full Turbo page visit.
+  Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
+  [PR 5227](https://github.com/shakacode/react_on_rails/pull/5227) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
   and RSC Client Component providers now read only their request's stores in a shared Node Renderer
   worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
