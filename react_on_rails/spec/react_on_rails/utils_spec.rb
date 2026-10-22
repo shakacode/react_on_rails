@@ -1129,11 +1129,24 @@ module ReactOnRails
         "an encoded at sign in a literal URL's path" => "GET http://api.example.com/users/john%40example.com failed",
         "a space between two paths" => "searched /app/lib/ /app/node_modules/@babel/core/index.js (a%20b)",
         "a line break between two paths" => "cwd: /srv/app/\n/srv/app/node_modules/@babel/core/lib/index.js (a%20b)",
-        "a webpack path with an escape elsewhere" => "at webpack://app/node_modules/@babel/x.js (query a%2Fb)"
+        "a webpack path with an escape elsewhere" => "at webpack://app/node_modules/@babel/x.js (query a%2Fb)",
+        "a webpack path with an escape in the same token" => "at webpack://app/node_modules/@babel/x.js?a%2Fb",
+        "an npm scoped-package URL" => "GET https://registry.npmjs.org/@babel%2Fcore/-/core-7.26.0.tgz 404",
+        "an encoded path slash before a path at sign" => "GET http://api.example.com/a%2Fb/john@example.com failed"
       }.each do |shape, text|
         it "leaves #{shape} unchanged" do
           expect(described_class.sanitize_error_text(text)).to eq(text)
         end
+      end
+
+      it "leaves an encoded password before a literal at sign to the literal patterns" do
+        text = "connect to http://user:p%40ss@renderer:3800/x failed"
+        expect(described_class.sanitize_error_text(text)).to eq("connect to http://renderer:3800/x failed")
+      end
+
+      it "documents the literal-slash password gap it leaves to the literal patterns" do
+        text = "redis://user:pa/ss%40host:6379"
+        expect(described_class.sanitize_error_text(text)).to eq(text)
       end
 
       it "keeps multibyte text valid around a replaced token" do
@@ -1144,7 +1157,7 @@ module ReactOnRails
 
       it "stays fast on large messages" do
         texts = ["%2F%2F #{'x %2F/ ' * 50_000}", "#{'lorem ipsum ' * 400_000}a%20b",
-                 "%41 x/#{"\t" * 300_000}x", "%41 #{'/' * 300_000}"]
+                 "%41 x/#{"\t" * 300_000}x", "%41 #{'/' * 300_000}", "%2F" * 100_000]
         texts.each do |text|
           expect { Timeout.timeout(2) { described_class.sanitize_error_text(text) } }.not_to raise_error
         end

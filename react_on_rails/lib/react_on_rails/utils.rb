@@ -493,15 +493,19 @@ module ReactOnRails
     end
 
     OBFUSCATION_HINT = %r{%[0-7]\h|/[ \t]+/}
-    # An encoded slash, a literal or encoded space or tab between a scheme's slashes, or an
-    # encoded at sign inside a literal authority (up to 3 levels of %25 nesting).
-    OBFUSCATED_AUTHORITY = %r{%(?:25){0,2}2f|:/(?:[ \t]|%(?:25){0,2}(?:09|20))+/|//[^/?#\s]*%(?:25){0,2}40}i
+    # Two slashes, either of them percent-encoded (up to 3 levels of %25 nesting), optionally
+    # separated by literal or encoded spaces and tabs.
+    AUTHORITY_START = %r{(?:/|%(?:25){0,2}2f)(?:[ \t]|%(?:25){0,2}(?:09|20))*(?:/|%(?:25){0,2}2f)}i
+    SPLIT_SPACE = /[ \t]|%(?:25){0,2}(?:09|20)/i
+    AT_SIGN = /@|%(?:25){0,2}40/
+    ENCODED_AT_SIGN = /%(?:25){0,2}40/
     REDACTED_URL = "[REDACTED URL]"
-    private_constant :OBFUSCATION_HINT, :OBFUSCATED_AUTHORITY, :REDACTED_URL
+    private_constant :OBFUSCATION_HINT, :AUTHORITY_START, :SPLIT_SPACE, :AT_SIGN, :ENCODED_AT_SIGN, :REDACTED_URL
 
-    # Replaces a whole whitespace-delimited token when its URL authority is percent-encoded
-    # or split by spaces or tabs and an at sign follows it once decoded. The literal patterns
-    # above never see these spellings. Runs first so they cannot consume the at sign first.
+    # Replaces a whole whitespace-delimited token when one of its URL authorities hides
+    # userinfo from the literal patterns below: the authority's slashes are encoded or split
+    # by spaces or tabs and an at sign follows, or its slashes are literal and its last at
+    # sign is encoded. Runs first so the literal patterns cannot consume that at sign.
     # Defense in depth: no current caller produces these forms. Works on bytes so index
     # arithmetic stays linear for multibyte text.
     def self.redact_obfuscated_url_tokens(text)
@@ -522,15 +526,36 @@ module ReactOnRails
     private_class_method :redact_obfuscated_url_tokens
 
     def self.credential_url_token?(token)
-      return false unless token.match?(OBFUSCATED_AUTHORITY)
+      # Found once so each authority start checks it in constant time.
+      last_at = token.rindex(AT_SIGN)
+      return false unless last_at
 
-      decoded = token
-      3.times { decoded = decoded.gsub(/%([0-7]\h)/) { Regexp.last_match(1).hex.chr } }
-      last_at = decoded.rindex("@")
-      authority_start = %r{/[ \t]*/}.match(decoded)
-      !last_at.nil? && !authority_start.nil? && authority_start.end(0) <= last_at
+      position = 0
+      while (authority_start = AUTHORITY_START.match(token, position))
+        return true if credential_authority?(token, authority_start, last_at)
+
+        position = authority_start.begin(0) + 1
+      end
+      false
     end
     private_class_method :credential_url_token?
+
+    def self.credential_authority?(token, authority_start, last_at)
+      unless authority_start[0] == "//"
+        # A split counts only after a scheme colon, so a list of paths is not an authority.
+        split = authority_start[0].match?(SPLIT_SPACE)
+        return false if split && (authority_start.begin(0).zero? || token[authority_start.begin(0) - 1] != ":")
+
+        return last_at >= authority_start.end(0)
+      end
+
+      authority_end = token.index(%r{[/?#]}, authority_start.end(0)) || token.length
+      authority = token[authority_start.end(0)...authority_end]
+      last_encoded = authority.rindex(ENCODED_AT_SIGN)
+      last_literal = authority.rindex("@")
+      !last_encoded.nil? && (last_literal.nil? || last_encoded > last_literal)
+    end
+    private_class_method :credential_authority?
 
     # A token ends at whitespace, except a space or tab run between two slashes.
     def self.token_end(bytes, index)
