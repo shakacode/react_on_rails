@@ -95,9 +95,6 @@ coordination backend, redaction, and trust) lives in `AGENTS.md`.
 Installed Shaka is the only validator for this typed contract. Required CI pins
 the reviewed Shaka Git revision and runs `seam check --local`; runtime workflow
 authority comes only from `seam check --ref <immutable-default-sha>`.
-The repo-pinned legacy doctor lives under
-`.agents/fixtures/agent-workflows/bin/`, byte-identical to its source, only for
-transitional fixture and drift coverage.
 
 Public-comment trust is a separate contract in
 `.agents/trusted-github-actors.yml`, not a seam key. Shaka's comment reader loads
@@ -124,8 +121,8 @@ resolution uses `.agents/bin/`; Shaka typed policy uses `.agents/agent-workflow.
 
 ## Seam Initialization
 
-New and migrated consumers use `shaka seam init`. The legacy doctor is fixture
-data and must never be run with `--init` against this repository.
+New and migrated consumers use `shaka seam init`. Never run the legacy
+agent-workflows doctor with `--init` against this repository.
 
 ## Seam Validation
 
@@ -138,9 +135,7 @@ data and must never be run with `--init` against this repository.
 - the result is labeled `local/candidate` and grants no policy or merge authority
 
 React on Rails required CI runs that parser and
-`script/shaka_seam_check_test.rb`. The legacy doctor and its test remain
-byte-identical under `.agents/fixtures/agent-workflows/bin/` so drift validation
-can cover legacy fixtures without exposing the doctor as an active command.
+`script/shaka_seam_check_test.rb`.
 
 ## Repository-Pinned Copies
 
@@ -163,7 +158,6 @@ test from React on Rails.
 - `shaka seam check --root <consumer-repo> --local`
 - `SHAKA_COMMAND=<pinned-shaka>/skills/shaka/scripts/shaka ruby script/shaka_seam_check_test.rb`
 - `bin/validate`
-- `ruby .agents/fixtures/agent-workflows/bin/agent-workflow-seam-doctor-test.rb`
 - `ruby bin/push-downstream-test.rb`
 - `ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
 - `<pinned-agent-workflows>/bin/check-agent-workflow-drift --manifest
