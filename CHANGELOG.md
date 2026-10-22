@@ -38,6 +38,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Diagnostic credential redaction covers encoded URL spellings**: Error-message redaction now replaces a
+  whitespace-delimited token with `[REDACTED URL]` when its URL authority is percent-encoded (`%2F%2F`,
+  double-encoded `%252F%252F`, `http%3A%2F%2F`, any hex case), holds an encoded at sign after literal slashes,
+  or has a space or tab between a scheme's slashes, and an at sign follows it once decoded. Those tokens lose
+  their host and path; literal URLs are handled as before. This is defense in depth; no current caller produces
+  these forms. [PR 5235](https://github.com/shakacode/react_on_rails/pull/5235) by
+  [justin808](https://github.com/justin808).
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.
