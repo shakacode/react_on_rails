@@ -509,9 +509,10 @@ module ReactOnRails
                      :AT_SIGN, :REDACTED_URL
 
     # Replaces a whole whitespace-delimited token when one of its URL authorities hides
-    # userinfo from the literal patterns below: the authority's slashes are encoded or split
-    # by spaces or tabs and an at sign follows, or its slashes are literal and its last at
-    # sign is encoded. Runs first so the literal patterns cannot consume that at sign.
+    # userinfo from the literal patterns below. The authority must start at a URL boundary;
+    # then either its slashes are encoded or split by spaces or tabs and an at sign follows,
+    # or its slashes are literal and its last at sign is encoded. Runs first so the literal
+    # patterns cannot consume that at sign.
     # Defense in depth: no current caller produces these forms. Works on bytes so index
     # arithmetic stays linear for multibyte text.
     def self.redact_obfuscated_url_tokens(text)
@@ -566,7 +567,12 @@ module ReactOnRails
     def self.authority_boundary?(token, index)
       return true if index.zero?
 
-      token[[index - 3, 0].max...index].match?(SCHEME_COLON) || !token[index - 1].match?(PATH_CHARACTER)
+      before = token[[index - 3, 0].max...index]
+      return true if before.match?(SCHEME_COLON)
+
+      # An encoded delimiter (%3D for =) bounds a URL as its literal form does.
+      previous = before.match?(/\A%\h\h\z/) ? before[1, 2].hex.chr : token[index - 1]
+      !previous.match?(PATH_CHARACTER)
     end
     private_class_method :authority_boundary?
 

@@ -1119,7 +1119,11 @@ module ReactOnRails
         "a literal slash, a space, then an encoded slash" => "http:/ %2Fuser:s3cr3t@host/x",
         "an encoded slash, a space, then an encoded slash" => "http:%2F %2Fuser:s3cr3t@host/x",
         "an encoded space between literal slashes" => "/%20/user:s3cr3t@host/x",
-        "an encoded authority after a key" => "url=%2F%2Fuser:s3cr3t%40host/x"
+        "an encoded authority after a key" => "url=%2F%2Fuser:s3cr3t%40host/x",
+        "literal slashes after a key" => "url=//user:s3cr3t%40host/x",
+        "literal slashes after a parenthesis" => "(//user:s3cr3t%40host/x)",
+        "literal slashes after an encoded delimiter" => "url%3D//user:s3cr3t%40host/x",
+        "encoded slashes after an encoded delimiter" => "url%3D%2F%2Fuser:s3cr3t%40host/x"
       }.each do |spelling, url|
         it "replaces a URL token with #{spelling}" do
           expect(described_class.sanitize_error_text("failed: #{url} (retrying)"))
