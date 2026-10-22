@@ -256,7 +256,7 @@ RSpec.describe "script/release-forward-port" do
       mutation_arguments_path = File.join(tmpdir, "mutation-arguments")
       defaults = {
         "BUNDLE_GEMFILE" => nil,
-        "PR_BATCH_SKILL_DIR" => tmpdir,
+        "AGENT_COORD_BIN_DIR" => File.join(tmpdir, "bin"),
         "RELEASE_BRANCH" => nil,
         "RELEASE_BRANCH_INPUT" => nil,
         "RELEASE_LINE_TARGET" => nil,

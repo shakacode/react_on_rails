@@ -241,7 +241,7 @@ test -n "${RELEASE_COORDINATOR_INSTANCE_ID}" || {
 RELEASE_COORDINATOR_ID="release-${RELEASE_VERSION}-${RELEASE_COORDINATOR_INSTANCE_ID}"
 readonly RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
 export RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
-PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
+AGENT_COORD_BIN_DIR="${AGENT_COORD_BIN_DIR:-$(pwd)/.agents/bin}"
 
 heartbeat_release_line_lease() {
   agent-coord heartbeat \
@@ -258,7 +258,7 @@ heartbeat_release_line_lease() {
 require_live_release_line_lease() {
   command -v jq >/dev/null || return 1
   lease_json="$(
-    "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+    "${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status \
       --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
   )" || return 1
   jq -e \
@@ -283,10 +283,10 @@ require_live_release_line_lease() {
 }
 
 acquire_release_line_lease() {
-  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+  "${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status \
     --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json \
     >/dev/null || return 1
-  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
+  "${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 claim \
     --agent-id "${RELEASE_COORDINATOR_ID}" \
     --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --repo shakacode/react_on_rails \

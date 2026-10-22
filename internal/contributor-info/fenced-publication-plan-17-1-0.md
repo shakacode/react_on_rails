@@ -33,7 +33,7 @@ precisely and compensated as far as a supervised run allows:
   `require_live_release_line_lease` immediately before invocation.
 - Identity handoff to the second shell: at claim time the first shell writes
   `RELEASE_COORDINATOR_ID`, `RELEASE_COORDINATOR_INSTANCE_ID`,
-  `RELEASE_LINE_TARGET`, and `PR_BATCH_SKILL_DIR` to
+  `RELEASE_LINE_TARGET`, and `AGENT_COORD_BIN_DIR` to
   `/tmp/rc0-coordinator-identity` (mode 600). The watchdog shell and every
   OTP re-check shell source THAT file and the runbook's function definitions
   only - re-running the identity bootstrap in any second shell is forbidden,

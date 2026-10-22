@@ -21,7 +21,12 @@ a normal `<base-ref>` argument. See
 [`internal/contributor-info/local-ci-contract.md`](../../internal/contributor-info/local-ci-contract.md)
 for the local CI contract.
 
-Additional helper:
+Additional helpers:
+
+- `agent-coord-bounded` runs an `agent-coord` subcommand with a timeout so a
+  slow private coordination read becomes explicit degraded state. The
+  release-train runbook calls it through `AGENT_COORD_BIN_DIR` (default
+  `$(pwd)/.agents/bin`); `agent-coord-bounded-test.rb` runs in required CI.
 
 - `shared-skill-dir <skill-name>` resolves a skill directory from an explicit
   repo-local skill override or repo-pinned helper `bin/` copy first, then

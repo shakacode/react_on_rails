@@ -235,17 +235,17 @@ agent-coord status --batch-id <batch-id> --json
 ```
 
 When the repo workflow calls for bounded reads, pass the same targeted status
-subcommand through the repo-pinned `pr-batch` `agent-coord-bounded` helper so a slow private read
+subcommand through the repo-owned `.agents/bin/agent-coord-bounded` helper so a slow private read
 becomes explicit degraded state instead of an indefinite wait:
 
 ```bash
-PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
+AGENT_COORD_BIN_DIR="${AGENT_COORD_BIN_DIR:-$(pwd)/.agents/bin}"
 
 # Specific issue/PR lane
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
 
 # Batch lane/dependency state
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json
+"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json
 ```
 
 Do not use broad `agent-coord status` for routine lane checks. Broad private
@@ -972,7 +972,7 @@ Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, b
 ### Changelog classification taxonomy
 
 Changelog work classifies each merged PR by `Category`;
-`.agents/skills/update-changelog/bin/changelog-merged-prs` lists
+`.agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs` lists
 the merged PRs in a range. Use the repo-local
 `$react-on-rails-update-changelog` skill when changelog work must target
 `release/X.Y.Z`. Allowed values (copy exactly, including spaces, hyphens, and

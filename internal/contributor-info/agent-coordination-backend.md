@@ -77,15 +77,15 @@ that have not yet migrated to Shaka; it is not part of the release command.
 
 Treat the backend as available when `agent-coord doctor --json` and targeted
 lane-scoped status probes exit 0. In React on Rails batch workflows, run agent
-preflights through the bounded helper from the installed/shared `$pr-batch`
-skill so a slow private read becomes explicit degraded state instead of an
+preflights through the repo-owned `.agents/bin/agent-coord-bounded` helper so
+a slow private read becomes explicit degraded state instead of an
 indefinite wait:
 
 ```bash
-PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 doctor --json
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo OWNER/REPO --target TARGET --json
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id BATCH_ID --json
+AGENT_COORD_BIN_DIR="${AGENT_COORD_BIN_DIR:-$(pwd)/.agents/bin}"
+"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 doctor --json
+"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status --repo OWNER/REPO --target TARGET --json
+"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status --batch-id BATCH_ID --json
 ```
 
 Use broad `agent-coord status` only for audit-mode triage sweeps and post-merge
