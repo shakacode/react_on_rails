@@ -66,9 +66,7 @@ jobs:
             Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
             Use `mcp__github_comment__update_claude_comment` to publish the complete review in the
             tracking comment, even when there are no findings. Include findings and review limitations.
-            Only after completing the review, end the published report with these two lines.
-            Put each on its own line exactly as written, with no links, branch names, formatting
-            or other text on those lines:
+            Only after completing the review, include these exact lines in the published report:
             REVIEWED ${{ github.event.pull_request.head.sha }} BY anthropic/claude
             CI run: ${{ github.run_id }}/${{ github.run_attempt }}
             If blocked, explain the blocker and omit the REVIEWED line.
