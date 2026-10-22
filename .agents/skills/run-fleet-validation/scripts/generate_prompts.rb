@@ -363,7 +363,7 @@ module FleetValidation
            under the candidate-specific batch/target recorded in live coordination. If no lane exists for
            a fresh target, use its generated fallback claim target shown below. Never use the fallback to
            bypass an active/refused existing claim or completed handoff. Follow
-           `.agents/workflows/pr-processing.md`: targeted status is preflight only; the claim is the
+           the coordination rules in `AGENTS.md`: targeted status is preflight only; the claim is the
            compare-and-swap gate. Hard-stop that target on CLAIM_REFUSED. On claim timeout or unknown
            outcome, report UNKNOWN and do not create a branch/worktree. Resume another owner's work only
            through an explicit fenced handoff. Replace `RESOLVED_TAG` in a fallback template with the exact

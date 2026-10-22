@@ -1,5 +1,9 @@
 # Multi-Batch Operations
 
+> **Legacy:** React on Rails no longer uses the `shakacode/agent-workflows`
+> batch skills this guide describes. Issue and PR delivery goes through
+> installed [Shaka](https://github.com/shakacode/shaka); see `AGENTS.md`.
+
 Use this playbook when one coordinator is running multiple agent batches across
 machines, launch surfaces, or repositories. It sits above the per-lane workflow
 rules in [AGENTS.md](../../AGENTS.md),
@@ -203,7 +207,7 @@ Use this lifecycle for every lane:
 
 If the private `agent-coord` state backend is unavailable, use the structured
 public claim comment fallback from
-[pr-processing.md](../../.agents/workflows/pr-processing.md#coordination-state),
+[pr-processing.md](https://github.com/shakacode/agent-workflows/blob/1958648b70a450aa67c15b833428485d17021045/workflows/pr-processing.md#coordination-state),
 but do not use a public comment to override a refused private claim.
 
 ## Batch Sizing And Routing

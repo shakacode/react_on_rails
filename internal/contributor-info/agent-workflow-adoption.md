@@ -24,9 +24,10 @@ Do not copy Shaka's schema, key lists, or defaults into this repository.
 ## Retired Agent Workflows Content
 
 React on Rails no longer syncs files from `shakacode/agent-workflows`. The
-drift manifest and its pinned-pack CI check are gone. Vendored pack copies still
-in `.agents/` are no longer verified against upstream; follow-up PRs remove
-them together with their remaining callers.
+drift manifest and its pinned-pack CI check are gone. The vendored workflow and
+doc copies are gone. Vendored helper scripts still under `.agents/skills/` are
+no longer verified against upstream; a follow-up PR moves the two live helpers
+into repo-owned paths and removes the rest.
 
 Until then, treat `.agents/docs/*.md` and `.agents/workflows/*.md` as historical.
 Their instructions to run `.agents/bin/agent-workflow-drift-manifest-test.rb`,
