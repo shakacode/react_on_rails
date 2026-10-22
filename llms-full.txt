@@ -11703,9 +11703,9 @@ ReactOnRails.setOptions({
 });
 ```
 
-**3. Use Turbo Frames** (works out of the box)
+**3. Use Turbo Frames**
 
-Turbo Frames work with React components without any special configuration:
+With `turbo: true` set, React on Rails mounts and unmounts the components inside a Turbo Frame as it navigates, subject to the requirements below:
 
 ```erb
 <%# app/views/items/index.html.erb %>
@@ -11715,6 +11715,23 @@ Turbo Frames work with React components without any special configuration:
 
 <%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
 ```
+
+When a frame navigation replaces the frame's content, the `react-on-rails` package handles `turbo:frame-render`:
+
+1. It unmounts the components the render removed from the page, so their React roots do not leak.
+2. It mounts the components in the new frame content.
+
+Nothing is unmounted before the frame renders, so pausing or canceling `turbo:before-frame-render` (for example, to animate the frame) leaves the old components working.
+
+Components outside the frame stay mounted. Redux stores are page-wide: a new component rendered with declared store dependencies initializes only those stores, and one without them initializes every store on the page. A store the page already has keeps its state.
+
+Turbo inserts only the frame's markup from the response, so anything the response renders outside the frame is discarded. That leads to three requirements:
+
+- **Bundles:** frame components must be registered by JavaScript the page already loaded. Pack tags in the frame response, including the ones `auto_load_bundle` appends, are not run. Load those packs on the page that holds the frame.
+- **Rails context:** React on Rails writes the `js-react-on-rails-context` element next to the first component a response renders. The page must already have one, or the frame response's first component must be inside the frame.
+- **Stores:** a store a frame component reads must already be on the page or have its hydration data rendered inside the frame. Store data that `redux_store_hydration_data` writes elsewhere in the layout is discarded.
+
+With the `react-on-rails-pro` package, each component's inline script mounts the new frame content as soon as it is inserted. Pro does not yet unmount the replaced frame's components on frame navigation; their React roots are released on the next full Turbo page visit.
 
 ### Turbo with Auto-Bundling
 
@@ -11797,7 +11814,7 @@ Use `content_for` to render your body content first, capturing auto-appends befo
 
 **Why Turbo Streams Need Special Handling:**
 
-Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. React on Rails Pro hydrates components immediately when they are inserted into the DOM, without waiting for page load events, so Turbo Stream updates work out of the box.
+Unlike Turbo Frame navigation, Turbo Streams don't dispatch the render events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. React on Rails Pro hydrates components immediately when they are inserted into the DOM, without waiting for page load events, so Turbo Stream updates work out of the box.
 
 **Example: Create a Turbo Stream Response**
 
