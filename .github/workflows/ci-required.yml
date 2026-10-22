@@ -110,7 +110,6 @@ jobs:
           ruby script/pr_merge_ledger_test.rb
           ruby .agents/bin/agent-coord-bounded-test.rb
           ruby .agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs-test.rb
-          ruby .agents/skills/pr-batch/bin/pr-ci-readiness-test.rb
 
       - name: Check mirrored blocks
         run: ruby bin/lint-mirrored-blocks

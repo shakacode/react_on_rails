@@ -23,14 +23,11 @@ Do not copy Shaka's schema, key lists, or defaults into this repository.
 
 ## Retired Agent Workflows Content
 
-React on Rails no longer syncs files from `shakacode/agent-workflows`. The
-drift manifest and its pinned-pack CI check are gone. The vendored workflow and
-doc copies are gone. The two helpers React on Rails still needs are repo-owned:
+React on Rails no longer uses `shakacode/agent-workflows`. The drift manifest,
+its pinned-pack CI check, and the vendored workflow, doc, and helper copies are
+gone. The two helpers React on Rails still needs are repo-owned:
 `.agents/bin/agent-coord-bounded` and
-`.agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs`. The
-remaining vendored helper scripts under `.agents/skills/` have no callers
-apart from the `pr-ci-readiness` test that required CI still runs; a follow-up
-PR deletes them together with that CI line.
+`.agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs`.
 
 ## What Retires And What Replaces It
 
