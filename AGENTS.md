@@ -10,8 +10,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - Installed [Shaka](https://github.com/shakacode/shaka) owns issue and PR
   delivery: claim, plan, implement, validate, local review, publication, and
   the merge decision. Start it with `/shaka` in Claude Code or `$shaka` in
-  Codex. React on Rails no longer uses `shakacode/agent-workflows` skills or
-  vendored copies.
+  Codex. React on Rails no longer uses `shakacode/agent-workflows` skills; the last
+  vendored helper copies are being moved or removed.
 - When updating reusable agent workflows, first consider whether the change
   belongs in Shaka rather than this repo; keep local edits focused on React on
   Rails-specific policy, seams, or overrides.
@@ -249,8 +249,8 @@ PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batc
 
 Do not use broad `agent-coord status` for routine lane checks. Broad private
 coordination reads are audit-only; if they time out, exit 1 (unexpected error),
-or exit 2, report private coordination as `UNKNOWN`/degraded and use structured
-public claim comments only as advisory evidence. Any non-zero exit other than
+or exit 2, report private coordination as `UNKNOWN`/degraded and use Shaka
+`claim` results (open PRs and branches) only as advisory evidence. Any non-zero exit other than
 `CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
 exits 0, private coordination state is authoritative. Refused claims
 (`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
