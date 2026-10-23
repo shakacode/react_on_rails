@@ -87,7 +87,7 @@
     "react": ">= 16",
     "react-dom": ">= 16",
     "react-on-rails-rsc": ">=19.2.1 <20.0.0",
-    "@tanstack/react-router": ">=1.139.0 <2.0.0",
+    "@tanstack/react-router": ">=1.139.0 <1.170.19",
     "ioredis": ">= 5"
   },
   "peerDependenciesMeta": {

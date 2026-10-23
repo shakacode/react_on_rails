@@ -152,7 +152,10 @@ end
 
 ## Compatibility
 
-- Supported `@tanstack/react-router` versions: `>=1.139.0 <2.0.0`
+- Supported `@tanstack/react-router` versions: `>=1.139.0 <1.170.19`
+- Version 1.170.19 and later removed the `router.state.statusCode` and `router.state.redirect`
+  APIs that React on Rails Pro reads for HTTP status propagation. Support for the replacement
+  API (`router._serverResult`) is tracked in [#5189](https://github.com/shakacode/react_on_rails/issues/5189).
 - Keep `react-on-rails-pro` up to date when upgrading `@tanstack/react-router`.
 
 ## Working Examples in This Repo
