@@ -167,8 +167,10 @@ function normalizeUrlForRouter(url: string, router: TanStackRouter): string {
   }
 
   // Normalize query encoding by round-tripping through URLSearchParams.
-  // This matches TanStack Router's internal stringifySearch behavior, which
-  // re-encodes values (e.g. commas become %2C).
+  // This handles the most common canonicalization patterns (percent-encoding
+  // normalization, e.g. commas become %2C). Patterns involving TanStack
+  // Router's JSON search serialization (duplicate keys, JSON-parseable values)
+  // are not covered and fall back to the redirect mechanism from extractHttpResponse.
   if (search.length > 1) {
     const params = new URLSearchParams(search.slice(1));
     const normalized = params.toString();
