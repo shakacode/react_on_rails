@@ -112,6 +112,8 @@ export interface TanStackSsrMatch {
   u: number;
   /** status — match resolution status */
   s: string;
+  /** globalNotFound — true when this match is the global not-found boundary */
+  g?: boolean;
   /** beforeLoadContext */
   b?: unknown;
   /** loaderData */

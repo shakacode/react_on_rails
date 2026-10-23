@@ -144,4 +144,51 @@ describe "TanStack Router Starter" do # rubocop:disable RSpec/FilePath,RSpec/Spe
       expect(hydration_errors).to be_empty, hydration_failure_message
     end
   end
+
+  describe "direct visit to an unknown route (not-found hydration)", :js do
+    let(:log_probe_message) { "tanstack-starter-notfound-log-probe" }
+
+    before do
+      page.driver.browser.logs.get(:browser)
+    rescue Selenium::WebDriver::Error::NoSuchDriverError
+      # Driver session gone; nothing to flush.
+    end
+
+    it "hydrates the not-found page without errors and navigates away cleanly" do
+      # Visit an unknown URL inside the catch-all. The server renders the
+      # not-found component; the client must hydrate it with the same
+      # globalNotFound match state preserved from SSR.
+      visit "/tanstack_starter/unknown_route_xyz"
+
+      expect(page).to have_css("h1#tanstack-starter-shell", text: "TanStack Router Starter")
+      expect(page).to have_css("h2#tanstack-starter-not-found", text: "Starter page not found")
+
+      # Prove hydration completed by clicking the shell counter.
+      click_on "Shell counter: 0"
+      expect(page).to have_button("Shell counter: 1")
+
+      # Navigate to a known route — proves the router recovered and is
+      # fully interactive after a not-found hydration.
+      click_on "Starter Home"
+      expect(page).to have_current_path("/tanstack_starter")
+      expect(page).to have_css("h2#tanstack-starter-home", text: "Starter Home Page")
+      # Shell counter survives — no full page reload happened.
+      expect(page).to have_button("Shell counter: 1")
+
+      # Assert no hydration errors in the browser console.
+      page.execute_script("console.error(arguments[0])", log_probe_message)
+      console_entries = page.driver.browser.logs.get(:browser)
+      expect(console_entries.map(&:message)).to include(a_string_including(log_probe_message)),
+                                                "Browser console log channel is unavailable; cannot assert " \
+                                                "absence of hydration errors."
+
+      hydration_errors = console_entries.select do |entry|
+        entry.level.match?(/SEVERE|WARNING/) &&
+          (entry.message.include?("Switched to client rendering") || entry.message.match?(/hydrat/i))
+      end
+      hydration_error_messages = hydration_errors.map(&:message).join("\n")
+      expect(hydration_errors).to be_empty,
+                                  "Expected no hydration errors on not-found route, got:\n#{hydration_error_messages}"
+    end
+  end
 end

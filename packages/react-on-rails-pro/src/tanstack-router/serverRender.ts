@@ -77,6 +77,9 @@ function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
     s: candidate.status,
   };
 
+  if (candidate.globalNotFound === true) {
+    dehydratedMatch.g = true;
+  }
   // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
   if (candidate.__beforeLoadContext !== undefined) {
     // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
