@@ -36,7 +36,9 @@ fi
 # masking applies to declaration assignments such as `local x=$(false)`). Keep
 # the guard so the failure names the refs being diffed, not as the sole failure
 # mechanism.
-CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
+# Classify renames as delete + add so both paths select suites and release gates,
+# regardless of the user or repository diff.renames configuration.
+CHANGED_FILES=$(git diff --no-renames --name-only "$MERGE_BASE" "$CURRENT_REF") || {
   echo -e "${RED}Error: git diff failed for $MERGE_BASE..$CURRENT_REF${NC}" >&2
   exit 1
 }
@@ -48,7 +50,7 @@ CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
 # pattern back into CI, where a silent empty diff would skip every job
 # (the original bug this script was rewritten to prevent).
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
-  UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null || echo "")
+  UNCOMMITTED=$(git diff --no-renames --name-only HEAD 2>/dev/null || echo "")
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
   CHANGED_FILES=$(printf "%s\n%s\n%s" "$CHANGED_FILES" "$UNCOMMITTED" "$UNTRACKED" | grep -v '^$' || echo "")
 fi
