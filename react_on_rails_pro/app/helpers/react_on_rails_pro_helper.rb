@@ -564,6 +564,14 @@ module ReactOnRailsProHelper
         # httpResponse metadata is stored in a cache envelope alongside the value.
         rendered_result = append_cached_csp_nonce_marker(yield)
         rendered_result = wrap_in_cache_envelope(rendered_result)
+
+        # Never cache 5xx error responses — the next request should retry rendering
+        # and may succeed (e.g. a transient downstream failure).
+        if server_error_envelope?(rendered_result)
+          cache_write_skipped = true
+          throw(skip_cache_write, rendered_result)
+        end
+
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -755,6 +763,16 @@ module ReactOnRailsProHelper
     http_response = value["hr"]
     store_ssr_http_response({ "httpResponse" => http_response }) if http_response.is_a?(Hash)
     original
+  end
+
+  # Returns true when the cache envelope carries a 5xx httpResponse status.
+  # Server errors should not be cached — the next request should retry rendering
+  # and may succeed (e.g. a transient downstream failure). See issue #5125.
+  def server_error_envelope?(envelope)
+    return false unless envelope.is_a?(Hash) && envelope.key?(CACHE_ENVELOPE_KEY)
+
+    hr = envelope["hr"]
+    hr.is_a?(Hash) && hr["status"].is_a?(Integer) && hr["status"] >= 500
   end
 
   def extract_cached_csp_nonce_marker_from_html(html)
@@ -1822,8 +1840,11 @@ module ReactOnRailsProHelper
         unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
           cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
           cached_value = wrap_in_cache_envelope(append_cached_csp_nonce_marker(result))
-          Rails.cache.write(cache_key, cached_value, cache_options)
-          ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+          # Never cache 5xx error responses — the next request retries rendering.
+          unless server_error_envelope?(cached_value)
+            Rails.cache.write(cache_key, cached_value, cache_options)
+            ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+          end
         end
         result
       end

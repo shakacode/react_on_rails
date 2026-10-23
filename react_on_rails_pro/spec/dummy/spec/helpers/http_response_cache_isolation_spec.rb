@@ -188,4 +188,125 @@ describe "Issue #5125: httpResponse cache envelope", :caching do
       expect(request_env[env_key]).to eq({ "status" => 307, "location" => "/api?filter={type}" })
     end
   end
+
+  describe "server_error_envelope?" do
+    it "returns true for 500 status" do
+      envelope = { ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1, "v" => "<div>error</div>", "hr" => { "status" => 500 } }
+      expect(send(:server_error_envelope?, envelope)).to be true
+    end
+
+    it "returns true for 503 status" do
+      envelope = { ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1, "v" => "<div>error</div>", "hr" => { "status" => 503 } }
+      expect(send(:server_error_envelope?, envelope)).to be true
+    end
+
+    it "returns false for 404 status (client error, cacheable)" do
+      envelope = { ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1, "v" => "<div>not found</div>", "hr" => { "status" => 404 } }
+      expect(send(:server_error_envelope?, envelope)).to be false
+    end
+
+    it "returns false for 307 redirect (cacheable)" do
+      envelope = { ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1, "v" => "<span></span>",
+                   "hr" => { "status" => 307, "location" => "/target" } }
+      expect(send(:server_error_envelope?, envelope)).to be false
+    end
+
+    it "returns false when no hr key (normal 200)" do
+      envelope = { ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1, "v" => "<div>ok</div>" }
+      expect(send(:server_error_envelope?, envelope)).to be false
+    end
+
+    it "returns false for non-envelope values" do
+      expect(send(:server_error_envelope?, "<div>raw html</div>")).to be false
+    end
+  end
+
+  describe "5xx cache skip and recovery" do
+    it "skips cache write for 500 responses via fetch_cache_entry" do
+      cache_key = "test-5xx-skip-#{SecureRandom.hex(4)}"
+
+      # Simulate a cache miss that renders a 500.
+      store_ssr_http_response({ "httpResponse" => { "status" => 500 } })
+      result, _cache_hit, cache_write_skipped = send(
+        :fetch_cache_entry, cache_key, {}, cache_write_if: nil
+      ) { "<div>server error</div>".html_safe }
+
+      # The result is returned (the user sees the error page this request).
+      unwrapped = send(:unwrap_cache_envelope, result)
+      expect(unwrapped).to eq("<div>server error</div>")
+      expect(cache_write_skipped).to be true
+
+      # But the cache entry was NOT written.
+      expect(Rails.cache.read(cache_key)).to be_nil
+    end
+
+    it "allows the next request to retry and succeed after a 500" do
+      cache_key = "test-5xx-recovery-#{SecureRandom.hex(4)}"
+      render_count = 0
+
+      # Request 1: render produces a 500 (transient failure).
+      store_ssr_http_response({ "httpResponse" => { "status" => 500 } })
+      send(:fetch_cache_entry, cache_key, {}, cache_write_if: nil) do
+        render_count += 1
+        "<div>error on render #{render_count}</div>".html_safe
+      end
+
+      # Request 2: render succeeds (no httpResponse = 200).
+      request_env.clear
+      # No store_ssr_http_response call — component renders normally.
+      result2, cache_hit2, _skipped2 = send(
+        :fetch_cache_entry, cache_key, {}, cache_write_if: nil
+      ) do
+        render_count += 1
+        "<div>success on render #{render_count}</div>".html_safe
+      end
+
+      # The block ran again (cache miss, not a hit from the 500).
+      expect(render_count).to eq(2)
+      expect(cache_hit2).to be false
+      unwrapped = send(:unwrap_cache_envelope, result2)
+      expect(unwrapped).to eq("<div>success on render 2</div>")
+
+      # Request 3: cache hit from the successful render.
+      request_env.clear
+      result3, cache_hit3, _skipped3 = send(
+        :fetch_cache_entry, cache_key, {}, cache_write_if: nil
+      ) do
+        render_count += 1
+        "<div>should not render</div>".html_safe
+      end
+
+      expect(render_count).to eq(2) # block did NOT run — cache hit
+      expect(cache_hit3).to be true
+      unwrapped3 = send(:unwrap_cache_envelope, result3)
+      expect(unwrapped3).to eq("<div>success on render 2</div>")
+    end
+
+    it "still caches 404 responses (client errors are stable)" do
+      cache_key = "test-404-cached-#{SecureRandom.hex(4)}"
+      render_count = 0
+
+      # Request 1: render produces a 404.
+      store_ssr_http_response({ "httpResponse" => { "status" => 404 } })
+      send(:fetch_cache_entry, cache_key, {}, cache_write_if: nil) do
+        render_count += 1
+        "<div>not found</div>".html_safe
+      end
+
+      # Request 2: cache hit — block does not run.
+      request_env.clear
+      result2, cache_hit2, = send(
+        :fetch_cache_entry, cache_key, {}, cache_write_if: nil
+      ) do
+        render_count += 1
+        "<div>should not render</div>".html_safe
+      end
+
+      expect(render_count).to eq(1) # block did NOT run — cache hit
+      expect(cache_hit2).to be true
+      unwrapped = send(:unwrap_cache_envelope, result2)
+      expect(unwrapped).to eq("<div>not found</div>")
+      expect(request_env[env_key]).to eq({ "status" => 404 })
+    end
+  end
 end
