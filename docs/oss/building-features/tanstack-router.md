@@ -123,9 +123,9 @@ The concern adds an `after_action` that reads the status from the SSR result and
 ### Canonicalization
 
 TanStack Router normalizes URLs internally. For example, with the default `trailingSlash: 'never'`
-setting, `/items/` is canonicalized to `/items`. During SSR, React on Rails Pro pre-normalizes the
-URL before `router.load()` to match the router's canonical form. This avoids a round-trip redirect
-and renders the page directly.
+setting, `/items/` is canonicalized to `/items`. During SSR, the router detects the non-canonical
+URL and returns a redirect, which `SsrStatusHandler` converts to a real HTTP 307 with a `Location`
+header. The browser follows the redirect to the canonical URL.
 
 ### Limitations
 

@@ -76,28 +76,20 @@ describe "Issue #5125: TanStack Router SSR HTTP status" do
   # ── Trailing-slash canonicalization ──
   #
   # TanStack Router's default trailingSlash: 'never' setting causes a 307
-  # redirect when the URL has a trailing slash. After the fix, this should
-  # either redirect properly (307 + Location) or render the correct page (200).
+  # redirect when the URL has a trailing slash. The httpResponse mechanism
+  # converts this into a real HTTP redirect.
 
-  it "GET /tanstack_starter/ (trailing slash) returns rendered content or a redirect" do
+  it "GET /tanstack_starter/ (trailing slash) returns 307 redirect to canonical URL" do
     get "/tanstack_starter/"
-    if response.status == 307 || response.status == 301
-      expect(response.headers["Location"]).to be_present
-    else
-      expect(response).to have_http_status(200)
-      expect(response.body).to include("tanstack-starter-home")
-    end
+    expect(response).to have_http_status(307)
+    expect(response.headers["Location"]).to be_present
   end
 
   # ── Query canonicalization ──
 
-  it "GET /tanstack_starter?ids=1,2 (non-canonical query) returns content or a redirect" do
+  it "GET /tanstack_starter?ids=1,2 (non-canonical query) returns 307 redirect to canonical URL" do
     get "/tanstack_starter?ids=1,2"
-    if response.status == 307 || response.status == 301
-      expect(response.headers["Location"]).to be_present
-    else
-      expect(response).to have_http_status(200)
-      expect(response.body).to include("tanstack-starter-home")
-    end
+    expect(response).to have_http_status(307)
+    expect(response.headers["Location"]).to be_present
   end
 end

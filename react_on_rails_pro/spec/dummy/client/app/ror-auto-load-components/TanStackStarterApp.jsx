@@ -46,6 +46,7 @@ import {
   createRouter,
   redirect,
   notFound,
+  useLocation,
 } from '@tanstack/react-router';
 import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
@@ -55,10 +56,17 @@ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 // reset to 0. The system test asserts it survives route changes.
 const ShellLayout = () => {
   const [count, setCount] = useState(0);
+  const location = useLocation();
 
   return (
     <div className="container">
       <h1 id="tanstack-starter-shell">TanStack Router Starter</h1>
+      {/* Displays the current pathname so tests can detect server/browser URL mismatches.
+          A hydration error here proves the server rendered with a different URL than the
+          browser's window.location. */}
+      <p id="tanstack-starter-pathname" data-testid="current-pathname">
+        {location.pathname}
+      </p>
       <button id="tanstack-starter-counter" type="button" onClick={() => setCount((c) => c + 1)}>
         Shell counter: {count}
       </button>
