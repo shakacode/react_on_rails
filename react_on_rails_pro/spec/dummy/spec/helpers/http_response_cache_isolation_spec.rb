@@ -15,17 +15,12 @@
 
 require "rails_helper"
 
-# Issue #5125 regression: httpResponse cache isolation.
+# Issue #5125 regression: httpResponse cache isolation via envelope.
 #
-# When two cached_react_component calls appear on the same page and the first
-# component's render sets httpResponse (e.g. status 404), the second component's
-# cache entry must NOT be contaminated with that 404. Each component caches its
-# own httpResponse metadata independently.
-#
-# This test exercises the marker append/extract methods directly, because the
-# dummy app's TanStack starter view uses react_component (non-cached), not
-# cached_react_component.
-describe "Issue #5125: httpResponse cache isolation", :caching do
+# The prerender cache wraps each component's rendered value in an envelope
+# { "__ror_cache_envelope" => 1, "v" => value, "hr" => httpResponse }
+# so that httpResponse metadata survives cache hits without modifying the HTML.
+describe "Issue #5125: httpResponse cache envelope", :caching do
   include ReactOnRailsProHelper
   include ReactOnRails::Helper
 
@@ -38,105 +33,159 @@ describe "Issue #5125: httpResponse cache isolation", :caching do
     allow(self).to receive(:request).and_return(fake_request)
   end
 
-  describe "append_cached_http_response_marker" do
-    it "appends the per-component httpResponse, not the request-wide one" do
-      # Simulate: component A rendered with 404, component B rendered with 200.
-      # store_ssr_http_response was called for A (sets both keys), then for B
-      # (sets only current key, request-wide already set from A).
-      request_env[env_key] = { "status" => 404 }
-      request_env[current_key] = nil # component B had no httpResponse
-
-      result = send(:append_cached_http_response_marker, "<div>B</div>".html_safe)
-
-      # No marker should be appended — component B had no httpResponse.
-      expect(result).to eq("<div>B</div>")
-      expect(result).not_to include("rorp-cached-http-response")
-    end
-
-    it "appends the current component's httpResponse when present" do
+  describe "wrap_in_cache_envelope" do
+    it "wraps a String value in an envelope" do
       request_env[current_key] = { "status" => 404 }
 
-      result = send(:append_cached_http_response_marker, "<div>A</div>".html_safe)
+      envelope = send(:wrap_in_cache_envelope, "<div>not found</div>".html_safe)
 
-      expect(result).to include("<!--rorp-cached-http-response:")
-      expect(result).to include('"status":404')
+      expect(envelope).to be_a(Hash)
+      expect(envelope[ReactOnRailsProHelper::CACHE_ENVELOPE_KEY]).to eq(1)
+      expect(envelope["v"]).to eq("<div>not found</div>")
+      expect(envelope["hr"]).to eq({ "status" => 404 })
     end
 
-    it "clears the per-component key after reading so the next component is not contaminated" do
+    it "wraps a Hash value (react_component_hash) in an envelope" do
+      request_env[current_key] = { "status" => 301, "location" => "/target" }
+
+      envelope = send(:wrap_in_cache_envelope, { "componentHtml" => "<div>redirect</div>" })
+
+      expect(envelope["v"]).to eq({ "componentHtml" => "<div>redirect</div>" })
+      expect(envelope["hr"]).to eq({ "status" => 301, "location" => "/target" })
+    end
+
+    it "omits hr key when no httpResponse is present" do
+      # No current_key set — normal 200 component.
+      envelope = send(:wrap_in_cache_envelope, "<div>ok</div>".html_safe)
+
+      expect(envelope[ReactOnRailsProHelper::CACHE_ENVELOPE_KEY]).to eq(1)
+      expect(envelope["v"]).to eq("<div>ok</div>")
+      expect(envelope).not_to have_key("hr")
+    end
+
+    it "clears the per-component key after reading" do
       request_env[current_key] = { "status" => 404 }
 
-      send(:append_cached_http_response_marker, "<div>A</div>".html_safe)
+      send(:wrap_in_cache_envelope, "<div>A</div>")
 
-      # After append, the per-component key should be cleared.
       expect(request_env[current_key]).to be_nil
     end
+
+    it "preserves redirect locations containing } characters" do
+      request_env[current_key] = { "status" => 307, "location" => "/path?data={foo}" }
+
+      envelope = send(:wrap_in_cache_envelope, "<div>redirect</div>")
+
+      expect(envelope["hr"]["location"]).to eq("/path?data={foo}")
+    end
   end
 
-  describe "extract_and_replay_http_response_marker" do
-    it "extracts the marker and replays httpResponse into request.env" do
-      cached_html = '<div>not found</div><!--rorp-cached-http-response:{"status":404}-->'.html_safe
-
-      result = send(:extract_and_replay_http_response_marker, cached_html)
-
-      expect(result).to eq("<div>not found</div>")
-      expect(result).not_to include("rorp-cached-http-response")
-      expect(request_env[env_key]).to eq({ "status" => 404 })
-    end
-
-    it "returns the value unchanged when no marker is present" do
-      html = "<div>normal page</div>".html_safe
-
-      result = send(:extract_and_replay_http_response_marker, html)
-
-      expect(result).to eq("<div>normal page</div>")
-      expect(request_env[env_key]).to be_nil
-    end
-
-    it "works with Hash values (react_component_hash)" do
-      cached_hash = {
-        "componentHtml" => '<div>404</div><!--rorp-cached-http-response:{"status":404}-->'.html_safe
+  describe "unwrap_cache_envelope" do
+    it "extracts the value and replays httpResponse into request.env" do
+      envelope = {
+        ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1,
+        "v" => "<div>not found</div>".html_safe,
+        "hr" => { "status" => 404 }
       }
 
-      result = send(:extract_and_replay_http_response_marker, cached_hash)
+      result = send(:unwrap_cache_envelope, envelope)
 
-      expect(result["componentHtml"]).to eq("<div>404</div>")
+      expect(result).to eq("<div>not found</div>")
+      expect(request_env[env_key]).to eq({ "status" => 404 })
+    end
+
+    it "replays redirect locations containing } characters" do
+      envelope = {
+        ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1,
+        "v" => "<span></span>",
+        "hr" => { "status" => 307, "location" => "/search?q={json}" }
+      }
+
+      send(:unwrap_cache_envelope, envelope)
+
+      expect(request_env[env_key]).to eq({ "status" => 307, "location" => "/search?q={json}" })
+    end
+
+    it "returns the value unchanged when no hr key is present" do
+      envelope = {
+        ReactOnRailsProHelper::CACHE_ENVELOPE_KEY => 1,
+        "v" => "<div>ok</div>".html_safe
+      }
+
+      result = send(:unwrap_cache_envelope, envelope)
+
+      expect(result).to eq("<div>ok</div>")
+      expect(request_env[env_key]).to be_nil
+    end
+
+    it "passes through old-format cache entries (raw String)" do
+      result = send(:unwrap_cache_envelope, "<div>old cached html</div>".html_safe)
+
+      expect(result).to eq("<div>old cached html</div>")
+      expect(request_env[env_key]).to be_nil
+    end
+
+    it "passes through old-format cache entries (react_component_hash without envelope key)" do
+      old_hash = { "componentHtml" => "<div>old</div>".html_safe }
+
+      result = send(:unwrap_cache_envelope, old_hash)
+
+      expect(result).to eq(old_hash)
+      expect(request_env[env_key]).to be_nil
+    end
+  end
+
+  describe "CSP nonce marker compatibility" do
+    it "preserves CSP nonce markers inside the envelope value" do
+      html_with_nonce = '<div><script nonce="abc123">console.log("hi")</script></div>' \
+                        "<!--rorp-cached-csp-nonce:abc123-->".html_safe
+      request_env[current_key] = { "status" => 404 }
+
+      envelope = send(:wrap_in_cache_envelope, html_with_nonce)
+      result = send(:unwrap_cache_envelope, envelope)
+
+      # The CSP nonce marker is inside the "v" value, untouched by the envelope.
+      expect(result).to include("<!--rorp-cached-csp-nonce:abc123-->")
+      expect(result).to include('nonce="abc123"')
       expect(request_env[env_key]).to eq({ "status" => 404 })
     end
   end
 
-  describe "full cache miss → cache hit cycle" do
+  describe "full cache miss → cache hit isolation" do
     it "does not contaminate a 200 component cached after a 404 component" do
-      # ── Simulate request 1: cache miss for both components ──
+      # ── Cache miss: component A renders 404, component B renders 200 ──
 
-      # Component A renders a 404 page.
+      # Component A: store_ssr_http_response sets both keys.
       store_ssr_http_response({ "httpResponse" => { "status" => 404 } })
-      component_a_html = "<div>not found</div>".html_safe
-      cached_a = send(:append_cached_http_response_marker, component_a_html)
+      cached_a = send(:wrap_in_cache_envelope, "<div>not found</div>".html_safe)
 
-      # Component B renders a normal 200 page (no httpResponse).
-      # store_ssr_http_response was not called for B (no httpResponse in result).
-      component_b_html = "<div>hello world</div>".html_safe
-      cached_b = send(:append_cached_http_response_marker, component_b_html)
+      # Component B: no httpResponse (current key was cleared by A's wrap).
+      cached_b = send(:wrap_in_cache_envelope, "<div>hello world</div>".html_safe)
 
-      # Verify: A's cache entry has the 404 marker.
-      expect(cached_a).to include("rorp-cached-http-response")
-      expect(cached_a).to include('"status":404')
+      # Verify A has hr, B does not.
+      expect(cached_a["hr"]).to eq({ "status" => 404 })
+      expect(cached_b).not_to have_key("hr")
 
-      # Verify: B's cache entry does NOT have any httpResponse marker.
-      expect(cached_b).not_to include("rorp-cached-http-response")
-
-      # ── Simulate request 2: cache hit for component B ──
-
-      # Clear request.env to simulate a fresh request.
+      # ── Cache hit: replay B then A on a fresh request ──
       request_env.clear
 
-      # Replay B's cached value — should NOT set httpResponse.
-      send(:extract_and_replay_http_response_marker, cached_b)
-      expect(request_env[env_key]).to be_nil
+      result_b = send(:unwrap_cache_envelope, cached_b)
+      expect(result_b).to eq("<div>hello world</div>")
+      expect(request_env[env_key]).to be_nil # B has no httpResponse
 
-      # Replay A's cached value — should set httpResponse to 404.
-      send(:extract_and_replay_http_response_marker, cached_a)
-      expect(request_env[env_key]).to eq({ "status" => 404 })
+      result_a = send(:unwrap_cache_envelope, cached_a)
+      expect(result_a).to eq("<div>not found</div>")
+      expect(request_env[env_key]).to eq({ "status" => 404 }) # A replays 404
+    end
+
+    it "handles redirect location with curly braces in a full cycle" do
+      store_ssr_http_response({ "httpResponse" => { "status" => 307, "location" => "/api?filter={type}" } })
+      cached = send(:wrap_in_cache_envelope, "<span></span>")
+
+      request_env.clear
+      send(:unwrap_cache_envelope, cached)
+
+      expect(request_env[env_key]).to eq({ "status" => 307, "location" => "/api?filter={type}" })
     end
   end
 end
