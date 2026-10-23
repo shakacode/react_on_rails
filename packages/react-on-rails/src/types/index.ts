@@ -156,6 +156,8 @@ interface ServerRenderResult {
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
+  /** HTTP response metadata from the render function (e.g. TanStack Router status/redirect). */
+  httpResponse?: { status: number; location?: string };
 }
 
 type CreateReactOutputSyncResult = ServerRenderResult | ReactElement;
@@ -765,6 +767,8 @@ export type RenderState = {
   clientProps?: Record<string, unknown>;
   hasErrors: boolean;
   error?: RenderingError;
+  /** HTTP response metadata from the render function (e.g. TanStack Router status/redirect). */
+  httpResponse?: { status: number; location?: string };
 };
 
 export type StreamRenderState = Omit<RenderState, 'result'> & {

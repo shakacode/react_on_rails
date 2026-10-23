@@ -67,6 +67,11 @@ module ReactOnRailsProHelper
     "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_PREFIX)}(#{CSP_NONCE_VALUE_SHAPE})" \
     "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_SUFFIX)}\\z"
   )
+
+  # Cache-envelope discriminator key. When a cached value is a Hash containing this key,
+  # it is an envelope wrapping the real value plus metadata (httpResponse). Old-format
+  # cache entries (raw String or Hash without this key) pass through unchanged. See #5125.
+  CACHE_ENVELOPE_KEY = "__ror_cache_envelope"
   # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
   # base64/base64url characters with optional trailing `=` padding — but validates the
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
@@ -538,6 +543,9 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
+    # Unwrap the cache envelope (extracts httpResponse and replays it into request.env).
+    # Must run before extract_cached_csp_nonce_marker, which operates on the raw value.
+    result = unwrap_cache_envelope(result)
     result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, options) if cache_hit
     result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
@@ -552,9 +560,18 @@ module ReactOnRailsProHelper
     result = catch(skip_cache_write) do
       Rails.cache.fetch(cache_key, cache_write_options) do
         cache_hit = false
-        # The marker travels with the cached value; both hit and miss consumers strip it
-        # with extract_cached_csp_nonce_marker before the value reaches the page.
+        # The CSP nonce marker travels inside the cached HTML string.
+        # httpResponse metadata is stored in a cache envelope alongside the value.
         rendered_result = append_cached_csp_nonce_marker(yield)
+        rendered_result = wrap_in_cache_envelope(rendered_result)
+
+        # Never cache 5xx error responses — the next request should retry rendering
+        # and may succeed (e.g. a transient downstream failure).
+        if server_error_envelope?(rendered_result)
+          cache_write_skipped = true
+          throw(skip_cache_write, rendered_result)
+        end
+
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -715,6 +732,47 @@ module ReactOnRailsProHelper
     return [hash, nil] unless nonce
 
     [hash.merge(ReactOnRails::Helper::COMPONENT_HTML_KEY => html), nonce]
+  end
+
+  # Wraps the rendered value in a cache envelope that carries httpResponse metadata
+  # alongside the HTML. The envelope is a Hash with a discriminator key so it can be
+  # distinguished from a react_component_hash return value on unwrap. Reads the
+  # per-component httpResponse (not the request-wide "first wins" value) so each
+  # component caches its own metadata without contamination. See issue #5125.
+  def wrap_in_cache_envelope(value)
+    http_response = nil
+    if defined?(request) && request.respond_to?(:env)
+      current_key = ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY
+      http_response = request.env.delete(current_key)
+      http_response = nil unless http_response.is_a?(Hash)
+    end
+
+    # Always wrap so unwrap_cache_envelope has a consistent format to detect.
+    envelope = { CACHE_ENVELOPE_KEY => 1, "v" => value }
+    envelope["hr"] = http_response if http_response
+    envelope
+  end
+
+  # Unwraps a cache envelope produced by wrap_in_cache_envelope. Returns the original
+  # value and replays httpResponse into request.env. Old-format cache entries (raw String
+  # or Hash without the envelope key) pass through unchanged for backward compatibility.
+  def unwrap_cache_envelope(value)
+    return value unless value.is_a?(Hash) && value.key?(CACHE_ENVELOPE_KEY)
+
+    original = value["v"]
+    http_response = value["hr"]
+    store_ssr_http_response({ "httpResponse" => http_response }) if http_response.is_a?(Hash)
+    original
+  end
+
+  # Returns true when the cache envelope carries a 5xx httpResponse status.
+  # Server errors should not be cached — the next request should retry rendering
+  # and may succeed (e.g. a transient downstream failure). See issue #5125.
+  def server_error_envelope?(envelope)
+    return false unless envelope.is_a?(Hash) && envelope.key?(CACHE_ENVELOPE_KEY)
+
+    hr = envelope["hr"]
+    hr.is_a?(Hash) && hr["status"].is_a?(Integer) && hr["status"] >= 500
   end
 
   def extract_cached_csp_nonce_marker_from_html(html)
@@ -1183,6 +1241,7 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
+    result = unwrap_cache_envelope(result)
     result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
@@ -1739,6 +1798,7 @@ module ReactOnRailsProHelper
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
       load_pack_for_cached_react_component(component_name, cache_options)
+      cached_result = unwrap_cache_envelope(cached_result)
       cached_result, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_result)
       normalized_result = normalize_cached_pro_attribution(cached_result, cached_csp_nonce)
       return ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
@@ -1779,8 +1839,12 @@ module ReactOnRailsProHelper
         result = react_component(component_name, options)
         unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
           cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-          Rails.cache.write(cache_key, append_cached_csp_nonce_marker(result), cache_options)
-          ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+          cached_value = wrap_in_cache_envelope(append_cached_csp_nonce_marker(result))
+          # Never cache 5xx error responses — the next request retries rendering.
+          unless server_error_envelope?(cached_value)
+            Rails.cache.write(cache_key, cached_value, cache_options)
+            ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+          end
         end
         result
       end
