@@ -67,6 +67,16 @@ module ReactOnRailsProHelper
     "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_PREFIX)}(#{CSP_NONCE_VALUE_SHAPE})" \
     "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_SUFFIX)}\\z"
   )
+
+  # Marker that carries httpResponse metadata (status code, redirect location) inside
+  # the cached value so it can be replayed on cache hits. Appended after the CSP nonce
+  # marker and extracted before it reaches the page. See #5125.
+  CACHED_HTTP_RESPONSE_MARKER_PREFIX = "<!--rorp-cached-http-response:"
+  CACHED_HTTP_RESPONSE_MARKER_SUFFIX = "-->"
+  CACHED_HTTP_RESPONSE_MARKER_REGEX = Regexp.new(
+    "#{Regexp.escape(CACHED_HTTP_RESPONSE_MARKER_PREFIX)}(\\{[^}]*\\})" \
+    "#{Regexp.escape(CACHED_HTTP_RESPONSE_MARKER_SUFFIX)}\\z"
+  )
   # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
   # base64/base64url characters with optional trailing `=` padding — but validates the
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
@@ -538,6 +548,9 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
+    # Extract httpResponse marker before CSP nonce marker (httpResponse is appended last,
+    # so it sits at the trailing end; CSP nonce regex anchors to \z).
+    result = extract_and_replay_http_response_marker(result)
     result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, options) if cache_hit
     result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
@@ -552,9 +565,10 @@ module ReactOnRailsProHelper
     result = catch(skip_cache_write) do
       Rails.cache.fetch(cache_key, cache_write_options) do
         cache_hit = false
-        # The marker travels with the cached value; both hit and miss consumers strip it
-        # with extract_cached_csp_nonce_marker before the value reaches the page.
+        # The markers travel with the cached value; both hit and miss consumers strip them
+        # before the value reaches the page.
         rendered_result = append_cached_csp_nonce_marker(yield)
+        rendered_result = append_cached_http_response_marker(rendered_result)
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -715,6 +729,66 @@ module ReactOnRailsProHelper
     return [hash, nil] unless nonce
 
     [hash.merge(ReactOnRails::Helper::COMPONENT_HTML_KEY => html), nonce]
+  end
+
+  # Appends an httpResponse marker to the cached value so the HTTP status and Location
+  # header survive across cache hits. Reads from request.env where store_ssr_http_response
+  # placed it during the current (miss) render. See issue #5125.
+  def append_cached_http_response_marker(value)
+    return value unless defined?(request) && request.respond_to?(:env)
+
+    http_response = request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_ENV_KEY]
+    return value unless http_response.is_a?(Hash)
+
+    marker = "#{CACHED_HTTP_RESPONSE_MARKER_PREFIX}#{http_response.to_json}#{CACHED_HTTP_RESPONSE_MARKER_SUFFIX}"
+
+    case value
+    when String
+      value.html_safe? ? value + marker.html_safe : value + marker
+    when Hash
+      key = ReactOnRails::Helper::COMPONENT_HTML_KEY
+      return value unless value.key?(key)
+
+      html = value[key]
+      value.merge(key => (html.html_safe? ? html + marker.html_safe : html + marker))
+    else
+      value
+    end
+  rescue StandardError => e
+    Rails.logger.warn { "[ReactOnRailsPro] Failed to append httpResponse marker: #{e.message}" }
+    value
+  end
+
+  # Extracts the httpResponse marker from a cached value and replays it into request.env
+  # so SsrStatusHandler can set the HTTP status and Location header. Runs on both cache
+  # hits and misses (the marker is stripped either way). See issue #5125.
+  def extract_and_replay_http_response_marker(value)
+    html = case value
+           when String then value
+           when Hash then value[ReactOnRails::Helper::COMPONENT_HTML_KEY]
+           else return value
+           end
+
+    return value unless html.is_a?(String)
+
+    match = html.match(CACHED_HTTP_RESPONSE_MARKER_REGEX)
+    return value unless match
+
+    clean_html = html[0...match.begin(0)]
+    clean_html = clean_html.html_safe if html.html_safe?
+
+    begin
+      http_response = JSON.parse(match[1])
+      store_ssr_http_response({ "httpResponse" => http_response })
+    rescue JSON::ParserError => e
+      Rails.logger.warn { "[ReactOnRailsPro] Failed to parse cached httpResponse marker: #{e.message}" }
+    end
+
+    case value
+    when String then clean_html
+    when Hash then value.merge(ReactOnRails::Helper::COMPONENT_HTML_KEY => clean_html)
+    else value
+    end
   end
 
   def extract_cached_csp_nonce_marker_from_html(html)
