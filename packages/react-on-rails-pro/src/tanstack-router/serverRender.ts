@@ -138,6 +138,46 @@ function extractHttpResponse(router: TanStackRouter): HttpResponse | undefined {
   return undefined;
 }
 
+/**
+ * Normalizes a URL to match TanStack Router's canonical form, preventing
+ * canonicalization redirects (trailing slash, query encoding) that would
+ * produce an empty render and a round-trip redirect.
+ *
+ * Only handles the two known canonicalization patterns:
+ * - Trailing slash: controlled by router.options.trailingSlash ('never' | 'always' | 'preserve')
+ * - Query encoding: round-trips search params through standard URL encoding
+ *
+ * Returns the original URL unchanged when no normalization is needed.
+ */
+function normalizeUrlForRouter(url: string, router: TanStackRouter): string {
+  const questionMark = url.indexOf('?');
+  let pathname = questionMark === -1 ? url : url.slice(0, questionMark);
+  let search = questionMark === -1 ? '' : url.slice(questionMark);
+
+  // Normalize trailing slash.
+  // Root path '/' is never stripped — it is not a trailing slash.
+  const trailingSlash =
+    (router as { options?: { trailingSlash?: string } }).options?.trailingSlash ?? 'never';
+  if (pathname.length > 1) {
+    if (trailingSlash === 'never' && pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1);
+    } else if (trailingSlash === 'always' && !pathname.endsWith('/')) {
+      pathname = `${pathname}/`;
+    }
+  }
+
+  // Normalize query encoding by round-tripping through URLSearchParams.
+  // This matches TanStack Router's internal stringifySearch behavior, which
+  // re-encodes values (e.g. commas become %2C).
+  if (search.length > 1) {
+    const params = new URLSearchParams(search.slice(1));
+    const normalized = params.toString();
+    search = normalized ? `?${normalized}` : '';
+  }
+
+  return pathname + search;
+}
+
 export interface TanStackServerRenderResult {
   appElement: ReactElement;
   dehydratedState: DehydratedRouterState;
@@ -159,7 +199,12 @@ export async function serverRenderTanStackAppAsync(
   createMemoryHistory: (opts: { initialEntries: string[] }) => TanStackHistory,
 ): Promise<TanStackServerRenderResult> {
   const router = options.createRouter();
-  const url = railsContext.pathname + normalizeSearch(railsContext.search);
+  const rawUrl = railsContext.pathname + normalizeSearch(railsContext.search);
+
+  // Normalize the URL to match TanStack Router's canonical form before loading.
+  // This prevents canonicalization redirects (trailing slash, query encoding)
+  // that would produce an empty render and a round-trip 307.
+  const url = normalizeUrlForRouter(rawUrl, router);
 
   const memoryHistory = createMemoryHistory({ initialEntries: [url] });
   router.update({ history: memoryHistory });
