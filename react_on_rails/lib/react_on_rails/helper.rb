@@ -1058,15 +1058,22 @@ module ReactOnRails
 
     # Stores httpResponse metadata from the render result in request.env so that
     # SsrStatusHandler's after_action can set the HTTP status and Location header.
-    # First httpResponse wins for pages with multiple react_component calls.
     # No-op outside a request context (e.g. mailers, tests without a request).
+    #
+    # Writes two keys:
+    # - SSR_HTTP_RESPONSE_ENV_KEY: request-wide "first wins" for SsrStatusHandler
+    # - SSR_HTTP_RESPONSE_CURRENT_ENV_KEY: per-component, overwritten each render,
+    #   used by the Pro caching layer to cache each component's own metadata
     def store_ssr_http_response(result)
       http_response = result["httpResponse"]
       return unless http_response.is_a?(Hash)
       return unless defined?(request) && request.respond_to?(:env)
 
+      # Per-component: always overwrite (used by Pro cache marker).
+      request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY] = http_response
+
+      # Request-wide: first httpResponse wins for SsrStatusHandler.
       env_key = ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_ENV_KEY
-      # First non-200 wins — don't overwrite if already set.
       return if request.env[env_key]
 
       request.env[env_key] = http_response

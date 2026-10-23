@@ -732,12 +732,16 @@ module ReactOnRailsProHelper
   end
 
   # Appends an httpResponse marker to the cached value so the HTTP status and Location
-  # header survive across cache hits. Reads from request.env where store_ssr_http_response
-  # placed it during the current (miss) render. See issue #5125.
+  # header survive across cache hits. Reads the per-component httpResponse (not the
+  # request-wide "first wins" value) so each component caches its own metadata without
+  # contaminating unrelated components. See issue #5125.
   def append_cached_http_response_marker(value)
     return value unless defined?(request) && request.respond_to?(:env)
 
-    http_response = request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_ENV_KEY]
+    # Read and clear the per-component httpResponse so the next component on the same
+    # page does not inherit it.
+    current_key = ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY
+    http_response = request.env.delete(current_key)
     return value unless http_response.is_a?(Hash)
 
     marker = "#{CACHED_HTTP_RESPONSE_MARKER_PREFIX}#{http_response.to_json}#{CACHED_HTTP_RESPONSE_MARKER_SUFFIX}"

@@ -28,6 +28,10 @@ module ReactOnRails
     extend ActiveSupport::Concern
 
     SSR_HTTP_RESPONSE_ENV_KEY = "react_on_rails.ssr_http_response"
+    # Per-component key: holds the httpResponse from the most recently rendered component.
+    # Used by the Pro caching layer to cache each component's own metadata, not the
+    # request-wide "first wins" value. Overwritten on every render.
+    SSR_HTTP_RESPONSE_CURRENT_ENV_KEY = "react_on_rails.ssr_http_response_current"
 
     included do
       after_action :apply_ssr_http_response
