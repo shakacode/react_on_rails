@@ -50,24 +50,25 @@ module ReactOnRails
     def apply_ssr_http_response
       http_response = request.env[SSR_HTTP_RESPONSE_ENV_KEY]
       return unless http_response.is_a?(Hash)
-
-      # Do not modify the response after headers have been sent (streaming SSR).
       return if response.committed?
 
+      status, location = validate_ssr_http_response(http_response)
+      return unless status
+
+      response.status = status
+      response.headers["Location"] = location if location
+    end
+
+    # Validates the complete metadata atomically. Returns [status, location] when
+    # valid, or nil when any field is invalid (the entire httpResponse is rejected).
+    def validate_ssr_http_response(http_response)
       status = http_response["status"]
       location = http_response["location"]
 
-      # Validate the complete metadata before changing anything on the response.
-      # If any field is invalid, the entire httpResponse is rejected — no partial
-      # application of status without a valid location or vice versa.
-      valid_status = status.is_a?(Integer) && status.between?(200, 599)
-      return unless valid_status
+      return unless status.is_a?(Integer) && status.between?(200, 599)
+      return [status, nil] if location.nil?
 
-      valid_location = location.nil? || (location.is_a?(String) && location.present? &&
-                                         !location.match?(UNSAFE_HEADER_VALUE_PATTERN))
-
-      # Reject the entire httpResponse if the location is present but invalid.
-      unless valid_location
+      unless location.is_a?(String) && location.present? && !location.match?(UNSAFE_HEADER_VALUE_PATTERN)
         Rails.logger.warn do
           "[ReactOnRails] Rejected httpResponse: invalid Location value. " \
             "status=#{status} location=#{location.inspect.truncate(200)}"
@@ -75,8 +76,7 @@ module ReactOnRails
         return
       end
 
-      response.status = status
-      response.headers["Location"] = location if location
+      [status, location]
     end
   end
 end

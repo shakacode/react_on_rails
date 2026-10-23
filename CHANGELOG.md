@@ -39,6 +39,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   release to install. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **TanStack Router SSR HTTP status propagation**: `redirect()`, `notFound()`, and loader errors
+  now produce real HTTP status codes and `Location` headers instead of always returning 200.
+  New `ReactOnRails::SsrStatusHandler` controller concern reads `httpResponse` metadata from the
+  render result and sets `response.status` and `response.headers["Location"]` in an `after_action`.
+  The prerender cache preserves status metadata via a cache envelope and skips writes for 5xx
+  responses so the next request retries. The `globalNotFound` state is preserved during hydration
+  so not-found pages hydrate without errors. Validated header values reject control characters and
+  literal backslashes. Supported `@tanstack/react-router` range narrowed to `>=1.139.0 <1.170.19`
+  (1.170.19+ removed the required `router.state.statusCode` API; tracked in
+  [#5189](https://github.com/shakacode/react_on_rails/issues/5189)).
+  Fixes [#5125](https://github.com/shakacode/react_on_rails/issues/5125).
+  [PR 5224](https://github.com/shakacode/react_on_rails/pull/5224).
+
 #### Fixed
 
 - **[Pro]** **Streamed `useId` hydration**: Client components now hydrate with the server's `useId` prefix even when
