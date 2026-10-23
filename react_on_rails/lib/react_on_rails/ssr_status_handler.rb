@@ -42,7 +42,7 @@ module ReactOnRails
       status = http_response["status"]
       location = http_response["location"]
 
-      response.status = status if status.is_a?(Integer) && status.between?(100, 599)
+      response.status = status if status.is_a?(Integer) && status.between?(200, 599)
 
       # Set Location header for redirects. Reject values containing CR/LF/null
       # to prevent header injection.
