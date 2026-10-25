@@ -502,7 +502,9 @@ if [ "$RUN_PRO_TESTS" = true ]; then
     if [ "$RUN_JS" != true ]; then
       run_job_argv "React on Rails Pro JS Tests" run_pro_js_tests
     fi
-    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec"
+    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec spec/react_on_rails_pro spec/async"
+    # The load harness disables RSpec monkey patching, so keep its unit specs isolated.
+    run_job "React on Rails Pro Load Harness RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec spec/load"
   fi
 fi
 
