@@ -121,6 +121,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **[Pro]** **`unstable_cache` no longer crashes on RSC payload-endpoint requests**: `BUILD_ID` was initialized only
+  on page-render requests, so any `/rsc_payload/*` request (e.g. `RSCRoute.refetch()`) that landed on a renderer
+  worker which had not yet served a full page render threw `BUILD_ID not set`. The RSC bundle hash is now published
+  on both paths, and the renderer VM context carries the bundle identity as a structural fallback so future RSC
+  entrypoints are safe by default. Fixes [Issue 5076](https://github.com/shakacode/react_on_rails/issues/5076).
+  [PR 5141](https://github.com/shakacode/react_on_rails/pull/5141),
+  [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [17.2.0] - 2026-10-13
 
 #### Changed
@@ -280,15 +289,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `</script` was rewritten to `(/script`). Fixes
   [Issue 5034](https://github.com/shakacode/react_on_rails/issues/5034).
   [PR 5035](https://github.com/shakacode/react_on_rails/pull/5035) by
-  [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- **[Pro]** **`unstable_cache` no longer crashes on RSC payload-endpoint requests**: `BUILD_ID` was initialized only
-  on page-render requests, so any `/rsc_payload/*` request (e.g. `RSCRoute.refetch()`) that landed on a renderer
-  worker which had not yet served a full page render threw `BUILD_ID not set`. The RSC bundle hash is now published
-  on both paths, and the renderer VM context carries the bundle identity as a structural fallback so future RSC
-  entrypoints are safe by default. Fixes [Issue 5076](https://github.com/shakacode/react_on_rails/issues/5076).
-  [PR 5141](https://github.com/shakacode/react_on_rails/pull/5141),
-  [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Standalone upgrades preserve customized bundler configurations**: The Pro generator automatically
