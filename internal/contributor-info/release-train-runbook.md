@@ -1496,10 +1496,12 @@ git push --atomic \
 
 `script/release-forward-port` intentionally classifies a backport whose
 main-origin commit was later reverted as `PICK`; `--ack-manual` cannot skip a
-`PICK`. When the recorded maintainer dispositions are to omit one or more such
-changes or use replacements already live on `main`, do not run normal-mode
-`script/release-forward-port` or `script/release-finish close-out`. Use this
-audited manual path instead:
+`PICK`. The same holds for a release-first fix (a commit with no `-x` footer)
+whose change `main` already has in a differently shaped commit, such as a
+combined forward-port. When the recorded maintainer dispositions are to omit
+one or more such changes or use replacements already live on `main`, do not
+run normal-mode `script/release-forward-port` or
+`script/release-finish close-out`. Use this audited manual path instead:
 
 1. Set `SELECTIVE_CLOSEOUT_RELEASE_VERSION`, `PLAN_FILE`, and
    `OMITTED_PICKS_FILE`; fetch both
@@ -1552,8 +1554,10 @@ audited manual path instead:
 2. Record the maintainer-approved omission dispositions against the exact
    initial plan and `AUDITED_RELEASE_TIP`. This is a provisional selection, not
    the final manifest. Each disposition must name the full release commit, its
-   direct main-origin commit, reverted/superseded proof, a replacement commit or
-   `NONE`, and the exact approval. A replacement also requires a renewed
+   direct main-origin commit (or `NONE` for a release-first commit),
+   reverted/superseded proof, a replacement commit or `NONE`, and the exact
+   approval. A release-first omission with no replacement also names its
+   omission class (see step 4). A replacement also requires a renewed
    verified-maintainer disposition whose identifiable approval record names the
    exact replacement SHA and the exact audited `main` tip. Any `UNKNOWN`
    disposition stops closeout.
@@ -1631,6 +1635,30 @@ audited manual path instead:
    }
    ```
 
+   A row has one of two kinds:
+   - **Main-origin** (a backport whose main commit was reverted or superseded):
+     `origin_sha` is the release commit's single direct `-x` footer.
+   - **Release-first** (the release commit has no `-x` footer): `origin_sha` is
+     the exact string `NONE`, and the validator requires that the release
+     commit body has zero `cherry picked from commit` lines. Name the `main`
+     commit that already carries the change as `replacement_sha`. When no such
+     commit exists, set `replacement_sha` to `NONE` and add one more key,
+     `omission_class`, with exactly one of these values:
+     - `version-only`: a release version bump the helper did not recognize.
+     - `revert-of-live`: a release revert of a change that stays live on `main`.
+     - `deferred`: a change the maintainers deferred out of `main` for now. The
+       row also needs `tracking_issue`, a bare
+       `https://github.com/shakacode/react_on_rails/issues/N` URL for the open
+       issue that tracks the later forward-port. It may not name a PR number
+       from the release commit subject; the checker confirms the rest.
+
+   For example, the 17.1.0 close-out would have recorded #4845 (replaced by
+   #5017/#5047), #4928/#4931/#4935 (landed through the combined forward-ports
+   #4932/#4936), and the folded test-only #5087 as release-first rows with a
+   `replacement_sha`. It would have recorded #5070 as `revert-of-live` and
+   #5026/#5066 as `deferred`. The RC bump #4997 needed `version-only` then; the
+   helper now skips its `Release: bump versions to` subject.
+
    When `replacement_sha` is `NONE`, `replacement_disposition` must be the exact
    string `NONE`. Otherwise the disposition object must have exactly the four
    keys shown above, repeat the same replacement SHA, bind the approval to the
@@ -1648,11 +1676,14 @@ audited manual path instead:
    the helper itself rejects any acknowledgement that is not currently
    classified `MANUAL`.
 
-   The row's `proof`, `approval`, and `replacement_disposition` fields are
-   structured attestations bound to exact objects; they do not prove the
-   underlying semantic facts or the approver's authority. Before accepting the
-   manifest, the maker and independent checker must each re-derive the omitted
-   origin and replacement audit against the exact fetched tips, and separately
+   The row's `proof`, `approval`, `replacement_disposition`, and
+   `omission_class` fields are structured attestations bound to exact objects;
+   they do not prove the underlying semantic facts or the approver's authority.
+   The validator does not check that a `version-only` commit changes only
+   versions or that a `revert-of-live` commit reverts a change live on `main`.
+   Before accepting the manifest, the maker and independent checker must each
+   re-derive the omitted origin, omission class, and replacement audit against
+   the exact fetched tips, and separately
    verify approval authorship, repository permission, and trust from every live
    authenticated approval record. Any stale, inaccessible, untrusted, or
    `UNKNOWN` audit or approval remains fail-closed.
@@ -1661,8 +1692,9 @@ audited manual path instead:
    release refs and require them to equal `AUDITED_MAIN_TIP` and
    `AUDITED_RELEASE_TIP`. Re-run the dry-run against audited `origin/main`.
    Machine-validate that the manifest release commits are **exactly** the final
-   plan's remaining `PICK` set, that each row's origin matches the release
-   commit's sole direct `-x` footer, and that every replacement is both an
+   plan's remaining `PICK` set, that each main-origin row's origin matches the
+   release commit's sole direct `-x` footer, that each release-first row's
+   release commit has no `-x` footer, and that every replacement is both an
    ancestor of audited main and covered by a renewed exact-main-tip-bound
    disposition. Separately re-derive replacement semantic liveness; ancestry is
    not proof that a replacement was not later reverted. No other `PICK`,
@@ -1733,6 +1765,10 @@ audited manual path instead:
      expected_row_keys = %w[
        approval origin_sha proof release_sha replacement_disposition replacement_sha
      ]
+     release_first_unreplaced_row_keys = (expected_row_keys + ["omission_class"]).sort
+     deferred_row_keys = (release_first_unreplaced_row_keys + ["tracking_issue"]).sort
+     tracking_issue_url = %r{\Ahttps://github\.com/shakacode/react_on_rails/issues/([1-9][0-9]*)\z}
+     release_first_omission_classes = %w[deferred revert-of-live version-only]
      expected_replacement_disposition_keys = %w[
        approval_record approved_by audited_main_sha replacement_sha
      ]
@@ -1750,17 +1786,35 @@ audited manual path instead:
      rows = manifest["omitted_picks"]
      fail_validation.call("omitted_picks must be a nonempty array") unless rows.is_a?(Array) && !rows.empty?
      rows.each_with_index do |row, index|
+       release_first_unreplaced =
+         row.is_a?(Hash) && row["origin_sha"] == "NONE" && row["replacement_sha"] == "NONE"
+       allowed_row_keys =
+         if !release_first_unreplaced then expected_row_keys
+         elsif row["omission_class"] == "deferred" then deferred_row_keys
+         else release_first_unreplaced_row_keys
+         end
        fail_validation.call("row #{index} shape is invalid") unless
-         row.is_a?(Hash) && row.keys.sort == expected_row_keys
+         row.is_a?(Hash) && row.keys.sort == allowed_row_keys
        %w[proof approval].each do |field|
          value = row[field]
          fail_validation.call("row #{index} #{field} is empty or UNKNOWN") unless
            value.is_a?(String) && !value.strip.empty? && !value.match?(/\bUNKNOWN\b/i)
        end
-       %w[release_sha origin_sha].each do |field|
-         value = row[field]
-         fail_validation.call("row #{index} #{field} is not a full lowercase SHA") unless
-           value.is_a?(String) && value.match?(full_sha)
+       fail_validation.call("row #{index} release_sha is not a full lowercase SHA") unless
+         row["release_sha"].is_a?(String) && row["release_sha"].match?(full_sha)
+       fail_validation.call("row #{index} origin_sha must be a full lowercase SHA or NONE") unless
+         row["origin_sha"] == "NONE" || (row["origin_sha"].is_a?(String) && row["origin_sha"].match?(full_sha))
+       if release_first_unreplaced
+         fail_validation.call("row #{index} release-first omission without a replacement needs " \
+                              "omission_class #{release_first_omission_classes.join(", ")}") unless
+           release_first_omission_classes.include?(row["omission_class"])
+         if row["omission_class"] == "deferred"
+           tracking_number = row["tracking_issue"].to_s[tracking_issue_url, 1]
+           fail_validation.call("row #{index} tracking_issue must be a bare issue URL") unless tracking_number
+           subject = capture_command.call("git", "show", "-s", "--format=%s", row.fetch("release_sha"))
+           fail_validation.call("row #{index} tracking_issue names the omitted change itself") if
+             subject.scan(/#([1-9][0-9]*)/).flatten.include?(tracking_number)
+         end
        end
        replacement = row["replacement_sha"]
        fail_validation.call("row #{index} replacement_sha must be a full SHA or NONE") unless
@@ -1786,7 +1840,7 @@ audited manual path instead:
          record.is_a?(String) && record.match?(approval_record) && !record.match?(/\bUNKNOWN\b/i)
      end
      release_shas = rows.map { |row| row.fetch("release_sha") }
-     origin_shas = rows.map { |row| row.fetch("origin_sha") }
+     origin_shas = rows.map { |row| row.fetch("origin_sha") } - ["NONE"]
      fail_validation.call("release_sha values are duplicated") unless release_shas.uniq.length == release_shas.length
      fail_validation.call("origin_sha values are duplicated") unless origin_shas.uniq.length == origin_shas.length
      lines = File.readlines(plan_path, chomp: true)
@@ -1849,11 +1903,16 @@ audited manual path instead:
          match = /\A\(cherry picked from commit ([0-9a-f]{40})\)\s*\z/.match(line)
          match && match[1]
        end
-       fail_validation.call("row #{index} origin does not match one direct -x footer") unless
-         origins == [row.fetch("origin_sha")]
-       fail_validation.call("row #{index} origin object is unavailable") unless
-         system("git", "cat-file", "-e", "#{row.fetch("origin_sha")}^{commit}",
-                out: File::NULL, err: File::NULL)
+       if row.fetch("origin_sha") == "NONE"
+         fail_validation.call("row #{index} release-first commit has a -x footer") if
+           body.match?(/cherry picked from commit/i)
+       else
+         fail_validation.call("row #{index} origin does not match one direct -x footer") unless
+           origins == [row.fetch("origin_sha")]
+         fail_validation.call("row #{index} origin object is unavailable") unless
+           system("git", "cat-file", "-e", "#{row.fetch("origin_sha")}^{commit}",
+                  out: File::NULL, err: File::NULL)
+       end
        replacement = row.fetch("replacement_sha")
        next if replacement == "NONE"
 
@@ -1929,7 +1988,8 @@ This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips
-> `Bump version to ...rc.N` commits. For stable non-RC version bumps, the helper always marks the commit
+> `Bump version to ...rc.N` commits. It also accepts `Bump versions to`, and either form after a
+> `Release:` prefix, such as `Release: bump versions to ...rc.N`. For stable non-RC version bumps, the helper always marks the commit
 > `MANUAL`, regardless of `main`'s current version, so the operator explicitly decides whether to extract
 > only the CHANGELOG hunks. For prerelease non-RC bumps (for example `beta` or `dev`), it compares
 > `main`'s current version to the commit subject and skips with an explicit version-drift message when

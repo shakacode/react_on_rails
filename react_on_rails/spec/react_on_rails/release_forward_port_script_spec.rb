@@ -512,6 +512,38 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  # Adds a release-first commit (no -x footer) as a final-plan PICK and its omitted-pick manifest row.
+  def add_release_first_omission(repo, fixture, subject, replacement_sha: "NONE", omission_class: nil,
+                                 tracking_issue: nil)
+    git(repo, "checkout", "release/1.0.0")
+    write_file(repo, "#{subject.downcase.gsub(/[^a-z0-9]+/, '-')}.txt", "#{subject}\n")
+    release_sha = commit_all(repo, subject)
+    fixture[:release_tip] = release_sha
+    fixture[:plan] += "PICK #{release_sha[0, 12]} #{subject}\n"
+    row = {
+      "release_sha" => release_sha,
+      "origin_sha" => "NONE",
+      "replacement_sha" => replacement_sha,
+      "replacement_disposition" => "NONE",
+      "proof" => "main already carries an equivalent change",
+      "approval" => "maintainer approved the exact omission"
+    }
+    if replacement_sha == "NONE"
+      row["omission_class"] = omission_class
+      row["tracking_issue"] = tracking_issue if tracking_issue
+    else
+      row["replacement_disposition"] = {
+        "replacement_sha" => replacement_sha,
+        "audited_main_sha" => fixture.fetch(:main_tip),
+        "approved_by" => "maintainer",
+        "approval_record" => "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-789"
+      }
+    end
+    fixture.fetch(:manifest).fetch("omitted_picks") << row
+    write_selective_closeout_inputs(repo, fixture)
+    row
+  end
+
   def version_file(version)
     <<~RUBY
       # frozen_string_literal: true
@@ -1041,6 +1073,110 @@ RSpec.describe "script/release-forward-port" do
       end
     end
 
+    it "accepts release-first omissions that have a main replacement or an explicit omission class" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        add_release_first_omission(repo, fixture, "Fix renderer timeout (#4845)",
+                                   replacement_sha: fixture.fetch(:replacement_sha))
+        add_release_first_omission(repo, fixture, "Fix test-only flake (#5087)",
+                                   replacement_sha: fixture.fetch(:replacement_sha))
+        add_release_first_omission(repo, fixture, "Release: set package versions for 1.0.0.rc.2 (#4997)",
+                                   omission_class: "version-only")
+        add_release_first_omission(repo, fixture, "Revert live main patch (#5070)", omission_class: "revert-of-live")
+        add_release_first_omission(repo, fixture, "Qualify Rspack support (#5026)",
+                                   omission_class: "deferred",
+                                   tracking_issue: "https://github.com/shakacode/react_on_rails/issues/5120")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).to be_success, stderr
+      end
+    end
+
+    it "rejects a release-first omission without a replacement unless it names a known omission class" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Qualify Rspack support (#5066)", omission_class: "later")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("release-first omission without a replacement needs omission_class")
+
+        row.delete("omission_class")
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+      end
+    end
+
+    it "rejects a deferred release-first omission without its own bare tracking issue" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Qualify Rspack support (#5066)", omission_class: "deferred")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+
+        row["tracking_issue"] = "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-789"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 tracking_issue must be a bare issue URL")
+
+        row["tracking_issue"] = "https://github.com/shakacode/react_on_rails/issues/5066"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 tracking_issue names the omitted change itself")
+      end
+    end
+
+    it "rejects an omission class on rows that are not unreplaced release-first omissions" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Fix renderer timeout (#4845)",
+                                         replacement_sha: fixture.fetch(:replacement_sha))
+        row["omission_class"] = "deferred"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+
+        row.delete("omission_class")
+        main_origin_row = fixture.fetch(:manifest).fetch("omitted_picks").fetch(0)
+        main_origin_row["omission_class"] = "deferred"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 0 shape is invalid")
+      end
+    end
+
+    it "rejects a release-first row whose release commit has a -x footer" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        main_origin_row = fixture.fetch(:manifest).fetch("omitted_picks").fetch(0)
+        main_origin_row["origin_sha"] = "NONE"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 0 release-first commit has a -x footer")
+      end
+    end
+
+    it "rejects a release-first replacement that is not on audited main" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        add_release_first_omission(repo, fixture, "Fix renderer timeout (#4928)",
+                                   replacement_sha: fixture.fetch(:manual_sha))
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 replacement is not an ancestor of audited main")
+      end
+    end
+
     it "rejects manual acknowledgement drift from ACK-MANUAL plan rows" do
       with_selective_closeout_validator_fixture do |repo, fixture|
         fixture[:manual_acks] = ""
@@ -1312,6 +1448,42 @@ RSpec.describe "script/release-forward-port" do
       _stdout, stderr, status =
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
       expect(status).to be_success, stderr
+    end
+  end
+
+  it "binds a final changelog whose provenance sentence was folded at 72 columns into a paragraph" do
+    with_release_repo do |repo|
+      changelog = "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n" \
+                  "- Final release fix. (PR #101)\n"
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "CHANGELOG.md", changelog)
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+      write_file(repo, "CHANGELOG.md", changelog)
+      git(repo, "add", "CHANGELOG.md")
+
+      fold = lambda do |paragraph|
+        paragraph.split.each_with_object([+""]) do |word, lines|
+          lines << +"" if !lines.last.empty? && lines.last.length + word.length + 1 > 72
+          lines.last << (lines.last.empty? ? word : " #{word}")
+        end.join("\n")
+      end
+      record_final = lambda do |paragraph|
+        body = fold.call(paragraph)
+        expect(body.lines).to all(satisfy { |line| line.chomp.length <= 72 })
+        git(repo, "commit", "--no-gpg-sign", "--allow-empty", "--amend", "-m",
+            "Record the final React on Rails 1.0.1 changelog (#999)", "-m", body)
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      end
+      git(repo, "commit", "--no-gpg-sign", "-m", "Record the final React on Rails 1.0.1 changelog (#999)")
+      sentence = "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+
+      stdout, stderr, status = record_final.call("Records the final 1.0.1 changelog on main. #{sentence} Thanks.")
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+
+      _stdout, stderr, status = record_final.call("Records the final 1.0.1 changelog on main, not yet: #{sentence}")
+      expect(status.exitstatus).to eq(1), stderr
     end
   end
 
@@ -3773,6 +3945,29 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).not_to include("PICK #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
       expect(File.read(File.join(repo, "react_on_rails/lib/react_on_rails/version.rb"))).to include("1.0.0")
+    end
+  end
+
+  it "classifies the `Release: bump versions to` subject form like `Bump version to`" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.2"))
+      rc_bump_sha = commit_all(repo, "Release: bump versions to 1.0.1.rc.2")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.3"))
+      bare_plural_rc_bump_sha = commit_all(repo, "Bump versions to 1.0.1.rc.3")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      stable_bump_sha = commit_all(repo, "Release: bump version to 1.0.1")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Release: bump versions to 1.0.1.rc.2")
+      expect(stdout).to include("rc version bump commit")
+      expect(stdout).to include("SKIP #{bare_plural_rc_bump_sha[0, 12]} Bump versions to 1.0.1.rc.3")
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Release: bump version to 1.0.1")
+      expect(stdout).to include("stable release version bump commit")
+      expect(stdout).not_to include("PICK ")
     end
   end
 
