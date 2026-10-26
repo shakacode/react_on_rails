@@ -22,3 +22,20 @@ import TurboFrameProbe from '../components/TurboFrameProbe';
 ReactOnRails.setOptions({ turbo: true, traceTurbolinks: true });
 
 ReactOnRails.register({ TurboFrameProbe });
+
+// A minimal store for the waiting-store frame scenario; the probe only needs it to exist.
+ReactOnRails.registerStoreGenerators({
+  TurboFrameStore: (props) => ({ getState: () => props, dispatch: () => {}, subscribe: () => () => {} }),
+});
+
+// ?pauseFrameRender=true holds each frame render until the spec calls window.__resumeFrameRender(),
+// the way an app animating a frame would.
+if (new URLSearchParams(window.location.search).get('pauseFrameRender') === 'true') {
+  document.addEventListener('turbo:before-frame-render', (event) => {
+    event.preventDefault();
+    window.__resumeFrameRender = () => {
+      window.__resumeFrameRender = undefined;
+      event.detail.resume();
+    };
+  });
+}

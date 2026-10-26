@@ -538,4 +538,51 @@ describe "Turbo Frame navigation", :js do
     expect(probe_events("frame-second", "mounted")).to eq(1)
     expect(probe_events("outside-frame", "unmounted")).to eq(0)
   end
+
+  it "replaces a component whose frame content reuses its DOM id" do
+    visit "/turbo_frame_navigation?case=same-id"
+    expect(page).to have_css("[data-testid='same-id-first'][data-mounted='true']")
+
+    click_on "Load next frame"
+
+    expect(page).to have_css("[data-testid='same-id-second'][data-mounted='true']", text: "Second same-id island")
+    expect(page).to have_no_css("[data-testid='same-id-first']")
+    expect(probe_events("same-id-first", "unmounted")).to eq(1)
+    expect(probe_events("same-id-second", "mounted")).to eq(1)
+  end
+
+  it "renders the new props when the replaced component was still waiting on its store" do
+    visit "/turbo_frame_navigation?case=waiting-store"
+    expect(page).to have_link("Load next frame")
+    expect(page).to have_css("[data-testid='outside-frame'][data-mounted='true']")
+    # The first frame component waits on a store whose data this page never renders.
+    expect(page).to have_no_css("[data-testid='waiting-first']")
+
+    click_on "Load next frame"
+
+    expect(page).to have_css("[data-testid='waiting-second'][data-mounted='true']", text: "Second waiting island")
+    expect(page).to have_no_css("[data-testid='waiting-first']")
+    expect(probe_events("waiting-first", "mounted")).to eq(0)
+    expect(probe_events("waiting-second", "mounted")).to eq(1)
+  end
+
+  it "keeps the frame's components mounted while a listener pauses the render" do
+    visit "/turbo_frame_navigation?pauseFrameRender=true"
+    expect(page).to have_css("[data-testid='frame-first'][data-mounted='true']")
+
+    click_on "Load next frame"
+
+    page.document.synchronize do
+      paused = page.evaluate_script("typeof window.__resumeFrameRender === 'function'")
+      raise Capybara::ExpectationNotMet, "frame render was not paused" unless paused
+    end
+    expect(page).to have_css("[data-testid='frame-first'][data-mounted='true']")
+    expect(probe_events("frame-first", "unmounted")).to eq(0)
+
+    page.execute_script("window.__resumeFrameRender()")
+
+    expect(page).to have_css("[data-testid='frame-second'][data-mounted='true']")
+    expect(probe_events("frame-first", "unmounted")).to eq(1)
+    expect(probe_events("outside-frame", "unmounted")).to eq(0)
+  end
 end
