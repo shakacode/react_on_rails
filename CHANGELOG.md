@@ -24,6 +24,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
+  and RSC Client Component providers now read only their request's stores in a shared Node Renderer
+  worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
+  APIs and page lifecycle behavior are unchanged. Set `isolateHydratedStores: false` or
+  `RENDERER_ISOLATE_HYDRATED_STORES=false` to restore the shared registry temporarily. Fixes [Issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
+  [PR 5133](https://github.com/shakacode/react_on_rails/pull/5133) by [justin808](https://github.com/justin808).
+
 ### [17.2.0] - 2026-10-13
 
 #### Changed
