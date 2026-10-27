@@ -136,7 +136,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   DoS [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect
   `react-server-dom-webpack` 19.3.0, and the patched 19.3.1 requires React 19.3.1. The generator also warns when an
   existing app has React 19.3.0.
-  [PR 5246](https://github.com/shakacode/react_on_rails/pull/5246) by [justin808](https://github.com/justin808).
+  [PR 5248](https://github.com/shakacode/react_on_rails/pull/5248) by [justin808](https://github.com/justin808).
 
 ### [17.2.0] - 2026-10-13
 
