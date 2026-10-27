@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.2.1.rc.0] - 2026-10-26
+
 #### Fixed
 
 - **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
@@ -3499,7 +3501,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.0...main
+[17.2.1.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...v17.2.1.rc.0
 [17.2.0]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...v17.2.0
 [17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
