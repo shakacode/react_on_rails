@@ -11479,6 +11479,110 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "check_rsc_flight_advisories" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+    end
+
+    def messages_of(type)
+      checker.messages.select { |message| message[:type] == type }.map { |message| message[:content] }
+    end
+
+    def write_pnpm_lock(*versions)
+      snapshots = versions.map do |version|
+        "  react-server-dom-webpack@#{version}(react@#{version}):\n    dependencies: {}\n"
+      end
+      File.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\nimporters:\n  .: {}\nsnapshots:\n#{snapshots.join}")
+    end
+
+    it "warns about a vulnerable 19.3.0 in pnpm-lock.yaml and names 19.3.1" do
+      write_pnpm_lock("19.3.0")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including(
+          "Your lockfile resolves react-server-dom-webpack 19.3.0",
+          "GHSA-xqc2-xf4c-x3h3 (critical remote code execution)",
+          "GHSA-h3gv-c5rc-p453 (denial of service)",
+          "update react, react-dom, and react-server-dom-webpack together to 19.3.1",
+          "commit the\nrefreshed lockfile"
+        )
+      )
+    end
+
+    it "points 19.2-line copies in yarn.lock at 19.2.9" do
+      File.write("yarn.lock", "react-server-dom-webpack@~19.2.8:\n  version \"19.2.8\"\n")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("react-server-dom-webpack 19.2.8", "together to 19.2.9\n")
+      )
+    end
+
+    it "names both patched releases when copies span the 19.2 and 19.3 lines" do
+      write_pnpm_lock("19.3.0", "19.2.8")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("19.3.0, 19.2.8", "together to 19.3.1 (or 19.2.9 for copies on the 19.2 line)")
+      )
+    end
+
+    it "warns about a vulnerable copy nested behind a patched one in package-lock.json" do
+      File.write("package-lock.json", JSON.generate(
+                                        "lockfileVersion" => 3,
+                                        "packages" => {
+                                          "node_modules/react-server-dom-webpack" => { "version" => "19.3.1" },
+                                          "node_modules/react-on-rails-rsc/node_modules/react-server-dom-webpack" =>
+                                            { "version" => "19.3.0" }
+                                        }
+                                      ))
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(a_string_including("react-server-dom-webpack 19.3.0,"))
+    end
+
+    it "reports success for patched releases on every line" do
+      write_pnpm_lock("19.3.1", "19.2.9", "19.1.10", "19.0.9")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to be_empty
+      expect(messages_of(:success)).to contain_exactly(
+        a_string_including("react-server-dom-webpack 19.3.1, 19.2.9, 19.1.10, 19.0.9 includes the fixes")
+      )
+    end
+
+    it "flags every vulnerable line and a prerelease of a patched version" do
+      %w[19.0.8 19.1.9 19.2.8 19.3.0 19.3.1-rc.0].each do |version|
+        expect(doctor.send(:rsc_flight_version_vulnerable?, version)).to be(true), version
+      end
+      %w[19.4.0 18.3.1 0.0.0-experimental-abc not-a-version].each do |version|
+        expect(doctor.send(:rsc_flight_version_vulnerable?, version)).to be(false), version
+      end
+    end
+
+    it "skips with an info message when no lockfile lists react-server-dom-webpack" do
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to be_empty
+      expect(messages_of(:info)).to contain_exactly(a_string_including("No lockfile lists react-server-dom-webpack"))
+    end
+  end
+
   describe "check_rsc_react_version" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
