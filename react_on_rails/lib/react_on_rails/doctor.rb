@@ -5375,8 +5375,7 @@ module ReactOnRails
                           "#{RSC_FLIGHT_ADVISORIES}")
     end
 
-    # Experimental and canary builds, and lines the advisories do not list, carry no rule to judge
-    # them by, so say so rather than report them as fixed.
+    # Copies rsc_flight_version_status cannot judge (see there) get this instead of a success.
     def report_unjudged_rsc_flight_versions(versions)
       checker.add_warning(<<~MSG.strip)
         ⚠️  Could not tell whether #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} includes the fixes for React's RSC
@@ -5423,10 +5422,10 @@ module ReactOnRails
       MSG
     end
 
-    # :vulnerable below its line's patched release, prereleases included; :patched for a stable
-    # release at or above it or on a later line; :unknown for anything the advisories give no rule
-    # for (a prerelease above the patched release, experimental or canary builds, earlier lines,
-    # unparseable versions).
+    # :vulnerable below its line's patched release, whatever the prerelease tag: even a canary built
+    # after the fix is answered by moving to the stable patched release. :patched for a stable release
+    # at or above it or on a later line. :unknown for what the advisories give no rule for: a
+    # prerelease above the patched release, experimental builds, earlier lines, unparseable versions.
     def rsc_flight_version_status(version)
       return :unknown unless Gem::Version.correct?(version)
 
