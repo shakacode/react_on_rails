@@ -1,13 +1,17 @@
 module ReactOnRails
   class VersionChecker
     module LockfileResolution
+      ALL_VERSION_READERS: Hash[String, Method]
+
       def self.version: (String dir, String package_name) -> String?
+      def self.all_versions: (String dir, String package_name) -> Array[String]
       def self.berry_yarn_version: (String content, String package_name) -> String?
       def self.guard: [T] () { () -> T } -> T?
       def self.log_ignored: (Exception error) -> void
 
       module PnpmLockfile
         def self.version: (String path, String package_name) -> String?
+        def self.all_versions: (String path, String package_name) -> Array[String]
         def self.dependencies: (Hash[String, untyped] doc) -> Hash[String, untyped]?
         def self.project_document: (String path) -> Hash[String, untyped]?
         def self.strip_peer_suffix: (String? version) -> String?
@@ -20,11 +24,23 @@ module ReactOnRails
         TRAILING_COMMA: Regexp
 
         def self.version: (String path, String package_name) -> String?
+        def self.all_versions: (String path, String package_name) -> Array[String]
         def self.jsonc_to_json: (String content) -> String
       end
 
       module BerryYarnLockfile
         def self.version: (String content, String package_name) -> String?
+        def self.all_versions: (String content, String package_name) -> Array[String]
+        def self.entry_for?: (untyped key, String package_name) -> bool
+      end
+
+      module ClassicYarnLockfile
+        def self.all_versions: (String path, String package_name) -> Array[String]
+      end
+
+      module NpmLockfile
+        def self.all_versions: (String path, String package_name) -> Array[String]
+        def self.v1_versions: (untyped dependencies, String package_name) -> Array[String]
       end
     end
   end
