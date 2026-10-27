@@ -5370,7 +5370,8 @@ module ReactOnRails
       report_unjudged_rsc_flight_versions(by_status[:unknown]) if by_status[:unknown]
       return unless by_status.keys == [:patched]
 
-      checker.add_success("✅ #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} is not affected by " \
+      verb = versions.size == 1 ? "is" : "are"
+      checker.add_success("✅ #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} #{verb} not affected by " \
                           "#{RSC_FLIGHT_ADVISORIES}")
     end
 
@@ -5422,19 +5423,23 @@ module ReactOnRails
       MSG
     end
 
-    # :vulnerable below its line's patched release (prereleases of a patched release included),
-    # :patched at or above it or on a later stable line, :unknown for anything the advisories
-    # give no rule for (experimental or canary builds, earlier lines, unparseable versions).
+    # :vulnerable below its line's patched release, prereleases included; :patched for a stable
+    # release at or above it or on a later line; :unknown for anything the advisories give no rule
+    # for (a prerelease above the patched release, experimental or canary builds, earlier lines,
+    # unparseable versions).
     def rsc_flight_version_status(version)
       return :unknown unless Gem::Version.correct?(version)
 
       major, minor, = npm_version_tuple(version)
       patched = RSC_FLIGHT_PATCHED_VERSIONS[[major, minor]]
-      return Gem::Version.new(version) < Gem::Version.new(patched) ? :vulnerable : :patched if patched
+      stable = npm_prerelease(version).blank?
+      if patched
+        return :vulnerable if Gem::Version.new(version) < Gem::Version.new(patched)
 
-      later_stable_line = npm_prerelease(version).blank? &&
-                          ([major, minor] <=> RSC_FLIGHT_PATCHED_VERSIONS.keys.max).positive?
-      later_stable_line ? :patched : :unknown
+        return stable ? :patched : :unknown
+      end
+
+      stable && ([major, minor] <=> RSC_FLIGHT_PATCHED_VERSIONS.keys.max).positive? ? :patched : :unknown
     end
 
     def check_legacy_rsc_react_version(react_version)

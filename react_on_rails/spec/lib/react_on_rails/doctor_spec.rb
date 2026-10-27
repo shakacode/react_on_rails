@@ -11562,12 +11562,12 @@ RSpec.describe ReactOnRails::Doctor do
 
       expect(messages_of(:warning)).to be_empty
       expect(messages_of(:success)).to contain_exactly(
-        a_string_including("react-server-dom-webpack 19.3.1, 19.2.9, 19.1.10, 19.0.9 is not affected")
+        a_string_including("react-server-dom-webpack 19.3.1, 19.2.9, 19.1.10, 19.0.9 are not affected")
       )
     end
 
     it "classifies versions by the advisory rules" do
-      statuses = %w[19.0.8 19.1.9 19.2.8 19.3.0 19.3.1-rc.0 19.3.1 19.2.9 19.4.0 20.0.0
+      statuses = %w[19.0.8 19.1.9 19.2.8 19.3.0 19.3.1-rc.0 19.3.1 19.2.9 19.4.0 20.0.0 19.3.2-canary-abc
                     19.4.0-canary-abc 0.0.0-experimental-abc 18.3.1 not-a-version].to_h do |version|
         [version, doctor.send(:rsc_flight_version_status, version)]
       end
@@ -11575,8 +11575,8 @@ RSpec.describe ReactOnRails::Doctor do
       expect(statuses).to eq(
         "19.0.8" => :vulnerable, "19.1.9" => :vulnerable, "19.2.8" => :vulnerable, "19.3.0" => :vulnerable,
         "19.3.1-rc.0" => :vulnerable, "19.3.1" => :patched, "19.2.9" => :patched, "19.4.0" => :patched,
-        "20.0.0" => :patched, "19.4.0-canary-abc" => :unknown, "0.0.0-experimental-abc" => :unknown,
-        "18.3.1" => :unknown, "not-a-version" => :unknown
+        "20.0.0" => :patched, "19.3.2-canary-abc" => :unknown, "19.4.0-canary-abc" => :unknown,
+        "0.0.0-experimental-abc" => :unknown, "18.3.1" => :unknown, "not-a-version" => :unknown
       )
     end
 
