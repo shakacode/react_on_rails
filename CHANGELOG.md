@@ -128,6 +128,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Security
+
+- **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
+  `rake react_on_rails:doctor` now reads every `react-server-dom-webpack` copy in `yarn.lock`, `package-lock.json`,
+  `pnpm-lock.yaml`, or `bun.lock`, including copies installed through `react-on-rails-rsc` and npm aliases. It warns
+  when a copy is affected by React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)): any 19.0 through 19.3
+  version below its line's patched release (19.0.9, 19.1.10, 19.2.9, 19.3.1), prereleases included. The fix updates
+  `react`, `react-dom`, and `react-server-dom-webpack` together to 19.3.1 (19.2.9 on the 19.2 line) and commits the
+  refreshed lockfile. Doctor also warns when no lockfile in the package root lists the package, or when a copy, such
+  as an experimental build, falls outside the advisories' version rules.
+  [PR 5247](https://github.com/shakacode/react_on_rails/pull/5247) by [justin808](https://github.com/justin808).
+
 ### [17.2.0] - 2026-10-13
 
 #### Changed
