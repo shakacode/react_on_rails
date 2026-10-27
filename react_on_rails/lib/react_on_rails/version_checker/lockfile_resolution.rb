@@ -253,7 +253,8 @@ module ReactOnRails
 
       # package-lock.json v2/v3 keys every copy by install path ("node_modules/name",
       # "node_modules/parent/node_modules/name"); an npm alias installs under the alias path and
-      # records the real package in "name". v1 nests copies under dependencies.
+      # records the real package in "name". v1 nests copies under dependencies, and records an
+      # alias's real package in its version ("flight": { "version": "npm:name@1.2.3" }).
       module NpmLockfile
         def self.all_versions(path, package_name)
           doc = JSON.parse(File.read(path))
@@ -271,10 +272,16 @@ module ReactOnRails
         def self.v1_versions(dependencies, package_name)
           return [] unless dependencies.is_a?(Hash)
 
+          alias_prefix = "npm:#{package_name}@"
           dependencies.flat_map do |name, entry|
             next [] unless entry.is_a?(Hash)
 
-            own = name == package_name && entry["version"] ? [entry["version"]] : []
+            version = entry["version"].to_s
+            own = if version.start_with?(alias_prefix) then [version.delete_prefix(alias_prefix)]
+                  elsif name == package_name && !version.empty? then [version]
+                  else
+                    []
+                  end
             own + v1_versions(entry["dependencies"], package_name)
           end
         end

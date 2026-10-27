@@ -11562,17 +11562,33 @@ RSpec.describe ReactOnRails::Doctor do
 
       expect(messages_of(:warning)).to be_empty
       expect(messages_of(:success)).to contain_exactly(
-        a_string_including("react-server-dom-webpack 19.3.1, 19.2.9, 19.1.10, 19.0.9 includes the fixes")
+        a_string_including("react-server-dom-webpack 19.3.1, 19.2.9, 19.1.10, 19.0.9 is not affected")
       )
     end
 
-    it "flags every vulnerable line and a prerelease of a patched version" do
-      %w[19.0.8 19.1.9 19.2.8 19.3.0 19.3.1-rc.0].each do |version|
-        expect(doctor.send(:rsc_flight_version_vulnerable?, version)).to be(true), version
+    it "classifies versions by the advisory rules" do
+      statuses = %w[19.0.8 19.1.9 19.2.8 19.3.0 19.3.1-rc.0 19.3.1 19.2.9 19.4.0 20.0.0
+                    19.4.0-canary-abc 0.0.0-experimental-abc 18.3.1 not-a-version].to_h do |version|
+        [version, doctor.send(:rsc_flight_version_status, version)]
       end
-      %w[19.4.0 18.3.1 0.0.0-experimental-abc not-a-version].each do |version|
-        expect(doctor.send(:rsc_flight_version_vulnerable?, version)).to be(false), version
-      end
+
+      expect(statuses).to eq(
+        "19.0.8" => :vulnerable, "19.1.9" => :vulnerable, "19.2.8" => :vulnerable, "19.3.0" => :vulnerable,
+        "19.3.1-rc.0" => :vulnerable, "19.3.1" => :patched, "19.2.9" => :patched, "19.4.0" => :patched,
+        "20.0.0" => :patched, "19.4.0-canary-abc" => :unknown, "0.0.0-experimental-abc" => :unknown,
+        "18.3.1" => :unknown, "not-a-version" => :unknown
+      )
+    end
+
+    it "does not claim an experimental build is fixed" do
+      write_pnpm_lock("0.0.0-experimental-abc")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:success)).to be_empty
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("Could not tell whether react-server-dom-webpack 0.0.0-experimental-abc includes the fixes")
+      )
     end
 
     it "warns that the check did not run when no lockfile lists react-server-dom-webpack" do

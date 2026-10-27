@@ -138,7 +138,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)): 19.0.0 through
   19.0.8, 19.1.0 through 19.1.9, 19.2.0 through 19.2.8, 19.3.0, or a prerelease of a patched release. The fix updates
   `react`, `react-dom`, and `react-server-dom-webpack` together to 19.3.1 (19.2.9 on the 19.2 line) and commits the
-  refreshed lockfile. When no lockfile in the package root lists the package, doctor warns that it could not check.
+  refreshed lockfile. Doctor also warns when no lockfile in the package root lists the package, or when a copy, such
+  as an experimental build, falls outside the advisories' version rules.
   [PR 5247](https://github.com/shakacode/react_on_rails/pull/5247) by [justin808](https://github.com/justin808).
 
 ### [17.2.0] - 2026-10-13

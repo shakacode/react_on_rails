@@ -142,6 +142,19 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       expect(versions_in("package-lock.json" => lockfile)).to eq(["19.2.8"])
     end
 
+    it "finds npm v1 alias copies beside a patched ordinary copy" do
+      lockfile = JSON.generate(
+        "lockfileVersion" => 1,
+        "dependencies" => {
+          "react-server-dom-webpack" => { "version" => "19.3.1" },
+          "flight" => { "version" => "npm:react-server-dom-webpack@19.3.0" },
+          "unrelated" => { "version" => "npm:react-server-dom-webpack-extra@1.0.0" }
+        }
+      )
+
+      expect(versions_in("package-lock.json" => lockfile)).to contain_exactly("19.3.1", "19.3.0")
+    end
+
     it "reads bun.lock copies keyed by install path" do
       lockfile = <<~JSONC
         {

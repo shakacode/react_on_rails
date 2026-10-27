@@ -5365,14 +5365,25 @@ module ReactOnRails
         return
       end
 
-      vulnerable = versions.select { |version| rsc_flight_version_vulnerable?(version) }
-      if vulnerable.empty?
-        checker.add_success("✅ #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} includes the fixes for " \
-                            "#{RSC_FLIGHT_ADVISORIES}")
-        return
-      end
+      by_status = versions.group_by { |version| rsc_flight_version_status(version) }
+      report_vulnerable_rsc_flight_versions(by_status[:vulnerable]) if by_status[:vulnerable]
+      report_unjudged_rsc_flight_versions(by_status[:unknown]) if by_status[:unknown]
+      return unless by_status.keys == [:patched]
 
-      report_vulnerable_rsc_flight_versions(vulnerable)
+      checker.add_success("✅ #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} is not affected by " \
+                          "#{RSC_FLIGHT_ADVISORIES}")
+    end
+
+    # Experimental and canary builds, and lines the advisories do not list, carry no rule to judge
+    # them by, so say so rather than report them as fixed.
+    def report_unjudged_rsc_flight_versions(versions)
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Could not tell whether #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} includes the fixes for React's RSC
+        security advisories #{RSC_FLIGHT_ADVISORIES}.
+
+        The advisories cover 19.0.0 through 19.3.0, fixed in #{RSC_FLIGHT_PATCHED_VERSIONS.values.join(', ')}.
+        Prefer a stable patched release, or confirm this build was published after 2026-10-14.
+      MSG
     end
 
     def report_vulnerable_rsc_flight_versions(vulnerable)
@@ -5411,12 +5422,19 @@ module ReactOnRails
       MSG
     end
 
-    def rsc_flight_version_vulnerable?(version)
-      return false unless Gem::Version.correct?(version)
+    # :vulnerable below its line's patched release (prereleases of a patched release included),
+    # :patched at or above it or on a later stable line, :unknown for anything the advisories
+    # give no rule for (experimental or canary builds, earlier lines, unparseable versions).
+    def rsc_flight_version_status(version)
+      return :unknown unless Gem::Version.correct?(version)
 
       major, minor, = npm_version_tuple(version)
       patched = RSC_FLIGHT_PATCHED_VERSIONS[[major, minor]]
-      patched.present? && Gem::Version.new(version) < Gem::Version.new(patched)
+      return Gem::Version.new(version) < Gem::Version.new(patched) ? :vulnerable : :patched if patched
+
+      later_stable_line = npm_prerelease(version).blank? &&
+                          ([major, minor] <=> RSC_FLIGHT_PATCHED_VERSIONS.keys.max).positive?
+      later_stable_line ? :patched : :unknown
     end
 
     def check_legacy_rsc_react_version(react_version)
