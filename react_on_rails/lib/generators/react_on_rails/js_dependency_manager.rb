@@ -156,9 +156,10 @@ module ReactOnRails
       # this to later minors just because those releases are current on npm; React's RSC runtime and
       # bundler integration can change between minors. Move it together with RSC_PACKAGE_VERSION_PIN.
       #
-      # The floor is 19.3.1, not the 19.3.0 the RSC package accepts: React's 2026-10-14 RSC advisories
-      # (GHSA-xqc2-xf4c-x3h3, GHSA-h3gv-c5rc-p453) affect react-server-dom-webpack 19.3.0, and the
-      # patched 19.3.1 peers on React ^19.3.1. A ~19.3.0 range would let a lockfile keep the vulnerable set.
+      # The floor is 19.3.1, stricter than the ^19.3.0 that react-on-rails-rsc 19.3.1 accepts: React's
+      # 2026-10-14 RSC advisories (GHSA-xqc2-xf4c-x3h3, GHSA-h3gv-c5rc-p453) affect
+      # react-server-dom-webpack 19.3.0, and the patched react-server-dom-webpack 19.3.1 peers on React
+      # ^19.3.1. A ~19.3.0 range would let a lockfile keep the vulnerable set.
       #
       # This is intentionally distinct from RSC_PACKAGE_VERSION_PIN below, which pins
       # `react-on-rails-rsc`. Coordination note for #3609: generated apps use this React range with

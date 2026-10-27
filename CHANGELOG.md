@@ -146,8 +146,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `react-dom@~19.3.1` instead of `~19.3.0`, so a lockfile cannot keep React 19.3.0. React's 2026-10-14 advisories
   (critical RCE [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and
   DoS [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect
-  `react-server-dom-webpack` 19.3.0, and the patched 19.3.1 requires React 19.3.1. The generator also warns when an
-  existing app has React 19.3.0.
+  `react-server-dom-webpack` 19.3.0, and the patched `react-server-dom-webpack` 19.3.1 peers on React 19.3.1.
+  `react-on-rails-rsc` 19.3.1 still accepts React 19.3.0, so this floor is stricter than the package requires. The
+  generator also warns when an existing app has React 19.3.0.
   [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
 
 ### [17.2.0] - 2026-10-13
