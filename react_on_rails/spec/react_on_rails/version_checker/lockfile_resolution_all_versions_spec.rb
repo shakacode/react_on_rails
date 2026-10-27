@@ -156,6 +156,28 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       expect(versions_in("bun.lock" => lockfile)).to contain_exactly("19.3.1", "19.3.0")
     end
 
+    it "finds npm alias copies in every lockfile format" do
+      npm = JSON.generate(
+        "packages" => {
+          "" => { "name" => "my-app" },
+          "node_modules/flight" => { "name" => "react-server-dom-webpack", "version" => "19.3.0" }
+        }
+      )
+      classic = "\"flight@npm:react-server-dom-webpack@19.3.0\":\n  version \"19.3.0\"\n"
+      berry = <<~YAML
+        __metadata:
+          version: 8
+
+        "flight@npm:react-server-dom-webpack@19.3.0":
+          version: 19.3.0
+          resolution: "react-server-dom-webpack@npm:19.3.0"
+      YAML
+
+      expect(versions_in("package-lock.json" => npm)).to eq(["19.3.0"])
+      expect(versions_in("yarn.lock" => classic)).to eq(["19.3.0"])
+      expect(versions_in("yarn.lock" => berry)).to eq(["19.3.0"])
+    end
+
     it "combines lockfiles from several package managers" do
       yarn = "react-server-dom-webpack@19.3.0:\n  version \"19.3.0\"\n"
       npm = JSON.generate("packages" => { "node_modules/react-server-dom-webpack" => { "version" => "19.3.1" } })

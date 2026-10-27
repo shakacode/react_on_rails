@@ -11575,11 +11575,61 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    it "skips with an info message when no lockfile lists react-server-dom-webpack" do
+    it "warns that the check did not run when no lockfile lists react-server-dom-webpack" do
+      File.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\nimporters:\n  .: {}\nsnapshots: {}\n")
+
       doctor.send(:check_rsc_flight_advisories)
 
-      expect(messages_of(:warning)).to be_empty
-      expect(messages_of(:info)).to contain_exactly(a_string_including("No lockfile lists react-server-dom-webpack"))
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including(
+          "Could not check react-server-dom-webpack",
+          "No readable yarn.lock, package-lock.json, pnpm-lock.yaml, or bun.lock in #{Dir.pwd} lists it.",
+          "If your lockfile lives at a workspace root"
+        )
+      )
+    end
+
+    it "steers 19.0 and 19.1 copies to 19.3.1" do
+      File.write("yarn.lock", "react-server-dom-webpack@~19.1.0:\n  version \"19.1.9\"\n")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("react-server-dom-webpack 19.1.9", "together to 19.3.1\n", "pnpm.overrides")
+      )
+    end
+
+    it "warns about a vulnerable npm alias copy" do
+      File.write("package-lock.json", JSON.generate(
+                                        "lockfileVersion" => 3,
+                                        "packages" => {
+                                          "node_modules/react-server-dom-webpack" => { "version" => "19.3.1" },
+                                          "node_modules/flight" => {
+                                            "name" => "react-server-dom-webpack", "version" => "19.3.0"
+                                          }
+                                        }
+                                      ))
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(a_string_including("react-server-dom-webpack 19.3.0,"))
+    end
+
+    it "runs as part of the RSC doctor section" do
+      pro_config = double("ProConfig",
+                          enable_rsc_support: true,
+                          server_renderer: "NodeRenderer",
+                          rsc_bundle_js_file: "rsc-bundle.js",
+                          rsc_payload_generation_url_path: "rsc_payload/")
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      allow(doctor).to receive(:puts)
+      write_pnpm_lock("19.3.0")
+
+      doctor.send(:check_rsc_setup)
+
+      expect(messages_of(:warning))
+        .to include(a_string_including("Your lockfile resolves react-server-dom-webpack 19.3.0"))
     end
   end
 

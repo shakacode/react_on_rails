@@ -211,8 +211,13 @@ module ReactOnRails
           doc = YAML.safe_load(content, permitted_classes: [Date, Time])
           return [] unless doc.is_a?(Hash)
 
+          # An alias ("flight@npm:react-server-dom-webpack@19.3.0") is keyed by the alias name, but
+          # its resolution still names the real package.
           doc.filter_map do |key, entry|
-            entry["version"]&.to_s if entry_for?(key, package_name) && entry.is_a?(Hash)
+            next unless entry.is_a?(Hash)
+            next unless entry_for?(key, package_name) || entry["resolution"].to_s.start_with?("#{package_name}@")
+
+            entry["version"]&.to_s
           end
         end
 
@@ -224,13 +229,14 @@ module ReactOnRails
       end
 
       # Yarn classic yarn.lock: one block per resolved copy, keyed by its selectors
-      # ("name@^1.0.0", "name@~1.0.2":) with an indented version "1.0.3" line.
+      # ("name@^1.0.0", "name@~1.0.2":) with an indented version "1.0.3" line. An npm alias
+      # selector ("flight@npm:name@19.3.0") names the real package after "npm:".
       module ClassicYarnLockfile
         def self.all_versions(path, package_name)
           content = File.read(path)
           return BerryYarnLockfile.all_versions(content, package_name) if content[0, 1024].include?("__metadata:")
 
-          selector = /\A"?#{Regexp.escape(package_name)}@/
+          selector = /\A"?(?:[^\s"]+@npm:)?#{Regexp.escape(package_name)}@/
           versions = []
           in_block = false
           content.each_line do |line|
@@ -246,7 +252,8 @@ module ReactOnRails
       end
 
       # package-lock.json v2/v3 keys every copy by install path ("node_modules/name",
-      # "node_modules/parent/node_modules/name"); v1 nests copies under dependencies.
+      # "node_modules/parent/node_modules/name"); an npm alias installs under the alias path and
+      # records the real package in "name". v1 nests copies under dependencies.
       module NpmLockfile
         def self.all_versions(path, package_name)
           doc = JSON.parse(File.read(path))
@@ -254,7 +261,9 @@ module ReactOnRails
 
           install_path = %r{(?:\A|/)node_modules/#{Regexp.escape(package_name)}\z}
           from_packages = (doc["packages"].is_a?(Hash) ? doc["packages"] : {}).filter_map do |key, entry|
-            entry["version"] if key.match?(install_path) && entry.is_a?(Hash)
+            next unless entry.is_a?(Hash)
+
+            entry["version"] if key.match?(install_path) || (key != "" && entry["name"] == package_name)
           end
           from_packages + v1_versions(doc["dependencies"], package_name)
         end

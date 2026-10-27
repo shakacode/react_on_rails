@@ -5361,7 +5361,7 @@ module ReactOnRails
 
       versions = ReactOnRails::VersionChecker::LockfileResolution.all_versions(package_root, RSC_FLIGHT_PACKAGE_NAME)
       if versions.empty?
-        checker.add_info("ℹ️  No lockfile lists #{RSC_FLIGHT_PACKAGE_NAME} — skipping the RSC security advisory check")
+        report_unchecked_rsc_flight_advisories(package_root)
         return
       end
 
@@ -5390,7 +5390,23 @@ module ReactOnRails
 
         Fix: update react, react-dom, and #{RSC_FLIGHT_PACKAGE_NAME} together to #{target_text}
         (each patched #{RSC_FLIGHT_PACKAGE_NAME} requires the matching React release), then commit the
-        refreshed lockfile. Confirm with `npm ls #{RSC_FLIGHT_PACKAGE_NAME}`, `pnpm why #{RSC_FLIGHT_PACKAGE_NAME}`,
+        refreshed lockfile. If a copy nested under #{RSC_PACKAGE_NAME} stays behind, pin it with npm
+        `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`.
+        Confirm with `npm ls #{RSC_FLIGHT_PACKAGE_NAME}`, `pnpm why #{RSC_FLIGHT_PACKAGE_NAME}`,
+        or `yarn why #{RSC_FLIGHT_PACKAGE_NAME}`.
+      MSG
+    end
+
+    # RSC always installs react-server-dom-webpack, so finding no copy means the check did not run:
+    # the lockfile is missing, unreadable, or at a workspace root above the package root.
+    def report_unchecked_rsc_flight_advisories(package_root)
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Could not check #{RSC_FLIGHT_PACKAGE_NAME} against React's RSC security advisories
+        #{RSC_FLIGHT_ADVISORIES}.
+
+        No readable yarn.lock, package-lock.json, pnpm-lock.yaml, or bun.lock in #{package_root} lists it.
+        If your lockfile lives at a workspace root, confirm every copy is #{RSC_FLIGHT_PATCHED_VERSIONS.values.join(', ')}
+        or later on its line with `npm ls #{RSC_FLIGHT_PACKAGE_NAME}`, `pnpm why #{RSC_FLIGHT_PACKAGE_NAME}`,
         or `yarn why #{RSC_FLIGHT_PACKAGE_NAME}`.
       MSG
     end
