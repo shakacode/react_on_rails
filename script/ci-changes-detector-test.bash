@@ -691,6 +691,80 @@ write_file_change() {
   commit_change "change $path"
 }
 
+# Exercise the actual detector against both sides of path changes. Rename
+# configuration must never hide a runtime source that was removed.
+assert_runtime_path_changes_select_suites() {
+  local mode="$1" base source suite operation renames out label destination
+  setup_repo
+  base="$(git rev-parse HEAD)"
+
+  for renames in default true false copies; do
+    if [ "$renames" = default ]; then
+      git config --unset-all diff.renames || true
+    else
+      git config diff.renames "$renames"
+    fi
+    git config diff.renameLimit 1
+    for source in packages/react-on-rails/src/example.ts react_on_rails/lib/react_on_rails/example.rb; do
+      case "$source" in
+        *.ts) suite=run_js_tests ;;
+        *.rb) suite=run_ruby_tests ;;
+      esac
+      for operation in add delete into_docs into_internal from_docs from_internal; do
+        git reset --hard "$base" >/dev/null
+        destination="docs/$(basename "$source")"
+        case "$operation" in
+          *internal) destination="internal/contributor-info/$(basename "$source")" ;;
+        esac
+        mkdir -p "$(dirname "$destination")"
+        case "$operation" in
+          add) cp "$source" "${source%.*}_added.${source##*.}" ;;
+          delete) git rm "$source" >/dev/null ;;
+          into_*) git mv "$source" "$destination" ;;
+          from_*)
+            git mv "$source" "$destination"
+            commit_change "prepare non-runtime source"
+            git mv "$destination" "$source"
+            ;;
+        esac
+        git add .
+        if [ "$mode" = committed ]; then
+          commit_change "$operation runtime path"
+          out="$(detector_output)"
+        else
+          out="$(env -u CI CI_JSON_OUTPUT=1 "$DETECTOR" HEAD HEAD)"
+        fi
+        label="$mode $operation $source diff.renames=$renames"
+        assert_contains "$out" '"docs_only": false' "$label"
+        assert_contains "$out" '"non_runtime_only": false' "$label"
+        assert_contains "$out" "\"$suite\": true" "$label"
+      done
+    done
+  done
+}
+
+test_committed_runtime_path_changes_select_suites() {
+  assert_runtime_path_changes_select_suites committed
+}
+
+test_staged_runtime_path_changes_select_suites() {
+  assert_runtime_path_changes_select_suites staged
+}
+
+test_non_runtime_rename_still_skips_suites() {
+  setup_repo
+  git config diff.renames true
+  mkdir -p internal/contributor-info
+  git mv docs/guide.md internal/contributor-info/guide.md
+  commit_change "move documentation"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "documentation rename"
+  assert_contains "$out" '"run_js_tests": false' "documentation rename"
+  assert_contains "$out" '"run_ruby_tests": false' "documentation rename"
+}
+
 test_docs_changes_are_non_runtime_only() {
   setup_repo
   printf '\nMore docs.\n' >> docs/guide.md
@@ -2129,6 +2203,9 @@ run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
 run_test test_release_tooling_shovel_operator_comment_only_change_stays_non_runtime
 run_test test_release_tooling_comment_only_change_outside_existing_heredoc_stays_non_runtime
 run_test test_changelog_only_change_is_non_runtime_only
+run_test test_committed_runtime_path_changes_select_suites
+run_test test_staged_runtime_path_changes_select_suites
+run_test test_non_runtime_rename_still_skips_suites
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
