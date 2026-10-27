@@ -21,7 +21,22 @@ import { createForm, SERVER_BUNDLE_TIMESTAMP } from './httpRequestUtils';
 import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 
 const { config } = createTestConfig('htmlStreaming');
-const app = buildApp(config);
+// The controlled test gates the fixture's one-second VM callbacks. Other delays
+// and requests outside that test use real timers.
+let holdComponentTimer;
+const app = buildApp({
+  ...config,
+  additionalContext: {
+    ...config.additionalContext,
+    setTimeout(callback, delay, ...args) {
+      if (holdComponentTimer && delay === 1000) {
+        holdComponentTimer(() => callback(...args));
+        return undefined;
+      }
+      return setTimeout(callback, delay, ...args);
+    },
+  },
+});
 
 beforeAll(async () => {
   await app.ready();
@@ -102,8 +117,7 @@ const htmlOutsideScripts = (html) => {
   return result + html.slice(cursor);
 };
 
-const makeRequest = async (options = {}) => {
-  const startTime = Date.now();
+const makeRequest = async (options = {}, { onChunks, signal } = {}) => {
   const form = createForm(options);
   const { port } = app.server.address();
   const client = http2.connect(`http://localhost:${port}`);
@@ -115,7 +129,6 @@ const makeRequest = async (options = {}) => {
   request.setEncoding('utf8');
 
   const parser = new LengthPrefixedStreamParser();
-  let firstByteTime;
   let status;
 
   request.on('response', (headers) => {
@@ -123,45 +136,78 @@ const makeRequest = async (options = {}) => {
   });
 
   request.on('data', (data) => {
+    const previousCount = parser.htmlChunks.length;
     parser.feed(data);
-    if (!firstByteTime) {
-      firstByteTime = Date.now();
-    }
+    onChunks?.(parser.htmlChunks.slice(previousCount));
   });
 
-  form.pipe(request);
-  form.on('end', () => {
-    request.end();
-  });
-
-  await new Promise((resolve, reject) => {
-    request.on('end', () => {
-      client.close();
-      resolve();
+  const abortRequest = () => request.destroy(new Error('Streaming request aborted'));
+  signal?.addEventListener('abort', abortRequest, { once: true });
+  try {
+    await new Promise((resolve, reject) => {
+      request.on('end', resolve);
+      request.on('error', reject);
+      form.on('error', reject);
+      form.pipe(request);
+      if (signal?.aborted) abortRequest();
     });
-    request.on('error', (err) => {
-      client.close();
-      reject(err);
-    });
-  });
+  } finally {
+    signal?.removeEventListener('abort', abortRequest);
+    form.destroy();
+    request.close();
+    client.destroy();
+  }
 
-  const endTime = Date.now();
   const { htmlChunks: chunks, parsedChunks: jsonChunks } = parser;
-  const fullBody = chunks.join('');
-  const timeToFirstByte = firstByteTime - startTime;
-  const streamingTime = endTime - firstByteTime;
-
-  return { status, chunks, fullBody, timeToFirstByte, streamingTime, jsonChunks };
+  return { status, chunks, fullBody: chunks.join(''), jsonChunks };
 };
 
 describe('html streaming', () => {
-  it("should send each html chunk immediately when it's ready", async () => {
-    const { status, timeToFirstByte, streamingTime, chunks } = await makeRequest();
-    expect(status).toBe(200);
-    expect(chunks.length).toBeGreaterThanOrEqual(5);
+  it('delivers chunks before the remaining async components are released', async () => {
+    const heldTimers = [];
+    const releasedBatches = [];
+    let shellReceived = false;
+    let deliveryAvailable = false;
+    const releasePending = () => {
+      if (!deliveryAvailable || heldTimers.length === 0) return;
+      deliveryAvailable = false;
+      const batch = heldTimers.splice(0);
+      releasedBatches.push(batch.length);
+      batch.forEach((callback) => callback());
+    };
+    holdComponentTimer = (callback) => {
+      heldTimers.push(callback);
+      releasePending();
+    };
 
-    expect(timeToFirstByte).toBeLessThan(2000);
-    expect(streamingTime).toBeGreaterThan(3 * timeToFirstByte);
+    try {
+      const { status, chunks, fullBody } = await makeRequest(
+        {},
+        {
+          // This is a deadlock bound, not a performance assertion. A renderer that
+          // buffers until completion cannot reach the consumer that releases it.
+          signal: AbortSignal.timeout(8000),
+          onChunks(receivedChunks) {
+            shellReceived ||= receivedChunks.some((chunk) => chunk.includes(SHELL_HEADER));
+            if (shellReceived && receivedChunks.length > 0) {
+              // Retain this receipt if the producer registers its next timer later.
+              deliveryAvailable = true;
+              releasePending();
+            }
+          },
+        },
+      );
+      expect(status).toBe(200);
+      expect(shellReceived).toBe(true);
+      expect(chunks.length).toBeGreaterThanOrEqual(5);
+      expect(releasedBatches.length).toBeGreaterThan(1);
+      expect(releasedBatches.reduce((sum, count) => sum + count, 0)).toBe(8);
+      expect(fullBody).toContain('branch1 (level 0)');
+      expect(fullBody).toContain('branch2 (level 0)');
+    } finally {
+      holdComponentTimer = undefined;
+      heldTimers.splice(0).forEach((callback) => callback());
+    }
   }, 10000);
 
   it('should stream the component shell with suspense fallbacks', async () => {
