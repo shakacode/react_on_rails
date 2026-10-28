@@ -239,6 +239,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     expect(response).to have_http_status(:ok)
     expect(prerender_calls).to eq(0)
     expect(resume_calls).to eq(0)
+    # The cached shell served the settled hole markup — zero renderer calls alone
+    # would also pass on an empty cached body.
+    expect(response.body).to include('<p id="ppr-dynamic-value">settled-value</p>')
   end
 
   it "the warm resume request carries pprShellAssets on the wire " \
