@@ -29,6 +29,25 @@ doc copies are gone. Vendored helper scripts still under `.agents/skills/` are
 no longer verified against upstream; a follow-up PR moves the two live helpers
 into repo-owned paths and removes the rest.
 
+## What Retires And What Replaces It
+
+| Retired agent-workflows item                         | Replacement                                                                                                | Not replaced                                                                                                    |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `pr-processing` workflow                             | Shaka delivery (`/shaka`): claim, validation, local review, publication, merge decision                    | Nothing                                                                                                         |
+| `address-review` skill and workflow                  | Shaka review phase: trusted `comments`, `reply`, `resolve`                                                 | Nothing                                                                                                         |
+| `adversarial-pr-review` skill and workflow           | Shaka local adversarial review (`shaka review run`)                                                        | Nothing                                                                                                         |
+| `tdd` workflow, `verify-pr-fix` skill                | Shaka implement rule: reproduce first, smallest fix, rerun the same check                                  | Separate evidence-posting flow for manual fix verification                                                      |
+| `evaluate-issue` skill and workflow                  | Shaka value checkpoint plus `internal/contributor-info/issue-evaluation.md`                                | Nothing                                                                                                         |
+| `update-changelog` skill                             | Repo-local `$react-on-rails-update-changelog`; a follow-up PR extends it from release branches to mainline | Nothing                                                                                                         |
+| `pr-batch`, `plan-pr-batch` skills and their helpers | Shaka control towers (`$rct`, `$mct`) select work and start one Shaka delivery per task                    | Batch goal prompts, Sol/Terra model routing, batch cancellation protocol, file-touch maps, dispatcher preflight |
+| `plan-issue-triage`, `triage` skills                 | None                                                                                                       | Review-only all-issue audits and generated dependency graphs                                                    |
+| `post-merge-audit` skill, `closeout-evidence-replay` | Shaka reviews-after-merge for each merged PR                                                               | Cross-PR batch audits and `qa-evidence` marker replay                                                           |
+| `continuous-evaluation-loop` workflow                | None                                                                                                       | Recurring evaluation loop                                                                                       |
+| `pr-security-preflight --strict-trust`               | Shaka trusted-actor filtering of public comments, plus the `AGENTS.md` trust rules                         | Pre-launch trust check of assigned issue and PR targets                                                         |
+| Drift manifest and pinned-pack CI check              | Shaka seam validation in required CI                                                                       | Nothing; the copies are gone                                                                                    |
+| `codex-claim` public comment fallback                | Shaka `claim`, as advisory evidence                                                                        | Nothing                                                                                                         |
+| `agent-coord-bounded` helper                         | Kept as repo-owned `.agents/bin/agent-coord-bounded`                                                       | Nothing                                                                                                         |
+
 ## Validation
 
 - `shaka seam check --root . --local`
