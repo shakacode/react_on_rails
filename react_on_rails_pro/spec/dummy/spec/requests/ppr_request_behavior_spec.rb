@@ -95,16 +95,21 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     expect(prerender_calls).to eq(1)
 
     renderer_stream_js_calls.clear
-    get ppr_path(key, dynamic_value: "warm-props-value")
+    with_ppr_events do |events|
+      get ppr_path(key, dynamic_value: "warm-props-value")
 
-    expect(response).to have_http_status(:ok)
-    # Warm request: cached shell, no prerender, exactly one resume.
-    expect(prerender_calls).to eq(0)
-    expect(resume_calls).to eq(1)
-    # The resumed hole must carry THIS request's fresh value. Cold and warm values
-    # are DIFFERENT on purpose: with a shared value, stale cold-request bytes can
-    # satisfy a fresh-props assertion (how break-it M4 survived the previous suite).
-    expect(response.body).to include('<p id="ppr-dynamic-value">warm-props-value</p>')
+      expect(response).to have_http_status(:ok)
+      # Warm request: cached shell, no prerender, exactly one resume — and no
+      # degradation fallback silently masked the resume outcome.
+      expect(prerender_calls).to eq(0)
+      expect(resume_calls).to eq(1)
+      expect(events_named(events, "ppr.resume.degraded_pre_flush")).to be_empty
+      expect(events_named(events, "ppr.resume.degraded_post_flush")).to be_empty
+      # The resumed hole must carry THIS request's fresh value. Cold and warm values
+      # are DIFFERENT on purpose: with a shared value, stale cold-request bytes can
+      # satisfy a fresh-props assertion (how break-it M4 survived the previous suite).
+      expect(response.body).to include('<p id="ppr-dynamic-value">warm-props-value</p>')
+    end
   end
 
   it "cold->warm: the cold request's props are ABSENT from the warm response " \
@@ -120,7 +125,7 @@ describe "PPR request-level behavior", :caching, :server_rendering do
 
     get ppr_path(key, dynamic_value: "fresh-props-value")
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("fresh-props-value")
+    expect(response.body).to include('<p id="ppr-dynamic-value">fresh-props-value</p>')
     expect(response.body).not_to include("stale-props-value")
   end
 
@@ -208,7 +213,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
      "(regression: settle budget not honored end to end)" do
     key = "settle-budget-#{SecureRandom.hex(4)}"
     # 50 ms << the 500 ms ppr_settle_budget_ms: the hole resolves before the budget
-    # expires, so the prerender completes with postponed == null.
+    # expires, so the prerender completes with postponed == null. Residual timing
+    # risk: both timers share the renderer's event loop, so only a >450 ms stall
+    # between render start and the 50 ms timer firing could postpone the hole.
     path = ppr_path(key, dynamic_value: "settled-value", hole_delay_ms: 50)
 
     with_ppr_events do |events|
