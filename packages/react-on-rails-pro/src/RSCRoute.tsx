@@ -189,8 +189,10 @@ type RSCContextValue = ReturnType<typeof useRSC>;
 // freshness of the refetch-error path with no error or warning. React 19.2
 // remains a supported RSC runtime (react-on-rails-rsc >= 19.2.1 peers on
 // react ^19.2.7), so the prohibition stays even though the repo's own
-// toolchain runs 19.3+. Guarded by imperativeRefetch test 2c — but only when
-// the suite runs on React 19.2.x; on 19.3+ the test passes either way.
+// toolchain runs 19.3+. Guarded by imperativeRefetch test 2c, which only
+// exercises the freeze on React 19.2.x (on 19.3+ it passes either way) — CI
+// pins that via test:react192-freeze-guard, which re-runs the suite against
+// an isolated react/react-dom 19.2.x install.
 type RouteHandleRef = { ref?: Ref<RSCRouteHandle> };
 type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue } & RouteHandleRef;
 
