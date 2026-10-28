@@ -2081,10 +2081,12 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 3. Cannot determine the target or applicable tracker → report `UNKNOWN` and do not auto-merge; fall
    back to standard `AGENTS.md` merge qualification with a maintainer decision.
 
-Agents act on the gate through installed Shaka: its local adversarial review
-supplies the `rc`/`final` adversarial review, and its merge decision applies
-the phase gate. Shaka carries no phase **table** of its own; the table lives
-only in `AGENTS.md` and this runbook. If the gate tiers ever change, update
+The `rc`/`final` adversarial review is a Shaka local review by a reviewer that
+did not write the change, attested on the PR for the head being merged. An open
+MUST-FIX is a recorded `defect` finding that is neither fixed nor dismissed with
+evidence. Shaka does not read release phase or tracker state, so the agent
+applying the gate resolves the phase from the table; it lives only in
+`AGENTS.md` and this runbook. If the gate tiers ever change, update
 `AGENTS.md` and this runbook (the canonical source), including the
 gate-selection diagram above, which mirrors the table and is illustrative only.
 
