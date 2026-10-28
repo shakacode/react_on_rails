@@ -2989,6 +2989,17 @@ describe ReactOnRailsProHelper do
 
     describe "#ppr_react_component", :caching do # rubocop:disable RSpec/MultipleMemoizedHelpers
       let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
+      let(:ppr_shell_chunks_with_manifest) do
+        [
+          ppr_shell_chunks.first,
+          ppr_shell_chunks.last.merge(pprAssetManifest: ppr_manifest_json)
+        ]
+      end
+      # --- #4897 pprShellAssets seam (asset manifest) ---
+
+      let(:ppr_manifest_json) do
+        '{"stylesheetHrefs":["/assets/ppr-shell.css"],"initScriptKeys":["PprInit-1"]}'
+      end
       let(:written_chunks) { [] }
       let(:ppr_postponed_state_json) { '{"nextSegmentId":1,"rootFormatContext":{"insertionMode":2}}' }
       let(:ppr_shell_chunks) do
@@ -4077,6 +4088,84 @@ describe ReactOnRailsProHelper do
 
         # Now the healthy result IS cached.
         expect(Rails.cache.read(computed_ppr_cache_key)).to be_a(Hash)
+      end
+
+      # Observes each renderer request's generated JS without changing behavior.
+      # Installed per-example (not in a shared before) so the wrap never touches
+      # the other #ppr_react_component examples.
+      def capture_renderer_js!
+        calls = []
+        allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream)
+          .and_wrap_original do |original, *args, **kwargs|
+            calls << args[1]
+            original.call(*args, **kwargs)
+          end
+        calls
+      end
+
+      def resume_render_js(calls)
+        calls.find { |js| js.include?("pprResumeServerRenderedReactComponent") }
+      end
+
+      it "asset manifest: stored in the envelope and forwarded to the warm resume as pprShellAssets " \
+         "(regression: Rails half of the #4897 handoff severed — break-it M10/M11)" do
+        calls = capture_renderer_js!
+        mock_ppr_responses(ppr_shell_chunks_with_manifest, ppr_resume_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+
+        run_stream
+        cached = Rails.cache.read(computed_ppr_cache_key)
+        expect(cached["assets"]).to eq(ppr_manifest_json)
+        # The cold request's own resume already carries the parsed manifest.
+        expect(resume_render_js(calls)).to include("railsContext.pprShellAssets = #{ppr_manifest_json.to_json};")
+
+        # Warm request: shell from cache (resume response only), manifest forwarded
+        # from the envelope — the dedup contract for later visitors.
+        reset_stream_buffers
+        calls.clear
+        run_stream
+        expect(chunks_read.count).to eq(ppr_resume_chunks.count)
+        expect(resume_render_js(calls)).to include("railsContext.pprShellAssets = #{ppr_manifest_json.to_json};")
+      end
+
+      it "asset manifest: a malformed prerender manifest degrades to no envelope assets and no pprShellAssets" do
+        calls = capture_renderer_js!
+        malformed = '{"stylesheetHrefs":"not-an-array","initScriptKeys":[]}'
+        mock_ppr_responses(
+          [ppr_shell_chunks.first, ppr_shell_chunks.last.merge(pprAssetManifest: malformed)],
+          ppr_resume_chunks, ppr_resume_chunks
+        )
+        stub_render_with_ppr
+
+        cold_chunks = run_stream
+        expect(cold_chunks.join).to include("PPR shell")
+        expect(Rails.cache.read(computed_ppr_cache_key)).not_to have_key("assets")
+
+        reset_stream_buffers
+        calls.clear
+        run_stream
+        expect(chunks_read.count).to eq(ppr_resume_chunks.count)
+        expect(resume_render_js(calls)).not_to include("pprShellAssets")
+      end
+
+      it "asset manifest: a corrupted cached manifest is dropped instead of reaching the renderer as raw JS " \
+         "(assets are excluded from the envelope checksum, so only shape validation guards this)" do
+        calls = capture_renderer_js!
+        mock_ppr_responses(ppr_shell_chunks_with_manifest, ppr_resume_chunks, ppr_resume_chunks)
+        stub_render_with_ppr
+        run_stream
+
+        entry = Rails.cache.read(computed_ppr_cache_key)
+        entry["assets"] = '{"stylesheetHrefs":[1,2],"initScriptKeys":"corrupted"}'
+        Rails.cache.write(computed_ppr_cache_key, entry)
+
+        reset_stream_buffers
+        calls.clear
+        warm_chunks = run_stream
+        # The envelope still validates (assets excluded from the checksum): warm hit.
+        expect(chunks_read.count).to eq(ppr_resume_chunks.count)
+        expect(warm_chunks.join).to include("PPR shell")
+        expect(resume_render_js(calls)).not_to include("pprShellAssets")
       end
     end
 
