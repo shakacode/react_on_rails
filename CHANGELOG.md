@@ -24,6 +24,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
+  `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
+  and prevents console replay from exposing server diagnostics that error metadata omits. Ruby diagnostics
+  now use JavaScript trim whitespace rules: NUL/NEL-only errors count as nonblank, while BOM-only errors do not.
+  Clean-chunk replay is unchanged. Backports [PR 5210](https://github.com/shakacode/react_on_rails/pull/5210)
+  by [justin808](https://github.com/justin808).
+
 ### [17.2.1.rc.0] - 2026-10-26
 
 #### Fixed
