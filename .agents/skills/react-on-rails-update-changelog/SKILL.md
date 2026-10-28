@@ -1,6 +1,6 @@
 ---
 name: react-on-rails-update-changelog
-description: React on Rails release-train changelog updates, including target=release and release/X.Y.Z PR targeting while the portable update-changelog skill remains mainline-only.
+description: React on Rails release-train changelog updates, including target=release and release/X.Y.Z PR targeting.
 argument-hint: '[classification-sweep BASE_REF..TARGET_REF|release|rc|beta|version] [target=main|release|release/X.Y.Z]'
 ---
 
@@ -13,9 +13,8 @@ Use this repo-local skill only when React on Rails release-train targeting matte
 - an RC/final promotion workflow needs the changelog PR to target `release/X.Y.Z`
 - the user asks for React on Rails release-train changelog handling
 
-For ordinary mainline changelog entries on `main`, use the installed/shared
-`$update-changelog` skill. This repo-local skill exists under a distinct name so
-Codex does not show a duplicate `update-changelog` picker entry.
+For ordinary mainline changelog entries on `main`, follow the Changelog section
+of `AGENTS.md`.
 
 ## Required Context
 
@@ -46,7 +45,7 @@ TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. origin/main or origin/release/17.
 
 Resolve the target before writing, stamping, branching, or creating a PR:
 
-- `target=main`: use the installed/shared `$update-changelog` flow against the
+- `target=main`: follow the Changelog section of `AGENTS.md` against the
   configured base branch.
 - `target=release/X.Y.Z`: verify `origin/release/X.Y.Z` exists and target that
   branch.
@@ -113,8 +112,3 @@ For a resolved `release/X.Y.Z` target:
 
 8. After the PR merges into `release/X.Y.Z`, follow the release-train runbook to
    forward-port the changelog result to `main` when required.
-
-Do not recreate `.agents/skills/update-changelog/SKILL.md` in this repo unless a
-maintainer explicitly chooses to restore a same-name local override and accepts
-the duplicate skill picker entry. Keep same-name shared workflow skills in the
-installed shared pack.

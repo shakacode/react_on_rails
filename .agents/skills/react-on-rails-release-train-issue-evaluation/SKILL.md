@@ -7,7 +7,7 @@ description: Use when evaluating React on Rails GitHub issues for release-train 
 
 ## Core Rule
 
-Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this skill answers "does it belong on the active release train or on `main`?"
+Use this with `internal/contributor-info/issue-evaluation.md`. That guide answers "is this worth doing?"; this skill answers "does it belong on the active release train or on `main`?"
 
 `release/*` receives only stabilizing fixes. Features, cleanup, docs, process work, non-blocking hardening, and ordinary follow-ups target `main`.
 
@@ -114,7 +114,7 @@ source PR per release backport PR:
    identified backport claims count as started-but-stalled, not non-started;
    generic source claims do not prove that a backport started.
 4. Read release context: active `Release gate:` tracker, `release` + `TRACKING` labels, the `Agent Release Mode` block, `agent-coord` phase when available, source PR base branches, and whether source commits are already on `origin/release/X.Y.Z`.
-5. Evaluate each candidate with `$evaluate-issue`: evidence source, impact, complexity, process gap disposition, and priority.
+5. Evaluate each candidate with `internal/contributor-info/issue-evaluation.md`: evidence source, impact, complexity, process gap disposition, and priority.
 6. Choose the target:
    - `release/X.Y.Z`: verified RC/final stabilizer such as an RC regression, hard-gate failure, install/upgrade blocker, security/data-loss/wrong-output bug, release-branch CI/release tooling blocker, or final-only public API/breaking-change decision.
    - `release/X.Y.Z contingent`: only needed if maintainers decide to cherry-pick a related main-only fix into the train. Name the dependency.

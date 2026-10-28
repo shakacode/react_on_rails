@@ -36,8 +36,9 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   and runs candidate-only validation.
 - `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
   current Shaka seam boundary and validation
-- `internal/contributor-info/portable-agent-workflows-seam-design.md`: current
-  Shaka seam architecture and legacy retirement status
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
+  history of the Shaka seam and the retired agent-workflows pack; its
+  shared-skill and drift-check sections predate the retirement
 - `internal/contributor-info/agent-pr-batch-skills.md`: legacy guide to the retired agent-workflows batch skills
 - `internal/contributor-info/multi-batch-operations.md`: legacy operator guide for agent-workflows batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing

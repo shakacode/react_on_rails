@@ -205,10 +205,10 @@ Use this lifecycle for every lane:
    and validation evidence, then releases or lets the claim expire according to
    the backend policy.
 
-If the private `agent-coord` state backend is unavailable, use the structured
-public claim comment fallback from
-[pr-processing.md](https://github.com/shakacode/agent-workflows/blob/1958648b70a450aa67c15b833428485d17021045/workflows/pr-processing.md#coordination-state),
-but do not use a public comment to override a refused private claim.
+If the private `agent-coord` state backend is unavailable, use Shaka `claim`,
+which checks open PRs and branches, as the public fallback that `AGENTS.md`
+names. The structured public claim-comment fallback is retired, and nothing
+overrides a refused private claim.
 
 ## Batch Sizing And Routing
 
