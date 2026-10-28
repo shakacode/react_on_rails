@@ -163,6 +163,10 @@ module DemoFleetUpgrade
                       "__MISE_SHIM" => nil)
     end
 
+    def initialize(term_grace: 10)
+      @term_grace = term_grace
+    end
+
     def run(argv, chdir:, env: {}, timeout: 900)
       output = +""
       status = nil
@@ -170,9 +174,8 @@ module DemoFleetUpgrade
         stdin.close
         reader = Thread.new { output << out.read.to_s }
         unless wait.join(timeout)
-          Process.kill("TERM", -wait.pid)
-          wait.join
-          reader.join
+          terminate(wait)
+          reader.join(5)
           return Result.new(output: "#{output}\nTimed out after #{timeout}s", success: false)
         end
         reader.join
@@ -182,12 +185,81 @@ module DemoFleetUpgrade
     rescue SystemCallError => e
       Result.new(output: e.message, success: false)
     end
+
+    private
+
+    # TERM the whole process group, then KILL whatever ignores it after a short grace period.
+    def terminate(wait)
+      Process.kill("TERM", -wait.pid)
+      return if wait.join(@term_grace)
+
+      Process.kill("KILL", -wait.pid)
+      wait.join(@term_grace)
+    rescue Errno::ESRCH
+      nil
+    end
   end
 
   # Per-repo outcome, rendered in the summary table and the JSON report.
   RepoResult = Struct.new(:repo, :branch, :pr_url, :smoke, :status, :error, :changes, :worktree, :logs,
                           keyword_init: true) do
     def to_h = super.transform_keys(&:to_s)
+  end
+
+  # One JS package root: picks its package manager and the lockfile/install commands for it.
+  JsProject = Struct.new(:dir, :fallback_manager) do
+    # Prefers the packageManager field, then the lockfile, then the manifest value.
+    def package_manager
+      @package_manager ||= begin
+        name, version = declared_manager.split("@", 2)
+        if name == "yarn" && version
+          version.to_i >= 2 ? "yarn_berry" : "yarn_classic"
+        elsif %w[npm pnpm].include?(name)
+          name
+        else
+          lockfile_package_manager
+        end
+      end
+    end
+
+    def lock_command
+      case package_manager
+      when "npm" then pm_command("install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund")
+      when "pnpm" then pm_command("install", "--lockfile-only", "--ignore-scripts")
+      when "yarn_berry" then pm_command("install", "--mode=update-lockfile")
+      else pm_command("install", "--ignore-scripts", "--non-interactive")
+      end
+    end
+
+    def frozen_install_command
+      case package_manager
+      when "npm" then pm_command("ci", "--no-audit", "--no-fund")
+      when "pnpm" then pm_command("install", "--frozen-lockfile")
+      when "yarn_berry" then pm_command("install", "--immutable")
+      else pm_command("install", "--frozen-lockfile", "--non-interactive")
+      end
+    end
+
+    def relative_to(root) = dir == root ? "." : dir.delete_prefix("#{root}/")
+
+    private
+
+    def declared_manager = JSON.parse(File.read(File.join(dir, "package.json")))["packageManager"].to_s
+
+    def lockfile_package_manager
+      lock = LOCKFILES.keys.find { |file| File.exist?(File.join(dir, file)) }
+      return fallback_manager unless lock
+      return LOCKFILES.fetch(lock) unless lock == "yarn.lock"
+
+      File.read(File.join(dir, lock)).include?("__metadata:") ? "yarn_berry" : "yarn_classic"
+    end
+
+    # Corepack runs the exact pnpm or yarn release a packageManager field pins.
+    def pm_command(*args)
+      tool = package_manager.start_with?("yarn") ? "yarn" : package_manager
+      prefix = !declared_manager.empty? && tool != "npm" ? ["corepack", tool] : [tool]
+      prefix + args
+    end
   end
 
   # Upgrades one demo repository. Every mutation goes through a separate git
@@ -418,65 +490,24 @@ module DemoFleetUpgrade
     end
 
     def regenerate_js_lock
-      return unless js_root
-
-      step("js-lock", lock_command, chdir: js_root, env: { "YARN_ENABLE_IMMUTABLE_INSTALLS" => "false" }, fatal: true)
-    end
-
-    def js_root
-      return @js_root if defined?(@js_root)
-
-      @js_root = [@worktree, *Dir[File.join(@worktree, "*/")].map { |dir| dir.chomp("/") }].find do |dir|
-        File.exist?(File.join(dir, "package.json")) && LOCKFILES.keys.any? { |lock| File.exist?(File.join(dir, lock)) }
+      env = { "YARN_ENABLE_IMMUTABLE_INSTALLS" => "false" }
+      js_projects.each_with_index do |project, index|
+        step(numbered("js-lock", index), project.lock_command, chdir: project.dir, env:, fatal: true)
       end
     end
 
-    # Prefers the packageManager field, then the lockfile, then the manifest value.
-    def package_manager
-      @package_manager ||= begin
-        declared = JSON.parse(File.read(File.join(js_root, "package.json")))["packageManager"].to_s
-        name, version = declared.split("@", 2)
-        if name == "yarn" && version
-          version.to_i >= 2 ? "yarn_berry" : "yarn_classic"
-        elsif %w[npm pnpm].include?(name)
-          name
-        else
-          lockfile_package_manager
+    def numbered(name, index) = index.zero? ? name : "#{name}-#{index}"
+
+    # Every directory (repo root or one level down) with its own package.json and lockfile.
+    def js_projects
+      @js_projects ||= begin
+        dirs = [@worktree, *Dir[File.join(@worktree, "*/")].map { |dir| dir.chomp("/") }]
+        dirs = dirs.select do |dir|
+          File.exist?(File.join(dir, "package.json")) && LOCKFILES.keys.any? do |lock|
+            File.exist?(File.join(dir, lock))
+          end
         end
-      end
-    end
-
-    def lockfile_package_manager
-      lock = LOCKFILES.keys.find { |file| File.exist?(File.join(js_root, file)) }
-      return repo.fetch("package_manager") unless lock
-      return LOCKFILES.fetch(lock) unless lock == "yarn.lock"
-
-      File.read(File.join(js_root, lock)).include?("__metadata:") ? "yarn_berry" : "yarn_classic"
-    end
-
-    def corepack? = !JSON.parse(File.read(File.join(js_root, "package.json")))["packageManager"].to_s.empty?
-
-    def pm_command(*args)
-      tool = package_manager.start_with?("yarn") ? "yarn" : package_manager
-      prefix = corepack? && tool != "npm" ? ["corepack", tool] : [tool]
-      prefix + args
-    end
-
-    def lock_command
-      case package_manager
-      when "npm" then pm_command("install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund")
-      when "pnpm" then pm_command("install", "--lockfile-only", "--ignore-scripts")
-      when "yarn_berry" then pm_command("install", "--mode=update-lockfile")
-      else pm_command("install", "--ignore-scripts", "--non-interactive")
-      end
-    end
-
-    def frozen_install_command
-      case package_manager
-      when "npm" then pm_command("ci", "--no-audit", "--no-fund")
-      when "pnpm" then pm_command("install", "--frozen-lockfile")
-      when "yarn_berry" then pm_command("install", "--immutable")
-      else pm_command("install", "--frozen-lockfile", "--non-interactive")
+        dirs.map { |dir| JsProject.new(dir, repo.fetch("package_manager")) }
       end
     end
 
@@ -485,7 +516,9 @@ module DemoFleetUpgrade
       return result.smoke = "skipped" if options[:smoke] == "none"
 
       checks = [["bundle-install", %w[bundle install], @worktree, { "BUNDLE_FROZEN" => "true" }]]
-      checks << ["js-install", frozen_install_command, js_root, {}] if js_root
+      js_projects.each_with_index do |project, index|
+        checks << [numbered("js-install", index), project.frozen_install_command, project.dir, {}]
+      end
       manifest_checks.each { |name| checks << [name, ["bash", "-c", repo[name]], @worktree, {}] }
       failed = checks.find { |name, argv, chdir, env| !step(name, argv, chdir:, env:) }
       result.smoke = failed ? "fail (#{failed.first})" : "pass (#{checks.map(&:first).join(', ')})"
@@ -578,9 +611,12 @@ module DemoFleetUpgrade
     end
 
     def js_lock_summary
-      return "No JS lockfile found, so no JS lockfile was regenerated." unless js_root
+      return "No JS lockfile found, so no JS lockfile was regenerated." if js_projects.empty?
 
-      "JS lockfile regenerated with `#{lock_command.shelljoin}` (#{package_manager})."
+      js_projects.map do |project|
+        "JS lockfile in `#{project.relative_to(@worktree)}` regenerated with `#{project.lock_command.shelljoin}` " \
+          "(#{project.package_manager})."
+      end.join("\n")
     end
 
     def locked_gems_summary

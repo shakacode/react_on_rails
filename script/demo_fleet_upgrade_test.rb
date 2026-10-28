@@ -77,6 +77,16 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     assert_nil env.fetch("BUNDLE_GEMFILE")
   end
 
+  def test_command_runner_kills_a_child_that_ignores_term
+    runner = DemoFleetUpgrade::CommandRunner.new(term_grace: 1)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result = runner.run(["sh", "-c", "trap '' TERM; echo started; sleep 30"], chdir: Dir.tmpdir, timeout: 1)
+
+    refute result.success
+    assert_match(/Timed out after 1s/, result.output)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
+  end
+
   def test_manifest_selects_by_short_or_full_name
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
     assert_equal(["shakacode/demo-a"], manifest.select(["demo-a"]).map { |r| r["name"] })
@@ -352,6 +362,19 @@ class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
     assert_match(/pr opened/, out)
     body = File.read(File.join(@tmp, "work", "logs", "demo-app", "pr-body.md"))
     assert_match(/No JS lockfile found/, body)
+  end
+
+  def test_regenerates_every_js_project_with_its_own_lockfile
+    push_to_main(write: { "client/package.json" => %({ "dependencies": { "react-on-rails": "17.2.0" } }\n),
+                          "client/package-lock.json" => "{}\n" })
+
+    out, code = run_cli("--execute")
+
+    assert_equal 0, code, out
+    lock_dirs = @runner.calls.count { |argv| argv.include?("--package-lock-only") }
+    assert_equal 2, lock_dirs
+    assert_includes sh("git", "--git-dir", @remote, "show", "#{BRANCH}:client/package-lock.json"), "17.2.1-rc.1"
+    assert_match(/js-install-1/, out)
   end
 
   def test_rejecting_commit_hook_fails_the_repo_without_pushing
