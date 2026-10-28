@@ -406,6 +406,20 @@ class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
     refute remote_branch_sha
   end
 
+  def test_unsupported_pin_on_an_ahead_local_branch_needs_an_agent
+    run_cli("--execute")
+    worktree = File.join(@tmp, "work", "demo-app")
+    File.write(File.join(worktree, "Gemfile"), %(source "https://rubygems.org"\ngem "react_on_rails_pro", "~> 17.2"\n))
+    sh("git", "-C", worktree, "commit", "-q", "-am", "loosen pin")
+    pushed = remote_branch_sha
+
+    out, code = run_cli("--execute")
+
+    assert_equal 1, code
+    assert_match(/needs agent.*without an exact version/, out)
+    assert_equal pushed, remote_branch_sha
+  end
+
   def test_rejecting_commit_hook_fails_the_repo_without_pushing
     hook = File.join(@clone, ".git", "hooks", "pre-commit")
     File.write(hook, "#!/bin/sh\necho blocked by hook\nexit 1\n")

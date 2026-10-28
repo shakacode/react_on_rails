@@ -35,6 +35,7 @@ module DemoFleetUpgrade
 
   class Error < StandardError; end
   class SkipRepo < Error; end
+  class NeedsAgent < Error; end
 
   # Converts between the gem form (17.2.1.rc.1) and the npm form (17.2.1-rc.1).
   Version = Struct.new(:gem, :npm) do
@@ -293,6 +294,8 @@ module DemoFleetUpgrade
       upgrade
     rescue SkipRepo => e
       finish("skipped", e.message)
+    rescue NeedsAgent => e
+      finish("needs agent", e.message)
     rescue Error => e
       finish("failed", e.message)
     rescue StandardError => e
@@ -483,8 +486,12 @@ module DemoFleetUpgrade
       raise Error, "Local #{@branch} and origin/#{@branch} diverged; resolve by hand (never force-pushed)"
     end
 
+    # Re-plans from the worktree, which can hold local commits the remote ref did not show.
     def apply_pins
-      read_plan("HEAD", chdir: @worktree).fetch(:files).each_key do |path|
+      plan = read_plan("HEAD", chdir: @worktree)
+      raise NeedsAgent, plan[:errors].join("; ") unless plan[:errors].empty?
+
+      plan.fetch(:files).each_key do |path|
         full_path = File.join(@worktree, path)
         editor = path.end_with?("Gemfile") ? GemfileEditor : PackageJsonEditor
         pins = path.end_with?("Gemfile") ? gem_pins : npm_pins
