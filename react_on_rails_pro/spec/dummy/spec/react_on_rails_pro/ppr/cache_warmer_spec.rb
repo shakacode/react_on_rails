@@ -489,6 +489,21 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
     end
   end
 
+  describe "session isolation" do
+    # The warmer's contract is a FRESH integration session per path, so one path's
+    # cookie or session state can never poison the next (#5002 break-it M7: memoizing
+    # build_session previously survived this whole suite because the constructor stub
+    # returns one shared double regardless of how many times it is called).
+    it "constructs a new integration session for every warmed path" do
+      stub_get(200) { instrument_write }
+
+      described_class.call(paths: ["/first", "/second"])
+
+      expect(ActionDispatch::Integration::Session)
+        .to have_received(:new).with(Rails.application).twice
+    end
+  end
+
   describe "summary logging" do
     it "logs the warmed / already-warm / failed summary" do
       stub_get(200) { instrument_write }
