@@ -4765,7 +4765,9 @@ describe ReactOnRailsProHelper do
           a_hash_including(
             pack: invalid_component_name,
             type: :generated_component_pack,
-            reason: /ArgumentError: react_on_rails_preload_links/
+            # #4966 redaction policy: diagnostics carry the error class name only,
+            # never the message (which can embed request-derived content).
+            reason: "ArgumentError"
           )
         )
         expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
