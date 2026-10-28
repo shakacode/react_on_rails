@@ -396,6 +396,16 @@ class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
     refute(@runner.calls.any? { |argv| argv[0..1] == %w[git fetch] })
   end
 
+  def test_push_url_on_another_repo_is_refused
+    sh("git", "-C", @clone, "config", "remote.origin.pushurl", "https://github.com/someone/else.git")
+
+    out, code = run_cli("--execute")
+
+    assert_equal 1, code
+    assert_match(%r{someone/else.git is not github.com/shakacode/demo-app}, out)
+    refute remote_branch_sha
+  end
+
   def test_rejecting_commit_hook_fails_the_repo_without_pushing
     hook = File.join(@clone, ".git", "hooks", "pre-commit")
     File.write(hook, "#!/bin/sh\necho blocked by hook\nexit 1\n")

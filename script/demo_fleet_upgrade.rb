@@ -332,9 +332,12 @@ module DemoFleetUpgrade
       git_dir = File.join(@clone, ".git")
       raise SkipRepo, "No local clone at #{@clone} (clone #{@slug} there first)" unless File.directory?(git_dir)
 
-      # The configured URL, before any insteadOf rewrite, must name the manifest repo on GitHub.
-      remote = git("config", "--get", "remote.origin.url").output.strip
-      raise Error, "#{@clone} origin #{remote} is not github.com/#{@slug}" unless github_origin?(remote)
+      # The configured fetch and push URLs, before any insteadOf rewrite, must name the manifest repo on GitHub.
+      urls = %w[url pushurl].flat_map do |key|
+        git("config", "--get-all", "remote.origin.#{key}", allow_failure: true).output.lines.map(&:strip)
+      end
+      wrong = urls.reject { |url| github_origin?(url) }
+      raise Error, "#{@clone} origin #{wrong.join(', ')} is not github.com/#{@slug}" if urls.empty? || wrong.any?
 
       git("fetch", "--prune", "origin") unless options[:no_fetch]
       @default_branch = detect_default_branch
