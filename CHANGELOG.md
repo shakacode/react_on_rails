@@ -38,6 +38,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Production refetch recovery handles streamed boundary errors.** HTTP 200 Flight
+  responses whose root resolves before a descendant fails now restore the previous route content,
+  report `refetchError` and `onRefetchError`, and keep Retry available. Restoring content can remount
+  descendant client components and reset their local state. Incomplete records are classified as failed
+  streams and restore prior content even when the decoded root never throws. Scalar return values stay
+  unchanged. Initial-load
+  render failures still propagate to the outer error boundary. Fixes
+  [Issue 5078](https://github.com/shakacode/react_on_rails/issues/5078).
+  [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
+  [Justin Gordon](https://github.com/justin808).
+
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.

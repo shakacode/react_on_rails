@@ -105,12 +105,13 @@ export default class LengthPrefixedStreamParser {
     }
   }
 
-  flush(): void {
+  flush(): boolean {
     // A stream can end after the CR half of a CRLF separator; all-CR buffers
     // are blank separator fragments, not incomplete payload data.
-    if (this.state === 'header' && isBlankSeparatorLine(this.buf)) return;
+    if (this.state === 'header' && isBlankSeparatorLine(this.buf)) return true;
     console.warn(
       `[react_on_rails] Incomplete length-prefixed stream: ${this.buf.length} bytes remaining in state ${this.state}`,
     );
+    return false;
   }
 }
