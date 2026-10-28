@@ -38,13 +38,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-- **[Pro]** **`RSCRoute` now uses React 19.2's `useEffectEvent` for `onRefetchError` and takes `ref` as a
-  regular prop instead of `forwardRef`**: The public `<RSCRoute ref={…}>` handle API and `onRefetchError`
-  behavior are unchanged, but the RSC client path now requires React >= 19.2 at runtime (the documented
-  Pro RSC floor — React 19.2.x and 19.3.x are the supported lines; on older React, rendering
-  `<RSCRoute>` fails fast with a branded error naming the React >= 19.2 requirement and the version it
-  found). Calling `useEffectEvent`, `useFormStatus`, or `useFormState`
-  in a server component without `'use client'` now gets the branded missing-directive diagnostic. Implements
+- **[Pro]** **`RSCRoute` takes `ref` as a regular prop instead of `forwardRef`**: The public
+  `<RSCRoute ref={…}>` handle API and `onRefetchError` behavior are unchanged, and no minimum React
+  version changes — the core package still supports React >= 16, and the RSC client path keeps its
+  existing React 19 floor (now enforced: rendering `<RSCRoute>` on older React fails fast with a
+  branded error naming the React >= 19 requirement and the version it found, instead of a cryptic
+  `use is not a function`, and CI re-runs the refetch suite against pinned React 19.0.x/19.2.x
+  installs). `useEffectEvent` was deliberately not adopted to keep that floor. Calling
+  `useEffectEvent`, `useFormStatus`, or `useFormState` in a server component without `'use client'`
+  now gets the branded missing-directive diagnostic. Implements
   [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
   [PR 5031](https://github.com/shakacode/react_on_rails/pull/5031) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).

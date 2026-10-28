@@ -30,8 +30,8 @@ const isReactServerEnv = (process.env.NODE_CONDITIONS ?? '')
 // manager swaps) instead of hardcoding `../../node_modules/react`.
 // JEST_REACT_PACKAGE_ROOT / JEST_REACT_DOM_PACKAGE_ROOT let a guard lane pin a
 // different React runtime without touching the workspace install — used by
-// scripts/run-react192-freeze-guard.mjs to re-run the imperativeRefetch suite
-// on React 19.2.x, where useEffectEvent freezes inside forwardRef/memo fibers.
+// scripts/run-react-floor-guard.mjs to re-run the imperativeRefetch suite on
+// the RSC client path's React floor (19.0.x) and oldest supported line (19.2.x).
 const reactPackageRoot =
   process.env.JEST_REACT_PACKAGE_ROOT ?? path.dirname(require.resolve('react/package.json'));
 const reactDomPackageRoot =

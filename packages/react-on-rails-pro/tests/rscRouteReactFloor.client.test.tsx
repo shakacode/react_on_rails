@@ -16,19 +16,19 @@
 /*
  * React runtime floor guard for <RSCRoute> (issue #5030 / PR #5031).
  *
- * RSCRoute uses useEffectEvent, which React added in 19.2. On older React the
- * named import resolves to undefined and, without a guard, the first render
- * dies with a bare "useEffectEvent is not a function". These tests simulate
- * that runtime by mocking the react module with useEffectEvent removed and pin
- * the branded, actionable error instead.
+ * RSCRoute's render path needs React 19.0's `use` (and ref-as-prop). On older
+ * React the named import resolves to undefined and, without a guard, rendering
+ * dies with a bare "use is not a function" — or a misleading provider error,
+ * depending on tree shape. These tests simulate that runtime by mocking the
+ * react module with `use` removed and pin the branded, actionable error.
  */
 
 jest.mock('react', () => {
   const actual = jest.requireActual('react');
   return {
     ...actual,
-    // Simulate React < 19.2: the hook is absent, everything else is intact.
-    useEffectEvent: undefined,
+    // Simulate React 18: the `use` hook is absent, everything else is intact.
+    use: undefined,
   };
 });
 
@@ -48,9 +48,9 @@ describe('RSCRoute React runtime floor', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('fails fast with a branded error naming the React >= 19.2 requirement', () => {
+  it('fails fast with a branded error naming the React >= 19 requirement', () => {
     expect(() => render(<RSCRoute componentName="AnyServerComponent" componentProps={{}} />)).toThrow(
-      /\[React on Rails Pro\] <RSCRoute> requires React >= 19\.2/,
+      /\[React on Rails Pro\] <RSCRoute> requires React >= 19 /,
     );
   });
 

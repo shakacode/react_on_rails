@@ -1122,9 +1122,9 @@ class CapturingErrorBoundary extends React.Component<
     expect(screen.getByTestId('card')).toHaveTextContent('v1');
 
     // Swap the callback prop without changing the route key. The error path
-    // must observe the swapped-in callback, not the one captured at mount.
-    // Guards the effect-event freshness that forwardRef/memo would silently
-    // freeze (see the ordering note in RSCRoute.tsx and issue #5030).
+    // must observe the swapped-in callback, not the one captured at mount —
+    // the freshness the onRefetchErrorRef layout-effect sync provides (see the
+    // useEffectEvent note above RouteHandleRef in RSCRoute.tsx / issue #5030).
     await rerenderInAct(result, <Root onRefetchError={freshCallback} />);
 
     await act(async () => {

@@ -25,7 +25,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useEffectEvent,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -181,18 +180,26 @@ const toServerComponentFetchError = (
 type RefetchErrorState = [string, ServerComponentFetchError];
 type RSCContextValue = ReturnType<typeof useRSC>;
 // React 19 ref-as-prop: `ref` is a regular prop on function components, so no
-// forwardRef wrapper is needed. Keep these three components plain named
-// functions — do NOT reintroduce forwardRef or wrap them in React.memo:
-// on React 19.2.x, useEffectEvent is silently frozen at its mount-time closure
-// inside ForwardRef/SimpleMemoComponent fibers (19.2 never swaps their impl;
-// fixed in React 19.3.0 by facebook/react#34831), which would break the
-// freshness of the refetch-error path with no error or warning. React 19.2
-// remains a supported RSC runtime (react-on-rails-rsc >= 19.2.1 peers on
-// react ^19.2.7), so the prohibition stays even though the repo's own
-// toolchain runs 19.3+. Guarded by imperativeRefetch test 2c, which only
-// exercises the freeze on React 19.2.x (on 19.3+ it passes either way) — CI
-// pins that via test:react192-freeze-guard, which re-runs the suite against
-// an isolated react/react-dom 19.2.x install.
+// forwardRef wrapper is needed. This keeps the RSC client floor at React 19.0
+// — the same floor PromiseWrapper's `use` already imposes; CI pins it via
+// test:react-floor-guard, which re-runs this file's suite against isolated
+// react/react-dom installs of the floor (19.0.x) and the oldest documented
+// supported RSC line (19.2.x).
+//
+// Deliberately NOT using useEffectEvent anywhere in this file, for three
+// load-bearing reasons; do not "modernize" these patterns without revisiting
+// all of them:
+// 1. It would raise the RSC client floor to React 19.2 (the hook's first
+//    stable release) — the floor lane above fails on 19.0.x the moment it is
+//    adopted.
+// 2. An effect event has a new identity every render, which would destabilize
+//    `refetch` → `handle` → the context provider value (imperativeRefetch
+//    test 2d pins this).
+// 3. On React 19.2.x it silently freezes at its mount-time closure inside
+//    ForwardRef/SimpleMemoComponent fibers (fixed in 19.3.0 by
+//    facebook/react#34831) — a trap for any future adoption that also
+//    reintroduces forwardRef or React.memo here (test 2c pins callback
+//    freshness).
 type RouteHandleRef = { ref?: Ref<RSCRouteHandle> };
 type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue } & RouteHandleRef;
 
@@ -220,6 +227,7 @@ function RSCRouteContent({
   // re-render every useCurrentRSCRoute consumer on every route render.
   // Guarded by imperativeRefetch test 2d.
   const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
+  const onRefetchErrorRef = useRef(onRefetchError);
   const latestRefetchRequestRef = useRef(0);
   // Version 0 means "evicted or not yet seen"; it lets a later monotonic
   // success token clear a stale refetch error after the key reloads.
@@ -234,6 +242,9 @@ function RSCRouteContent({
   useLayoutEffect(() => {
     latestPropsRef.current = [componentName, componentProps];
   }, [componentName, componentProps]);
+  useLayoutEffect(() => {
+    onRefetchErrorRef.current = onRefetchError;
+  }, [onRefetchError]);
   useLayoutEffect(
     () => retainComponent(componentName, componentProps),
     [componentName, componentProps, retainComponent],
@@ -290,17 +301,14 @@ function RSCRouteContent({
     [clearRefetchError, refetch, refetchError],
   );
   useImperativeHandle(ref, () => handle, [handle]);
-  // Always sees the latest committed onRefetchError prop without making the
-  // effect below re-run on callback identity changes. Safe only because these
-  // components are plain function components — see the ordering note above
-  // RouteHandleRef (on React 19.2.x, useEffectEvent freezes inside
-  // ForwardRef/SimpleMemoComponent fibers; fixed in 19.3.0).
-  const emitRefetchError = useEffectEvent((error: ServerComponentFetchError) => {
-    onRefetchError?.(error);
-  });
   useEffect(() => {
     if (refetchError) {
-      emitRefetchError(refetchError);
+      // Read through the layout-effect-synced ref so the latest committed
+      // onRefetchError prop is observed (imperativeRefetch test 2c) without
+      // this effect re-running on callback identity changes — the ref-box
+      // equivalent of useEffectEvent, kept for the reasons listed above
+      // RouteHandleRef (React 19.0 floor, identity stability, 19.2 freeze).
+      onRefetchErrorRef.current?.(refetchError);
     }
   }, [refetchError]);
 
@@ -366,17 +374,18 @@ function RSCRouteContentWithErrorBoundary({
  * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
  * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
  */
-// React added useEffectEvent in 19.2; on older React the named import above
-// resolves to undefined and the render path would die with a bare
-// "useEffectEvent is not a function" (or, depending on tree shape, an
-// unrelated-looking provider error) instead of naming the real requirement.
+// React added `use` (and ref-as-prop) in 19.0; on older React the named import
+// above resolves to undefined and the render path would die with a bare
+// "use is not a function" (or, depending on tree shape, an unrelated-looking
+// provider error) instead of naming the real requirement. This is the RSC
+// client path's actual runtime floor — guarded in CI by test:react-floor-guard.
 function assertReactSupportsRSCRoute(): void {
-  if (typeof useEffectEvent !== 'function') {
+  if (typeof use !== 'function') {
     throw new Error(
-      `[React on Rails Pro] <RSCRoute> requires React >= 19.2 (found ${React.version}): the RSC client ` +
-        `path uses React's useEffectEvent, which was added in 19.2. Upgrade react and react-dom to a ` +
-        `supported version pair — see the React on Rails Pro React Server Components docs for the ` +
-        `support table.`,
+      `[React on Rails Pro] <RSCRoute> requires React >= 19 (found ${React.version}): the RSC client ` +
+        `path uses React's \`use\` and ref-as-prop, which were added in React 19. Upgrade react and ` +
+        `react-dom to a supported version pair — see the React on Rails Pro React Server Components ` +
+        `docs for the support table.`,
     );
   }
 }
