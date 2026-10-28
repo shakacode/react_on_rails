@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.2.1.rc.1] - 2026-10-28
+
 #### Fixed
 
 - **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
@@ -3510,7 +3512,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.1...main
+[17.2.1.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.0...v17.2.1.rc.1
 [17.2.1.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...v17.2.1.rc.0
 [17.2.0]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...v17.2.0
 [17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
