@@ -29,11 +29,6 @@ doc copies are gone. Vendored helper scripts still under `.agents/skills/` are
 no longer verified against upstream; a follow-up PR moves the two live helpers
 into repo-owned paths and removes the rest.
 
-Until then, treat `.agents/docs/*.md` and `.agents/workflows/*.md` as historical.
-Their instructions to run `.agents/bin/agent-workflow-drift-manifest-test.rb`,
-`check-agent-workflow-drift`, or `.agents/agent-workflow-drift.yml` describe the
-retired drift check and no longer apply.
-
 ## Validation
 
 - `shaka seam check --root . --local`
