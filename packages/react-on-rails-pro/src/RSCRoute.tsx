@@ -366,6 +366,21 @@ function RSCRouteContentWithErrorBoundary({
  * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
  * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
  */
+// React added useEffectEvent in 19.2; on older React the named import above
+// resolves to undefined and the render path would die with a bare
+// "useEffectEvent is not a function" (or, depending on tree shape, an
+// unrelated-looking provider error) instead of naming the real requirement.
+function assertReactSupportsRSCRoute(): void {
+  if (typeof useEffectEvent !== 'function') {
+    throw new Error(
+      `[React on Rails Pro] <RSCRoute> requires React >= 19.2 (found ${React.version}): the RSC client ` +
+        `path uses React's useEffectEvent, which was added in 19.2. Upgrade react and react-dom to a ` +
+        `supported version pair — see the React on Rails Pro React Server Components docs for the ` +
+        `support table.`,
+    );
+  }
+}
+
 function RSCRoute({
   componentName,
   componentProps,
@@ -373,6 +388,7 @@ function RSCRoute({
   onRefetchError,
   ref,
 }: RSCRouteProps & RouteHandleRef): ReactNode {
+  assertReactSupportsRSCRoute();
   if (!ssr && typeof window === 'undefined') {
     throw new RSCRouteSSRFalseBailoutError(componentName);
   }
