@@ -41,6 +41,21 @@ prove that the dynamic selector still resolves to the same candidate. A changed 
 policy/inventory manifest fails closed. Generate a fresh pack in a fresh output directory; one pack
 must never replace another pack's durable result ledger.
 
+## Open the first upgrade PRs with the script
+
+Once `APP_WORK_ALLOWED` is recorded, let `script/demo-fleet-upgrade` do the mechanical bump in
+every app instead of a lane per repo. It pins the coordinated gems and npm packages, regenerates
+lockfiles with each repo's own tools, runs a local install smoke, and opens one draft PR per repo:
+
+```bash
+script/demo-fleet-upgrade 17.2.1.rc.1                  # dry run: plan table only
+script/demo-fleet-upgrade 17.2.1.rc.1 --execute --json tmp/fleet-upgrade.json
+```
+
+It never merges, deploys, or force-pushes, and reruns reuse the branch and PR. Give lanes only
+the rows whose status is `failed`, `needs agent`, or `skipped`, or whose smoke failed. Every PR
+still needs its review-app deploy, smoke, and teardown from a lane.
+
 ## Generate public standing-health evidence
 
 Standing health is a sibling contract, not a shortened candidate closeout. It reads only manifest

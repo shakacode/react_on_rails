@@ -98,6 +98,7 @@ jobs:
             bash -n "$script"
           done
           ruby -c script/ci-required-merge-group-gate
+          ruby -c script/demo-fleet-upgrade
 
       - name: Run CI gate tests
         run: |
@@ -108,6 +109,7 @@ jobs:
           node --test .github/workflows/ci-commands.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
+          ruby script/demo_fleet_upgrade_test.rb
           ruby .agents/skills/pr-batch/bin/pr-ci-readiness-test.rb
 
       - name: Check mirrored blocks
