@@ -61,6 +61,11 @@ const CLIENT_HOOK_NAMES = [
   'useInsertionEffect',
   'useOptimistic',
   'useActionState',
+  // react-dom exports (not react): the react-server react-dom build omits
+  // them, so misuse in a server component fails with the same
+  // "... is not a function" shape as the react hooks above.
+  'useFormStatus',
+  'useFormState',
 ].join('|');
 // The (?<![\w$]) lookbehind keeps the diagnostic to whole-identifier hook
 // calls: app errors like `reuseState is not a function` or minified

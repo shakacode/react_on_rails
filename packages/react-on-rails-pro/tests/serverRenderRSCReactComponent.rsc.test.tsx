@@ -22,6 +22,7 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import * as React from 'react';
 import { Suspense, useEffectEvent, useInsertionEffect, useState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import * as mock from 'mock-fs';
 import * as path from 'path';
 import { finished } from 'stream/promises';
@@ -93,6 +94,21 @@ const EffectEventWithoutClientDirective = () => {
   return <p>Client effect event in RSC runtime</p>;
 };
 
+// useFormStatus / useFormState are react-dom exports (not react); the
+// react-server react-dom build omits them, so calling either in a server
+// component fails with the same "... is not a function" shape as react hooks.
+const FormStatusWithoutClientDirective = () => {
+  useFormStatus();
+
+  return <p>Client form status in RSC runtime</p>;
+};
+
+const FormStateWithoutClientDirective = () => {
+  useFormState((state: number) => state + 1, 0);
+
+  return <p>Client form state in RSC runtime</p>;
+};
+
 // The helper's name deliberately ends in a hook name ('...reuseState') to pin
 // that the client-hook diagnostic only brands whole-identifier hook calls.
 const HelperWithHookNameSuffix = () => {
@@ -104,6 +120,8 @@ const HelperWithHookNameSuffix = () => {
 ReactOnRails.register({
   DelayedFailureContainer,
   EffectEventWithoutClientDirective,
+  FormStateWithoutClientDirective,
+  FormStatusWithoutClientDirective,
   HelperWithHookNameSuffix,
   HooksWithoutClientDirective,
   InsertionEffectWithoutClientDirective,
@@ -425,6 +443,28 @@ test('explains likely missing use client directive when a server component calls
   expect((error as Error).message).toContain('"use client";');
   expect((error as Error).message).toContain('Original error:');
   expect((error as Error).message).toContain('useEffectEvent');
+  expect((error as Error).message).toContain('is not a function');
+});
+
+test('explains likely missing use client directive when a server component calls useFormStatus', async () => {
+  const error = await captureRenderedError('FormStatusWithoutClientDirective');
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('FormStatusWithoutClientDirective');
+  expect((error as Error).message).toContain('client hook "useFormStatus"');
+  expect((error as Error).message).toContain('"use client";');
+  expect((error as Error).message).toContain('Original error:');
+  expect((error as Error).message).toContain('is not a function');
+});
+
+test('explains likely missing use client directive when a server component calls useFormState', async () => {
+  const error = await captureRenderedError('FormStateWithoutClientDirective');
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('FormStateWithoutClientDirective');
+  expect((error as Error).message).toContain('client hook "useFormState"');
+  expect((error as Error).message).toContain('"use client";');
+  expect((error as Error).message).toContain('Original error:');
   expect((error as Error).message).toContain('is not a function');
 });
 
