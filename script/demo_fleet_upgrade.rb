@@ -170,15 +170,17 @@ module DemoFleetUpgrade
     def run(argv, chdir:, env: {}, timeout: 900)
       output = +""
       status = nil
+      deadline = now + timeout
       Open3.popen2e(self.class.child_env.merge(env), *argv, chdir:, pgroup: true) do |stdin, out, wait|
         stdin.close
         reader = Thread.new { output << out.read.to_s }
-        unless wait.join(timeout)
+        # The reader also waits on background descendants that keep stdout open, so it shares the deadline.
+        finished = wait.join(timeout) && reader.join([deadline - now, 0].max)
+        unless finished
           terminate(wait)
           reader.join(5)
           return Result.new(output: "#{output}\nTimed out after #{timeout}s", success: false)
         end
-        reader.join
         status = wait.value
       end
       Result.new(output:, success: status.success?)
@@ -188,14 +190,20 @@ module DemoFleetUpgrade
 
     private
 
-    # TERM the whole process group, then KILL whatever ignores it after a short grace period.
-    def terminate(wait)
-      Process.kill("TERM", -wait.pid)
-      return if wait.join(@term_grace)
+    def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-      Process.kill("KILL", -wait.pid)
+    # TERM the whole process group, then KILL the group after a grace period, since
+    # descendants can outlive the parent.
+    def terminate(wait)
+      signal_group("TERM", wait.pid)
       wait.join(@term_grace)
-    rescue Errno::ESRCH
+      signal_group("KILL", wait.pid)
+      wait.join(@term_grace)
+    end
+
+    def signal_group(signal, pid)
+      Process.kill(signal, -pid)
+    rescue Errno::ESRCH, Errno::EPERM
       nil
     end
   end
@@ -324,14 +332,17 @@ module DemoFleetUpgrade
       git_dir = File.join(@clone, ".git")
       raise SkipRepo, "No local clone at #{@clone} (clone #{@slug} there first)" unless File.directory?(git_dir)
 
-      remote = git("remote", "get-url", "origin").output.strip
-      unless remote.match?(%r{[:/]#{Regexp.escape(@slug)}(\.git)?\z})
-        raise Error,
-              "#{@clone} origin #{remote} is not #{@slug}"
-      end
+      # The configured URL, before any insteadOf rewrite, must name the manifest repo on GitHub.
+      remote = git("config", "--get", "remote.origin.url").output.strip
+      raise Error, "#{@clone} origin #{remote} is not github.com/#{@slug}" unless github_origin?(remote)
 
       git("fetch", "--prune", "origin") unless options[:no_fetch]
       @default_branch = detect_default_branch
+    end
+
+    def github_origin?(url)
+      slug = Regexp.escape(@slug)
+      url.match?(%r{\A(?:git@github\.com:|ssh://git@github\.com/|https://github\.com/)#{slug}(?:\.git)?/?\z}i)
     end
 
     def detect_default_branch

@@ -87,6 +87,16 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
   end
 
+  def test_command_runner_times_out_a_background_child_holding_output
+    runner = DemoFleetUpgrade::CommandRunner.new(term_grace: 1)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result = runner.run(["sh", "-c", "sleep 30 & echo parent done"], chdir: Dir.tmpdir, timeout: 1)
+
+    refute result.success
+    assert_match(/parent done/, result.output)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
+  end
+
   def test_manifest_selects_by_short_or_full_name
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
     assert_equal(["shakacode/demo-a"], manifest.select(["demo-a"]).map { |r| r["name"] })
@@ -161,6 +171,7 @@ end
 # Builds a bare remote plus an operator clone and runs the CLI against them.
 module FleetFixture
   BRANCH = "chore/demo-fleet/react-on-rails-17.2.1.rc.1"
+  GITHUB_URL = "https://github.com/shakacode/demo-app.git"
 
   def setup
     @tmp = Dir.mktmpdir("demo-fleet-upgrade")
@@ -216,11 +227,9 @@ module FleetFixture
     sh("git", "-C", seed, "commit", "-q", "-m", "seed")
     sh("git", "clone", "-q", "--bare", seed, @remote)
     sh("git", "clone", "-q", @remote, @clone)
-    sh("git", "-C", @clone, "remote", "set-url", "origin", @remote)
-    # The script matches origin against the manifest slug; a local path alias keeps the fixture offline.
-    FileUtils.mkdir_p(File.join(@tmp, "shakacode"))
-    File.symlink(@remote, File.join(@tmp, "shakacode", "demo-app.git"))
-    sh("git", "-C", @clone, "remote", "set-url", "origin", File.join(@tmp, "shakacode", "demo-app.git"))
+    # The script requires a GitHub origin; insteadOf points that URL at the local bare remote.
+    sh("git", "-C", @clone, "remote", "set-url", "origin", GITHUB_URL)
+    sh("git", "-C", @clone, "config", "url.#{@remote}.insteadOf", GITHUB_URL)
     sh("git", "-C", @clone, "fetch", "-q", "origin")
     sh("git", "-C", @clone, "remote", "set-head", "origin", "main")
   end
@@ -375,6 +384,16 @@ class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
     assert_equal 2, lock_dirs
     assert_includes sh("git", "--git-dir", @remote, "show", "#{BRANCH}:client/package-lock.json"), "17.2.1-rc.1"
     assert_match(/js-install-1/, out)
+  end
+
+  def test_origin_on_another_host_is_refused_before_fetching
+    sh("git", "-C", @clone, "remote", "set-url", "origin", "https://example.org/shakacode/demo-app.git")
+
+    out, code = run_cli("--execute")
+
+    assert_equal 1, code
+    assert_match(%r{is not github.com/shakacode/demo-app}, out)
+    refute(@runner.calls.any? { |argv| argv[0..1] == %w[git fetch] })
   end
 
   def test_rejecting_commit_hook_fails_the_repo_without_pushing
