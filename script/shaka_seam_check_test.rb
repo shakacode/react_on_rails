@@ -10,12 +10,12 @@ require "yaml"
 module ShakaTrustConfigHelper
   GitHubTrustFixture = Struct.new(:repository, :contents) do
     def graphql(_query, owner:, name:, expression:, **modern_keywords)
-      expected_expression = "#{'a' * 40}:.agents/trusted-github-actors.yml"
+      base_oid = "a" * 40
       raise "unexpected trust repository" unless [owner, name].join("/") == repository
-      raise "unexpected trust expression: #{expression}" unless expression == expected_expression
+      raise "unexpected trust expression: #{expression}" unless expression.start_with?("#{base_oid}:")
 
       modern_expression = modern_keywords.fetch(:newExpression, nil)
-      if modern_expression && modern_expression != "#{'a' * 40}:.agents/shaka/trusted-github-actors.yml"
+      unless modern_expression == "#{base_oid}:.agents/shaka/trusted-github-actors.yml"
         raise "unexpected modern trust expression: #{modern_expression}"
       end
 
@@ -23,7 +23,7 @@ module ShakaTrustConfigHelper
         "__typename" => "Blob", "text" => contents, "isBinary" => false,
         "isTruncated" => false, "byteSize" => contents.bytesize
       }
-      { "repository" => { "object" => object } }
+      { "repository" => { "object" => nil, "newObject" => object } }
     end
   end
 
@@ -38,11 +38,14 @@ module ShakaTrustConfigHelper
 end
 
 module ShakaSeamFixtureHelper
+  CONFIG_PATH = ".agents/shaka/config.yml"
+  COMMAND_DIRECTORY = ".agents/shaka/bin"
+
   def with_valid_seam
     Dir.mktmpdir("shaka-seam-check") do |root|
       execution_marker = File.join(root, "candidate-wrapper-executed")
-      FileUtils.mkdir_p(File.join(root, ".agents/bin"))
-      File.write(File.join(root, ".agents/agent-workflow.yml"), <<~YAML)
+      FileUtils.mkdir_p(File.join(root, COMMAND_DIRECTORY))
+      File.write(File.join(root, CONFIG_PATH), <<~YAML)
         ---
         version: 1
         base_branch: main
@@ -57,7 +60,7 @@ module ShakaSeamFixtureHelper
           preference: ask
       YAML
       %w[setup validate test].each do |name|
-        command = File.join(root, ".agents/bin", name)
+        command = File.join(root, COMMAND_DIRECTORY, name)
         File.write(command, "#!/bin/sh\ntouch #{execution_marker.dump}\n")
         File.chmod(0o755, command)
       end
@@ -97,11 +100,11 @@ module ShakaSeamFixtureHelper
   end
 
   def append_config(root, content)
-    File.open(File.join(root, ".agents/agent-workflow.yml"), "a") { |file| file.write(content) }
+    File.open(File.join(root, CONFIG_PATH), "a") { |file| file.write(content) }
   end
 
   def replace_config(root, old_value, new_value)
-    path = File.join(root, ".agents/agent-workflow.yml")
+    path = File.join(root, CONFIG_PATH)
     source = File.read(path)
     raise "missing fixture value: #{old_value}" unless source.include?(old_value)
 
@@ -109,7 +112,7 @@ module ShakaSeamFixtureHelper
   end
 
   def update_config(root)
-    path = File.join(root, ".agents/agent-workflow.yml")
+    path = File.join(root, CONFIG_PATH)
     config = YAML.safe_load_file(path, permitted_classes: [], aliases: false)
     yield config
     File.write(path, YAML.dump(config))
@@ -175,7 +178,7 @@ class ShakaSeamCheckTest < Minitest::Test
     with_valid_seam do |root|
       append_config(root, "surprise: true\n")
 
-      assert_rejected(root, "unknown .agents/agent-workflow.yml key: surprise")
+      assert_rejected(root, "unknown #{CONFIG_PATH} key: surprise")
     end
   end
 
@@ -191,7 +194,7 @@ class ShakaSeamCheckTest < Minitest::Test
     with_valid_seam do |root|
       update_config(root) { |config| config.delete("review") }
 
-      assert_rejected(root, "missing .agents/agent-workflow.yml key: review")
+      assert_rejected(root, "missing #{CONFIG_PATH} key: review")
     end
   end
 
@@ -233,34 +236,34 @@ class ShakaSeamCheckTest < Minitest::Test
         outside_command = File.join(outside_root, "command")
         File.write(outside_command, "#!/bin/sh\nexit 0\n")
         File.chmod(0o755, outside_command)
-        FileUtils.rm(File.join(root, ".agents/bin/test"))
-        File.symlink(outside_command, File.join(root, ".agents/bin/test"))
+        FileUtils.rm(File.join(root, COMMAND_DIRECTORY, "test"))
+        File.symlink(outside_command, File.join(root, COMMAND_DIRECTORY, "test"))
 
-        assert_rejected(root, ".agents/bin/test must resolve inside the repository")
+        assert_rejected(root, "#{COMMAND_DIRECTORY}/test must resolve inside the repository")
       end
     end
   end
 
   def test_missing_required_command_is_rejected
     with_valid_seam do |root|
-      FileUtils.rm(File.join(root, ".agents/bin/validate"))
+      FileUtils.rm(File.join(root, COMMAND_DIRECTORY, "validate"))
 
-      assert_rejected(root, ".agents/bin/validate does not exist")
+      assert_rejected(root, "#{COMMAND_DIRECTORY}/validate does not exist")
     end
   end
 
   def test_non_executable_required_command_is_rejected
     with_valid_seam do |root|
-      File.chmod(0o644, File.join(root, ".agents/bin/setup"))
+      File.chmod(0o644, File.join(root, COMMAND_DIRECTORY, "setup"))
 
-      assert_rejected(root, ".agents/bin/setup is not executable")
+      assert_rejected(root, "#{COMMAND_DIRECTORY}/setup is not executable")
     end
   end
 
   def test_repository_trust_config_is_accepted_by_shaka
     skip "installed Shaka does not expose its skill library" unless SHAKA_SKILL_ROOT
 
-    trust_path = File.join(REPOSITORY_ROOT, ".agents/trusted-github-actors.yml")
+    trust_path = File.join(REPOSITORY_ROOT, ".agents/shaka/trusted-github-actors.yml")
 
     merged = load_trust_config(File.binread(trust_path))
 

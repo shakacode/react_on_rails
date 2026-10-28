@@ -1,20 +1,21 @@
 # Agent Workflow Scripts
 
-Standard entry points that portable agent-workflow skills call, so a skill can
-run `.agents/bin/<name>` in any repo without knowing this repo's specific
-commands. Each script is a thin, repo-owned wrapper. The scripts listed below
-are required for this repo's portable contract; capabilities without a listed
-script are n/a here.
+Repository-owned wrappers that coding agents and skills call instead of
+hard-coding this repo's commands. Shaka's required commands (`setup`, `validate`,
+`test`) live in `.agents/shaka/bin/`; this directory keeps the
+other tools. Capabilities without a listed script are n/a here.
 
-| Script      | Purpose                                      | This repo runs                                                                                                     |
-| ----------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `setup`     | Install dependencies                         | `bin/setup`                                                                                                        |
-| `validate`  | Pre-push gate (`--changed`/`--all`/`--fast`) | `bin/ci-local`                                                                                                     |
-| `test`      | Run tests                                    | `(cd react_on_rails && bundle exec rake run_rspec:all_but_examples)` (includes JS tests via rake dependency)       |
-| `lint`      | Lint / format (`rake autofix` to fix)        | `(cd react_on_rails && bundle exec rake lint)` + Pro RuboCop + `pnpm run lint` + `pnpm start format.listDifferent` |
-| `build`     | Build / type-check                           | `pnpm run build` + `pnpm run type-check` + OSS and Pro RBS validation when present                                 |
-| `docs`      | Docs checks                                  | `script/check-docs-sidebar` + `bin/check-links`                                                                    |
-| `ci-detect` | CI change detector                           | `script/ci-changes-detector [base-ref]` (default `origin/main`)                                                    |
+| Script       | Purpose                                      | This repo runs                                                                                                     |
+| ------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `setup`\*    | Install dependencies                         | `bin/setup`                                                                                                        |
+| `validate`\* | Pre-push gate (`--changed`/`--all`/`--fast`) | `bin/ci-local`                                                                                                     |
+| `test`\*     | Run tests                                    | `(cd react_on_rails && bundle exec rake run_rspec:all_but_examples)` (includes JS tests via rake dependency)       |
+| `lint`       | Lint / format (`rake autofix` to fix)        | `(cd react_on_rails && bundle exec rake lint)` + Pro RuboCop + `pnpm run lint` + `pnpm start format.listDifferent` |
+| `build`      | Build / type-check                           | `pnpm run build` + `pnpm run type-check` + OSS and Pro RBS validation when present                                 |
+| `docs`       | Docs checks                                  | `script/check-docs-sidebar` + `bin/check-links`                                                                    |
+| `ci-detect`  | CI change detector                           | `script/ci-changes-detector [base-ref]` (default `origin/main`)                                                    |
+
+\* In `.agents/shaka/bin/`.
 
 `validate` intentionally delegates base discovery to `bin/ci-local`; do not pass
 a normal `<base-ref>` argument. See
@@ -29,7 +30,7 @@ Additional helper:
   `$HOME/src/agent-workflows`. Use it when a workflow needs a helper script from
   a shared skill without keeping duplicate local `SKILL.md` copies.
 
-Shaka typed policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
+Shaka typed policy lives in `.agents/shaka/config.yml`.
 Installed Shaka is the seam validator; required CI checks out an immutable
 Shaka Git revision and runs `seam check --local` plus the consumer regression
 fixtures in `script/shaka_seam_check_test.rb`.

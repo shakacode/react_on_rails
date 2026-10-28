@@ -940,11 +940,24 @@ test_agent_tooling_changes_are_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "agent tooling output"
 }
 
-test_agent_bin_change_runs_ci_infrastructure_without_benchmarks() {
+test_agent_tool_change_runs_ci_infrastructure() {
   setup_repo
   mkdir -p .agents/bin
-  printf '#!/usr/bin/env ruby\nputs "validate"\n' > .agents/bin/validate
-  commit_change "update agent workflow binstub"
+  printf '#!/usr/bin/env bash\necho lint\n' > .agents/bin/lint
+  commit_change "update agent lint tool"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "agent tool output"
+  assert_contains "$out" '"run_lint": true' "agent tool output"
+  assert_contains "$out" '"run_core_benchmarks": false' "agent tool output"
+}
+
+test_shaka_command_change_runs_ci_infrastructure_without_benchmarks() {
+  setup_repo
+  mkdir -p .agents/shaka/bin
+  printf '#!/usr/bin/env ruby\nputs "validate"\n' > .agents/shaka/bin/validate
+  commit_change "update Shaka validate wrapper"
 
   local out
   out="$(detector_output)"
@@ -982,11 +995,11 @@ test_agent_bin_markdown_change_is_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "agent bin markdown output"
 }
 
-test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks() {
+test_shaka_config_change_runs_ci_infrastructure_without_benchmarks() {
   setup_repo
-  mkdir -p .agents
-  printf 'version: 1\n' > .agents/agent-workflow.yml
-  commit_change "update agent workflow seam config"
+  mkdir -p .agents/shaka
+  printf 'version: 1\n' > .agents/shaka/config.yml
+  commit_change "update Shaka config"
 
   local out
   out="$(detector_output)"
@@ -2215,9 +2228,10 @@ run_test test_docs_internal_non_markdown_file_is_non_runtime_only
 run_test test_docs_internal_image_only_is_non_runtime_only
 run_test test_docs_internal_doc_plus_runtime_source_still_runs_tests
 run_test test_agent_tooling_changes_are_non_runtime_only
-run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
+run_test test_agent_tool_change_runs_ci_infrastructure
+run_test test_shaka_command_change_runs_ci_infrastructure_without_benchmarks
 run_test test_agent_bin_markdown_change_is_non_runtime_only
-run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
+run_test test_shaka_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
 run_test test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present
 run_test test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec
