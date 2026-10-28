@@ -27,8 +27,9 @@ require "rails_helper"
 # renderer: `cd spec/dummy && pnpm run node-renderer`.
 #
 # Each example names the regression it catches. "Break-it" references (M-IDs)
-# map to the mutation evidence recorded in
-# .claude/docs/issue-5002-deep-test-investigation-and-plan.md §4.
+# map to the mutation evidence recorded on issue #5002 and in this file's PR
+# description (each M-ID is one deliberate implementation breakage that the
+# pre-existing suite did not detect).
 describe "PPR request-level behavior", :caching, :server_rendering do
   let(:renderer_stream_js_calls) { [] }
 
@@ -87,7 +88,10 @@ describe "PPR request-level behavior", :caching, :server_rendering do
 
     get ppr_path(key, dynamic_value: "cold-props-value")
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("cold-props-value")
+    # Bind the HOLE MARKUP, not a bare value scan: the rails-context tag echoes the
+    # request URL (href/location/search), so any dynamicValue appears in the body
+    # several times regardless of what the render produced.
+    expect(response.body).to include('<p id="ppr-dynamic-value">cold-props-value</p>')
     expect(prerender_calls).to eq(1)
 
     renderer_stream_js_calls.clear
@@ -97,12 +101,10 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     # Warm request: cached shell, no prerender, exactly one resume.
     expect(prerender_calls).to eq(0)
     expect(resume_calls).to eq(1)
-    # The fresh value must appear — in the regenerated component specification tag
-    # AND in the resumed hole content. Cold and warm values are DIFFERENT on
-    # purpose: with a shared value, stale cold-request bytes can satisfy a
-    # fresh-props assertion (how break-it M4 survived the previous suite).
-    expect(response.body.scan("warm-props-value").length).to be >= 2
-    expect(response.body).to include('id="ppr-dynamic-value"')
+    # The resumed hole must carry THIS request's fresh value. Cold and warm values
+    # are DIFFERENT on purpose: with a shared value, stale cold-request bytes can
+    # satisfy a fresh-props assertion (how break-it M4 survived the previous suite).
+    expect(response.body).to include('<p id="ppr-dynamic-value">warm-props-value</p>')
   end
 
   it "cold->warm: the cold request's props are ABSENT from the warm response " \
@@ -214,8 +216,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
       expect(response).to have_http_status(:ok)
       expect(prerender_calls).to eq(1)
       expect(resume_calls).to eq(0)
-      # The hole content made it into the shell itself.
-      expect(response.body).to include("settled-value")
+      # The hole MARKUP (not just the URL-echoed value) made it into the shell:
+      # with no resume phase, only the shell can have rendered it.
+      expect(response.body).to include('<p id="ppr-dynamic-value">settled-value</p>')
       expect(events_named(events, "ppr.static_shell").length).to eq(1)
     end
 
