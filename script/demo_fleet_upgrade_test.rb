@@ -148,7 +148,8 @@ class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
   end
 end
 
-class DemoFleetUpgradeFlowTest < Minitest::Test
+# Builds a bare remote plus an operator clone and runs the CLI against them.
+module FleetFixture
   BRANCH = "chore/demo-fleet/react-on-rails-17.2.1.rc.1"
 
   def setup
@@ -166,6 +167,94 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     git_env.each_key { |key| ENV[key] = @saved_env[key] }
     FileUtils.rm_rf(@tmp)
   end
+
+  private
+
+  def git_env
+    { "GIT_CONFIG_GLOBAL" => File::NULL, "GIT_CONFIG_NOSYSTEM" => "1", "GIT_AUTHOR_NAME" => "Fleet Test",
+      "GIT_AUTHOR_EMAIL" => "fleet@example.com", "GIT_COMMITTER_NAME" => "Fleet Test",
+      "GIT_COMMITTER_EMAIL" => "fleet@example.com" }
+  end
+
+  def manifest
+    DemoFleetUpgrade::Manifest.new(
+      "defaults" => { "branch_prefix" => "chore/demo-fleet", "package_manager" => "npm" },
+      "repos" => [{ "name" => "shakacode/demo-app", "js_test" => nil }]
+    )
+  end
+
+  def run_cli(*args, version: "17.2.1.rc.1")
+    out = StringIO.new
+    argv = [version, "--demos-dir", @demos, "--work-dir", File.join(@tmp, "work"), "--skip-registry-check",
+            "--jobs", "1", *args]
+    code = DemoFleetUpgrade::CLI.new(argv, runner: @runner, out:, manifest:).run
+    [out.string, code]
+  end
+
+  def build_fixture
+    seed = File.join(@tmp, "seed")
+    FileUtils.mkdir_p(seed)
+    File.write(File.join(seed, "Gemfile"), %(source "https://rubygems.org"\ngem "react_on_rails_pro", "= 17.2.0"\n))
+    File.write(File.join(seed, "Gemfile.lock"),
+               "GEM\n  specs:\n    react_on_rails (17.2.0)\n    react_on_rails_pro (17.2.0)\n      react_on_rails\n")
+    package = { "packageManager" => "npm@10.8.2", "dependencies" => { "react-on-rails-pro" => "17.2.0" },
+                "overrides" => { "react-on-rails" => "17.2.0" } }
+    File.write(File.join(seed, "package.json"), "#{JSON.pretty_generate(package)}\n")
+    File.write(File.join(seed, "package-lock.json"), "{}\n")
+    sh("git", "init", "-q", "-b", "main", seed)
+    sh("git", "-C", seed, "add", ".")
+    sh("git", "-C", seed, "commit", "-q", "-m", "seed")
+    sh("git", "clone", "-q", "--bare", seed, @remote)
+    sh("git", "clone", "-q", @remote, @clone)
+    sh("git", "-C", @clone, "remote", "set-url", "origin", @remote)
+    # The script matches origin against the manifest slug; a local path alias keeps the fixture offline.
+    FileUtils.mkdir_p(File.join(@tmp, "shakacode"))
+    File.symlink(@remote, File.join(@tmp, "shakacode", "demo-app.git"))
+    sh("git", "-C", @clone, "remote", "set-url", "origin", File.join(@tmp, "shakacode", "demo-app.git"))
+    sh("git", "-C", @clone, "fetch", "-q", "origin")
+    sh("git", "-C", @clone, "remote", "set-head", "origin", "main")
+  end
+
+  def push_foreign_commit(file, from: BRANCH)
+    other = File.join(@tmp, "other-#{file}")
+    sh("git", "clone", "-q", "-b", from, @remote, other)
+    sh("git", "-C", other, "checkout", "-q", "-B", BRANCH)
+    File.write(File.join(other, file), "fix\n")
+    sh("git", "-C", other, "add", file)
+    sh("git", "-C", other, "commit", "-q", "-m", "agent fix")
+    sh("git", "-C", other, "push", "-q", "-f", "origin", BRANCH) # simulates another writer, not the script
+    remote_branch_sha
+  end
+
+  def push_to_main(write: {}, delete: [])
+    other = File.join(@tmp, "main-#{rand(1_000_000)}")
+    sh("git", "clone", "-q", @remote, other)
+    write.each do |path, text|
+      FileUtils.mkdir_p(File.dirname(File.join(other, path)))
+      File.write(File.join(other, path), text)
+    end
+    sh("git", "-C", other, "rm", "-q", *delete) unless delete.empty?
+    sh("git", "-C", other, "add", "-A")
+    sh("git", "-C", other, "commit", "-q", "-m", "main moves on")
+    sh("git", "-C", other, "push", "-q", "origin", "main")
+  end
+
+  def remote_branch_sha
+    out, status = Open3.capture2e("git", "--git-dir", @remote, "rev-parse", "--verify", "--quiet",
+                                  "refs/heads/#{BRANCH}")
+    status.success? ? out.strip : nil
+  end
+
+  def sh(*argv)
+    out, status = Open3.capture2e(*argv)
+    raise "#{argv.join(' ')} failed: #{out}" unless status.success?
+
+    out.strip
+  end
+end
+
+class DemoFleetUpgradeFlowTest < Minitest::Test
+  include FleetFixture
 
   def test_dry_run_plans_without_touching_git_state
     out, code = run_cli
@@ -240,75 +329,40 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
 
     assert_match(/up to date/, out)
   end
+end
 
-  private
+class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
+  include FleetFixture
 
-  def git_env
-    { "GIT_CONFIG_GLOBAL" => File::NULL, "GIT_CONFIG_NOSYSTEM" => "1", "GIT_AUTHOR_NAME" => "Fleet Test",
-      "GIT_AUTHOR_EMAIL" => "fleet@example.com", "GIT_COMMITTER_NAME" => "Fleet Test",
-      "GIT_COMMITTER_EMAIL" => "fleet@example.com" }
+  def test_pins_files_the_default_branch_added_after_the_operator_checkout
+    push_to_main(write: { "client/package.json" => %({ "dependencies": { "react-on-rails": "17.2.0" } }\n) })
+
+    out, code = run_cli("--execute")
+
+    assert_equal 0, code, out
+    assert_includes sh("git", "--git-dir", @remote, "show", "#{BRANCH}:client/package.json"), "17.2.1-rc.1"
   end
 
-  def manifest
-    DemoFleetUpgrade::Manifest.new(
-      "defaults" => { "branch_prefix" => "chore/demo-fleet", "package_manager" => "npm" },
-      "repos" => [{ "name" => "shakacode/demo-app", "js_test" => nil }]
-    )
+  def test_repo_without_js_lockfile_still_opens_pr
+    push_to_main(delete: %w[package.json package-lock.json])
+
+    out, code = run_cli("--execute")
+
+    assert_equal 0, code, out
+    assert_match(/pr opened/, out)
+    body = File.read(File.join(@tmp, "work", "logs", "demo-app", "pr-body.md"))
+    assert_match(/No JS lockfile found/, body)
   end
 
-  def run_cli(*args, version: "17.2.1.rc.1")
-    out = StringIO.new
-    argv = [version, "--demos-dir", @demos, "--work-dir", File.join(@tmp, "work"), "--skip-registry-check",
-            "--jobs", "1", *args]
-    code = DemoFleetUpgrade::CLI.new(argv, runner: @runner, out:, manifest:).run
-    [out.string, code]
-  end
+  def test_rejecting_commit_hook_fails_the_repo_without_pushing
+    hook = File.join(@clone, ".git", "hooks", "pre-commit")
+    File.write(hook, "#!/bin/sh\necho blocked by hook\nexit 1\n")
+    File.chmod(0o755, hook)
 
-  def build_fixture
-    seed = File.join(@tmp, "seed")
-    FileUtils.mkdir_p(seed)
-    File.write(File.join(seed, "Gemfile"), %(source "https://rubygems.org"\ngem "react_on_rails_pro", "= 17.2.0"\n))
-    File.write(File.join(seed, "Gemfile.lock"),
-               "GEM\n  specs:\n    react_on_rails (17.2.0)\n    react_on_rails_pro (17.2.0)\n      react_on_rails\n")
-    package = { "packageManager" => "npm@10.8.2", "dependencies" => { "react-on-rails-pro" => "17.2.0" },
-                "overrides" => { "react-on-rails" => "17.2.0" } }
-    File.write(File.join(seed, "package.json"), "#{JSON.pretty_generate(package)}\n")
-    File.write(File.join(seed, "package-lock.json"), "{}\n")
-    sh("git", "init", "-q", "-b", "main", seed)
-    sh("git", "-C", seed, "add", ".")
-    sh("git", "-C", seed, "commit", "-q", "-m", "seed")
-    sh("git", "clone", "-q", "--bare", seed, @remote)
-    sh("git", "clone", "-q", @remote, @clone)
-    sh("git", "-C", @clone, "remote", "set-url", "origin", @remote)
-    # The script matches origin against the manifest slug; a local path alias keeps the fixture offline.
-    FileUtils.mkdir_p(File.join(@tmp, "shakacode"))
-    File.symlink(@remote, File.join(@tmp, "shakacode", "demo-app.git"))
-    sh("git", "-C", @clone, "remote", "set-url", "origin", File.join(@tmp, "shakacode", "demo-app.git"))
-    sh("git", "-C", @clone, "fetch", "-q", "origin")
-    sh("git", "-C", @clone, "remote", "set-head", "origin", "main")
-  end
+    out, code = run_cli("--execute")
 
-  def push_foreign_commit(file, from: BRANCH)
-    other = File.join(@tmp, "other-#{file}")
-    sh("git", "clone", "-q", "-b", from, @remote, other)
-    sh("git", "-C", other, "checkout", "-q", "-B", BRANCH)
-    File.write(File.join(other, file), "fix\n")
-    sh("git", "-C", other, "add", file)
-    sh("git", "-C", other, "commit", "-q", "-m", "agent fix")
-    sh("git", "-C", other, "push", "-q", "-f", "origin", BRANCH) # simulates another writer, not the script
-    remote_branch_sha
-  end
-
-  def remote_branch_sha
-    out, status = Open3.capture2e("git", "--git-dir", @remote, "rev-parse", "--verify", "--quiet",
-                                  "refs/heads/#{BRANCH}")
-    status.success? ? out.strip : nil
-  end
-
-  def sh(*argv)
-    out, status = Open3.capture2e(*argv)
-    raise "#{argv.join(' ')} failed: #{out}" unless status.success?
-
-    out.strip
+    assert_equal 1, code
+    assert_match(/commit failed/, out)
+    refute remote_branch_sha
   end
 end

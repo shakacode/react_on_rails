@@ -278,18 +278,18 @@ module DemoFleetUpgrade
 
     def start_ref = remote_branch? ? "origin/#{@branch}" : "origin/#{@default_branch}"
 
-    def show(ref, path)
-      outcome = git("show", "#{ref}:#{path}", allow_failure: true)
+    def show(ref, path, chdir: @clone)
+      outcome = git("show", "#{ref}:#{path}", chdir:, allow_failure: true)
       outcome.success ? outcome.output : nil
     end
 
-    def tracked_files(ref)
-      git("ls-tree", "-r", "--name-only", ref).output.lines.map(&:strip)
+    def tracked_files(ref, chdir: @clone)
+      git("ls-tree", "-r", "--name-only", ref, chdir:).output.lines.map(&:strip)
     end
 
     # Computes the pin edits a ref still needs, from committed file contents only.
-    def read_plan(ref)
-      files = file_contents(ref)
+    def read_plan(ref, chdir: @clone)
+      files = file_contents(ref, chdir:)
       changes = []
       errors = []
       files.each do |path, text|
@@ -305,11 +305,11 @@ module DemoFleetUpgrade
       { changes:, errors:, files: }
     end
 
-    def file_contents(ref)
-      paths = tracked_files(ref).select do |path|
+    def file_contents(ref, chdir:)
+      paths = tracked_files(ref, chdir:).select do |path|
         path == "Gemfile" || (File.basename(path) == "package.json" && path.count("/") <= 1)
       end
-      paths.to_h { |path| [path, show(ref, path)] }.compact
+      paths.to_h { |path| [path, show(ref, path, chdir:)] }.compact
     end
 
     def gem_pins
@@ -398,7 +398,7 @@ module DemoFleetUpgrade
     end
 
     def apply_pins
-      read_plan("HEAD").fetch(:files).each_key do |path|
+      read_plan("HEAD", chdir: @worktree).fetch(:files).each_key do |path|
         full_path = File.join(@worktree, path)
         editor = path.end_with?("Gemfile") ? GemfileEditor : PackageJsonEditor
         pins = path.end_with?("Gemfile") ? gem_pins : npm_pins
@@ -511,7 +511,8 @@ module DemoFleetUpgrade
       return false if changed.empty?
 
       git("add", "--", *changed, chdir: @worktree)
-      git("-c", "core.hooksPath=/dev/null", "commit", "-m", commit_message, chdir: @worktree)
+      # Repository hooks run; a rejecting hook fails this repo with its log instead of being skipped.
+      step("commit", ["git", "commit", "-m", commit_message], fatal: true)
       true
     end
 
@@ -567,13 +568,19 @@ module DemoFleetUpgrade
         #{rows.empty? ? '| (no pin changes on this run) | | | |' : rows.join("\n")}
 
         Locked gems after `bundle lock --update`: #{locked_gems_summary}.
-        JS lockfile regenerated with `#{lock_command.shelljoin}` (#{package_manager}).
+        #{js_lock_summary}
 
         Local smoke: **#{result.smoke}**.
         #{options[:issue_url] ? "\nRelease tracking: #{options[:issue_url]}\n" : ''}
         Still needed before merge: this repo's CI, the review-app deploy and smoke (then shut it down),
         and any baseline fixes. Opened as a draft by `script/demo-fleet-upgrade` in shakacode/react_on_rails.
       MARKDOWN
+    end
+
+    def js_lock_summary
+      return "No JS lockfile found, so no JS lockfile was regenerated." unless js_root
+
+      "JS lockfile regenerated with `#{lock_command.shelljoin}` (#{package_manager})."
     end
 
     def locked_gems_summary
