@@ -673,7 +673,7 @@ Known residual risk: <none or concise risk>
 Finalized by: <different GitHub account or named check/app, with GitHub review/check or git-log source>
 ```
 
-Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on the exact release-branch SHA being promoted, and get an explicit maintainer release decision before publishing the final release.
+Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: audit the PRs merged into the release line for missed review findings, unaddressed late bot comments, and changelog gaps, update the changelog/release notes as needed, confirm required checks on the exact release-branch SHA being promoted, and get an explicit maintainer release decision before publishing the final release.
 
 Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, using the larger deduction when unsure, and at least 2 points for any failed or unexplained check. Missing required validation for a changed surface is at least a 2-point deduction. Any unresolved non-trivial concern disqualifies auto-merge regardless of score. A missing independent finalizer disqualifies auto-merge regardless of score.
 
@@ -736,7 +736,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
   waive or record the optional item in a triage reply or decision log instead of
   spending another CI/review cycle.
 - During accelerated-RC auto-merge, the default waiver-soak window is 10 minutes after the latest final waiver or triage reply before merge. A distinct finalizer or maintainer may override that default only with an explicit auditable acknowledgement: a PR comment, GitHub review, or issue/release-tracker comment that names the final waiver set and immediate-merge decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule above.
-- The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout route into the next post-merge audit intake by default.
+- The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout follow Shaka's reviews-after-merge procedure by default.
 
 For auto-merge, all GitHub checks for the current head SHA must be complete.
 An empty full `gh pr checks <PR>` list is `UNKNOWN` / not ready, not a

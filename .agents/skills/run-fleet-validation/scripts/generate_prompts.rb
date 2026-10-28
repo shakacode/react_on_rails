@@ -362,9 +362,9 @@ module FleetValidation
         2. Before starting a mutable app worker, acquire or resume its authoritative `agent-coord` claim
            under the candidate-specific batch/target recorded in live coordination. If no lane exists for
            a fresh target, use its generated fallback claim target shown below. Never use the fallback to
-           bypass an active/refused existing claim or completed handoff. Follow
-           the coordination rules in `AGENTS.md`: targeted status is preflight only; the claim is the
-           compare-and-swap gate. Hard-stop that target on CLAIM_REFUSED. On claim timeout or unknown
+           bypass an active/refused existing claim or completed handoff. Targeted
+           status is preflight only; the claim is the compare-and-swap gate. Hard-stop that
+           target on CLAIM_REFUSED. On claim timeout or unknown
            outcome, report UNKNOWN and do not create a branch/worktree. Resume another owner's work only
            through an explicit fenced handoff. Replace `RESOLVED_TAG` in a fallback template with the exact
            tag before status/claim and use the displayed fallback claim repository; never submit the
