@@ -105,6 +105,8 @@ describe "PPR request-level behavior", :caching, :server_rendering do
       expect(resume_calls).to eq(1)
       expect(events_named(events, "ppr.resume.degraded_pre_flush")).to be_empty
       expect(events_named(events, "ppr.resume.degraded_post_flush")).to be_empty
+      # The cached shell content reached the response (not just the resume stream).
+      expect(response.body).to include("Static section rendered in the PPR shell")
       # The resumed hole must carry THIS request's fresh value. Cold and warm values
       # are DIFFERENT on purpose: with a shared value, stale cold-request bytes can
       # satisfy a fresh-props assertion (how break-it M4 survived the previous suite).
@@ -154,6 +156,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
       expect(prerender_calls).to eq(0)
       expect(resume_calls).to eq(0)
       expect(response.body).not_to include("$RC(")
+      # The cached shell's content actually reached the warm response — an empty
+      # body would otherwise satisfy every zero-renderer-call assertion above.
+      expect(response.body).to include("Static section rendered in the PPR shell")
       static_events = events_named(events, "ppr.static_shell")
       expect(static_events.length).to eq(1)
       expect(static_events.first[:payload][:cache_hit]).to be(true)
