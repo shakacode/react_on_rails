@@ -1,7 +1,8 @@
 # Agent Workflow Adoption
 
 React on Rails uses [Shaka](https://github.com/shakacode/shaka)'s versioned
-repository contract, which lives in `.agents/shaka/config.yml`.
+repository contract, which lives in
+[`.agents/shaka/config.yml`](../../.agents/shaka/config.yml).
 
 ## Current Boundary
 

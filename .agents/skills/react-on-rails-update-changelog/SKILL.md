@@ -23,7 +23,7 @@ Before editing, read:
 1. `AGENTS.md` changelog and release-train sections.
 2. `internal/contributor-info/release-train-runbook.md` when the target is a
    `release/*` branch.
-3. `.agents/agent-workflow.yml` for `base_branch`, and the Changelog section of
+3. `.agents/shaka/config.yml` for `base_branch`, and the Changelog section of
    `AGENTS.md` for changelog policy.
 
 Use the repo-owned helper for mechanical classification sweeps:

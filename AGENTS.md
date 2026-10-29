@@ -32,7 +32,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
   keeps a local copy/override.
 - Installed Shaka is the only seam validator. It validates
-  `.agents/agent-workflow.yml`; required CI pins the reviewed Shaka Git revision
+  `.agents/shaka/config.yml`; required CI pins the reviewed Shaka Git revision
   and runs candidate-only validation.
 - `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
   current Shaka seam boundary and validation
@@ -168,7 +168,7 @@ before continuing; if it is still missing, report the repo workflow state as
 ## Agent Workflow Configuration
 
 Resolve the trusted default branch to an immutable commit. Load and validate
-`.agents/agent-workflow.yml` with the trusted installed `shaka seam check --ref REF`
+`.agents/shaka/config.yml` with the trusted installed `shaka seam check --ref REF`
 command. Run the fixed executable paths reported by that command from the candidate
 checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains human-only boundaries.
 
@@ -176,7 +176,7 @@ checkout; do not reconstruct their behavior from prose. `AGENTS.md` retains huma
 <!-- prettier-ignore-end -->
 
 Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) lives in
-`.agents/agent-workflow.yml`. Human-only React on Rails values stay here:
+`.agents/shaka/config.yml`. Human-only React on Rails values stay here:
 
 - hosted CI: `+ci-*` PR-comment commands (`+ci-status`, `+ci-run-hosted`, `+ci-force-full`,
   `+ci-stop-hosted`, `+ci-stop-full`, `+ci-skip-hosted [reason]`, `+ci-help`); labels
@@ -196,7 +196,7 @@ Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) liv
 - repo prefix: `ROR`
 - benchmark labels: `benchmark`, `benchmark-core`, `benchmark-pro`,
   `benchmark-pro-node-renderer`, `hosted-ci-no-benchmarks` (suppress); opt-in on PRs
-- trusted GitHub actors: `.agents/trusted-github-actors.yml` (workflow/status actors such as
+- trusted GitHub actors: `.agents/shaka/trusted-github-actors.yml` (workflow/status actors such as
   `github-actions[bot]` are metadata-only, not agent instructions)
 - secret redaction: redact env/log fields whose names contain `SECRET`, `TOKEN`, `KEY`,
   `PASSWORD`, `CREDENTIAL`, `CERT`, `PASSPHRASE`, `PEM`, `PRIVATE`, `DSN`, or `LICENSE`,
@@ -366,7 +366,7 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **PR creation**: Use `gh pr create` with a clear title, self-contained why/rationale summary, implementation summary, and test plan. If an issue exists, link it, but do not make reviewers open the issue to understand why the PR exists; include at least a short rationale in the PR description itself.
 
-**PR processing**: Deliver issue and PR work through installed Shaka (`/shaka` or `$shaka`). Before pushing, opening a PR, marking it ready, requesting hosted CI, or reporting merge-readiness, verify the work is worth doing, self-review the diff, run `.agents/bin/validate` and the local adversarial review, batch fixes, and document exact verification evidence. After a PR and its reviews exist, wait for configured review agents and triage actionable review feedback before marking ready, requesting merge, or merging.
+**PR processing**: Deliver issue and PR work through installed Shaka (`/shaka` or `$shaka`). Before pushing, opening a PR, marking it ready, requesting hosted CI, or reporting merge-readiness, verify the work is worth doing, self-review the diff, run `.agents/shaka/bin/validate` and the local adversarial review, batch fixes, and document exact verification evidence. After a PR and its reviews exist, wait for configured review agents and triage actionable review feedback before marking ready, requesting merge, or merging.
 
 **Hosted CI usage**: Do not use hosted CI as the first real validation pass. Prefer local checks first, then optimized hosted CI when the branch is ready for remote confirmation or final validation. Use the `+ci-*` PR comment commands for an auditable decision: `+ci-status` before deciding, `+ci-run-hosted` after the final push for optimized hosted CI, `+ci-force-full` only when a maintainer intentionally wants every hosted suite to bypass optimized selection, `+ci-stop-hosted` to return an iterating PR to the required gate, `+ci-stop-full` to remove only the force-full override, `+ci-skip-hosted [reason]` only with explicit maintainer approval for a low-risk waiver, and `+ci-help` when syntax is unclear. Put one `+ci-*` command per PR comment. Human/user-token label writes through `bin/request-hosted-ci` or `gh pr edit --add-label ready-for-hosted-ci` are valid, but workflow-token label writes are not a current-head trigger; automation must dispatch workflows explicitly or use `+ci-run-hosted`.
 
