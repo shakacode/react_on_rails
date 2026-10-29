@@ -446,6 +446,16 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     assert remote_branch_sha
   end
 
+  def test_unparseable_package_json_needs_an_agent
+    push_to_main(write: { "Gemfile" => %(gem "rails", "8.0.0"\n),
+                          "package.json" => %({ "dependencies": { "react-on-rails-pro": "17.2.0" }, }\n) })
+
+    out, code = run_cli
+
+    assert_equal 1, code
+    assert_match(/needs agent.*package.json does not parse/, out)
+  end
+
   def test_repo_already_on_target_is_up_to_date
     out, = run_cli(version: "17.2.0")
 

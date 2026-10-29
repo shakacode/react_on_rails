@@ -106,7 +106,12 @@ module DemoFleetUpgrade
     DEPENDENCY_SECTIONS = %w[dependencies devDependencies optionalDependencies].freeze
     OVERRIDE_SECTIONS = [%w[overrides], %w[resolutions], %w[pnpm overrides]].freeze
 
-    def declares?(text, names) = names.any? { |name| entries(text, name).any? }
+    # A file that does not parse counts as declaring, so rewrite reports the parse error as needs agent.
+    def declares?(text, names)
+      names.any? { |name| entries(text, name).any? }
+    rescue JSON::ParserError
+      true
+    end
 
     def rewrite(text, pins)
       changes = []
