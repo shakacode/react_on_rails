@@ -575,8 +575,10 @@ module DemoFleetUpgrade
       apply_pins
       regenerate_gem_lock
       regenerate_js_lock
+      upgrade_files = changed_files
       run_smoke
-      commit_changes
+      discard_smoke_changes(upgrade_files)
+      commit_changes(upgrade_files)
     rescue StandardError
       restore_own_edits
       raise
@@ -746,8 +748,18 @@ module DemoFleetUpgrade
       outcome
     end
 
-    def commit_changes
-      changed = git("diff", "--name-only", chdir: @worktree).output.lines.map(&:strip)
+    def changed_files
+      git("diff", "--name-only", "HEAD", chdir: @worktree).output.lines.map(&:strip).reject(&:empty?)
+    end
+
+    # Smoke commands (tests, builds) can rewrite tracked artifacts; those changes are not part of the
+    # upgrade, so they are put back and only the pin and lockfile changes are committed.
+    def discard_smoke_changes(upgrade_files)
+      extra = changed_files - upgrade_files
+      git("checkout", "HEAD", "--", *extra, chdir: @worktree) unless extra.empty?
+    end
+
+    def commit_changes(changed)
       return false if changed.empty?
 
       git("add", "--", *changed, chdir: @worktree)
