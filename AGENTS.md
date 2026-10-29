@@ -7,39 +7,21 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 ## Reusable Workflows
 
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
-- Shared agent workflow skills may be installed in the user's or agent's normal
-  skill directory and reused across repos; they must resolve repo-specific
-  values through this repo's `AGENTS.md` seam. The canonical shared source is
-  [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows).
-  Use that repo's `agent-workflows-status` and `upgrade-agent-workflows`
-  helpers to keep installed Codex or Claude homes current.
-- When updating reusable agent workflows, skills, commands, or prompt
-  templates, first consider whether the change belongs in
-  `shakacode/agent-workflows` rather than this repo; keep local edits focused on
-  React on Rails-specific policy, seams, or overrides.
-- `.agents/skills/`: repo-specific skills, explicit overrides, and
-  repo-pinned helper `bin/` copies for checkout-only agent sessions. Keep shared
-  workflow `SKILL.md` files installed in the user's or agent's normal skill
-  directory; duplicating them here creates duplicate Codex skill picker entries.
+- Installed [Shaka](https://github.com/shakacode/shaka) owns issue and PR
+  delivery: claim, plan, implement, validate, local review, publication, and
+  the merge decision. Start it with `/shaka` in Claude Code or `$shaka` in
+  Codex. React on Rails no longer uses `shakacode/agent-workflows` skills; the last
+  vendored helper copies are being moved or removed.
+- When updating reusable agent workflows, first consider whether the change
+  belongs in Shaka rather than this repo; keep local edits focused on React on
+  Rails-specific policy, seams, or overrides.
+- `.agents/skills/`: repo-specific skills and their helper scripts.
   Current repo-specific skills include `$stress-test`,
   `$optimize-rsc-performance`, `$react-on-rails-update-changelog`, and
   `$react-on-rails-release-train-issue-evaluation`.
 - `.claude/skills`: symlink to `.agents/skills` so Claude Code exposes the
-  repo-specific local skills kept by this checkout. Shared skills should come
-  from the installed shared pack, not this symlink.
-- `.agents/workflows/`: repo-local workflow files for Codex, GPT, and other
-  non-Claude tools when this checkout needs copy/paste workflows or overrides.
-- `.agents/bin/shared-skill-dir`: helper for workflow files that need a
-  repo-pinned helper copy or installed/shared skill directory.
-- `.agents/skills/*/bin`: repo-pinned shared helper scripts for workflows that
-  must run inside checkout-only or directory-restricted agent sessions. These
-  directories intentionally do not include duplicate shared `SKILL.md` files.
-- This repo deliberately does not adopt the pack's
-  `autonomous-merge-eligibility`, `merge-assurance`, `pr-merge-submit`, or
-  `autonomous-merge-closeout` helpers as repo-pinned merge or closeout gates.
-  When pack logic probes those absent helpers, its result is a structural
-  `UNKNOWN` for the unadopted helper chain, not evidence that a particular PR
-  is blocked. The adopted React on Rails merge seam is
+  repo-specific local skills kept by this checkout.
+- The React on Rails merge seam is
   `script/pr-merge-ledger <PR> --strict`, followed by the applicable phase and
   merge-authority gates in this `AGENTS.md`. Shaka merge preference is `ask`;
   GitHub remains authoritative for merge queue and required checks.
@@ -51,54 +33,26 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   keeps a local copy/override.
 - Installed Shaka is the only seam validator. It validates
   `.agents/agent-workflow.yml`; required CI pins the reviewed Shaka Git revision
-  and runs candidate-only validation. Pack management helpers such as `agent-workflows-status`,
-  `install-agent-workflows`, `upgrade-agent-workflows`, and `bin/validate`
-  remain transitional installed/shared-pack tools.
+  and runs candidate-only validation.
 - `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
-  current Shaka seam boundary, transitional source-pack content, and validation
-- `internal/contributor-info/portable-agent-workflows-seam-design.md`: current
-  Shaka seam architecture and legacy retirement status
-- `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
-- `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
+  current Shaka seam boundary and validation
+- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
+  history of the Shaka seam and the retired agent-workflows pack; its
+  shared-skill and drift-check sections predate the retirement
+- `internal/contributor-info/agent-pr-batch-skills.md`: legacy guide to the retired agent-workflows batch skills
+- `internal/contributor-info/multi-batch-operations.md`: legacy operator guide for agent-workflows batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
-- When deciding whether an issue or proposed fix is worth doing, use the
-  installed/shared `$evaluate-issue` skill; a short invocation is
-  `$evaluate-issue` or "Is this issue worth fixing?"
+- When deciding whether an issue or proposed fix is worth doing, apply
+  `internal/contributor-info/issue-evaluation.md`.
 - When deciding whether a React on Rails issue belongs on the active release
   train (`release/X.Y.Z`, especially `release/17.0.0`) or should wait for
   `main`, use the repo-local
   `.agents/skills/react-on-rails-release-train-issue-evaluation/SKILL.md`; a
   short invocation is `$react-on-rails-release-train-issue-evaluation`.
-- When the user wants a ready prompt for review-only GitHub issue triage or an
-  all-open-issues audit, use the installed/shared `$plan-issue-triage` skill; a
-  short invocation is `$plan-issue-triage` or "Plan an issue triage"
-- When the user wants a generated whole-surface issue/PR inventory, dependency
-  graph, and capacity-aware batch split, use the installed/shared `$triage`
-  skill; a short invocation is `$triage` or "Run triage"
-- When the user wants to choose issues or PRs for a future agent/Codex/Claude
-  batch, use the installed/shared `$plan-pr-batch` skill to produce a ready
-  `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a PR batch"
-- When the user wants a multi-issue or multi-PR agent/Codex/Claude batch, use the
-  installed/shared `$pr-batch` skill; a short invocation is `$pr-batch`,
-  "Run an agent batch", "Run a Codex batch", or "Run a Claude batch"
-- When the user wants to stop or cancel an in-flight Codex/Claude batch (for example to relaunch it with updated skills), follow the **Cancelling Or Stopping A Batch** protocol in `.agents/workflows/pr-processing.md#cancelling-or-stopping-a-batch`; there is no short skill invocation for this coordinator action
-- When the user wants to audit merged batch work, missed reviews,
-  release-candidate risk, or possible bad merges, use the installed/shared
-  `$post-merge-audit` skill; reusable prompts live in
-  `.agents/workflows/post-merge-audit.md`
-- When the user wants an adversarial PR review, red-team review, Claude/Codex
-  comparison review, or a stricter pre-merge gate, use the installed/shared
-  `$adversarial-pr-review` skill; reusable prompts live in
-  `.agents/workflows/adversarial-pr-review.md`
-- When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
-- When the user asks to address PR review comments, use the installed/shared
-  `$address-review` skill; `.agents/workflows/address-review.md` remains a
-  copy/paste prompt for assistants without skill support
-- When the user wants to manually verify a bug-fix PR by reproducing the failure
-  before the fix and confirming it is gone after (with captured evidence or
-  screenshots, optionally posted to the PR and issue), use the installed/shared
-  `$verify-pr-fix` skill; a short invocation is `$verify-pr-fix` or
-  "manually verify this fix"
+- When the user assigns an issue, PR, review-fix pass, or PR review comments to
+  an agent, use installed Shaka (`/shaka` or `$shaka`); it owns claiming,
+  validation, local adversarial review, review-thread handling, and the merge
+  decision.
 - When the user explicitly asks for destructive React on Rails stress testing,
   use the repo-local `.agents/skills/stress-test/SKILL.md`; a short invocation is
   `$stress-test`
@@ -110,7 +64,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   PR targeting `release/X.Y.Z`, use the repo-local
   `.agents/skills/react-on-rails-update-changelog/SKILL.md`; a short invocation
   is `$react-on-rails-update-changelog`. For ordinary mainline changelog updates
-  on `main`, use the installed/shared `$update-changelog` skill.
+  on `main`, follow the Changelog section of this file.
 - When a maintainer wants to run or inspect RC/beta validation across the demo
   fleet, use the repo-local `.agents/skills/run-fleet-validation/SKILL.md`; a
   short invocation is `$run-fleet-validation`. Its Ruby generator reads
@@ -200,7 +154,7 @@ branch, bisect, or work offline. Creating a new worktree does not fetch from
 GitHub by itself.
 
 After fetching, verify the `## Agent Workflow Configuration` seam before relying
-on installed/shared skills for issue, PR, or batch work:
+on installed Shaka for issue or PR work:
 
 ```bash
 shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
@@ -210,31 +164,10 @@ This trusted-ref check establishes workflow policy. Candidate CI validation uses
 the separately pinned Shaka checkout with `--local`, which grants neither policy
 nor merge authority.
 
-If a workflow explicitly needs a repo-local `.agents/skills/...` file, it should
-be a repo-specific local skill such as `stress-test` or
-`optimize-rsc-performance`, release-branch changelog handling such as
-`react-on-rails-update-changelog`, a pinned helper `bin/` copy without
-`SKILL.md`, or a deliberate override. Shared workflow skills normally resolve
-from the installed/shared pack for picker-visible instructions. Helper commands
-may resolve to repo-pinned `.agents/skills/<skill>/bin` copies so checkout-only
-or directory-restricted agents can still run repo workflows. If a required
-repo-local skill or `.agents/workflows/...` file is missing in the checkout but
-present on `origin/main`, update the worktree before continuing; if it is still
-missing, report the repo workflow state as `UNKNOWN`.
-
-For user-installed shared skills, check the installed pack with:
-
-```bash
-agent-workflows-status --host codex
-```
-
-Use `--host claude` for Claude Code installs. Upgrade the transitional shared
-pack, then validate this repository with trusted Shaka:
-
-```bash
-upgrade-agent-workflows --host codex
-shaka seam check --root "$(pwd)" --ref "$(git rev-parse origin/main)"
-```
+Repo-specific skills live in `.agents/skills/`. If a required repo-local skill
+is missing in the checkout but present on `origin/main`, update the worktree
+before continuing; if it is still missing, report the repo workflow state as
+`UNKNOWN`.
 
 <!-- prettier-ignore-start -->
 ## Agent Workflow Configuration
@@ -265,7 +198,7 @@ Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) liv
 - approval-exempt: workflow, build-config, package-script, dependency, lockfile, and Pro
   edits on trusted assignments
 - coordination backend: private agent-coord HTTP/D1 backend via `AGENT_COORD_API_URL` and
-  `AGENT_COORD_API_TOKEN`; public claim-comment fallback in `.agents/workflows/pr-processing.md`
+  `AGENT_COORD_API_TOKEN`; public fallback is Shaka `claim`, which checks open PRs and branches
 - repo prefix: `ROR`
 - benchmark labels: `benchmark`, `benchmark-core`, `benchmark-pro`,
   `benchmark-pro-node-renderer`, `hosted-ci-no-benchmarks` (suppress); opt-in on PRs
@@ -277,11 +210,6 @@ Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) liv
   `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`,
   `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and `SECRET_KEY_BASE`. These are public
   identifier names, not values; favor conservative over-redaction.
-
-Shared skill helper scripts resolve through `.agents/bin/shared-skill-dir` when a
-workflow file needs an executable from the installed/shared pack. The shared source
-lives at [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows);
-see [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
 
 ## Agent Coordination Reads
 
@@ -307,7 +235,7 @@ agent-coord status --batch-id <batch-id> --json
 ```
 
 When the repo workflow calls for bounded reads, pass the same targeted status
-subcommand through the installed/shared `pr-batch` helper so a slow private read
+subcommand through the repo-pinned `pr-batch` `agent-coord-bounded` helper so a slow private read
 becomes explicit degraded state instead of an indefinite wait:
 
 ```bash
@@ -322,8 +250,8 @@ PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batc
 
 Do not use broad `agent-coord status` for routine lane checks. Broad private
 coordination reads are audit-only; if they time out, exit 1 (unexpected error),
-or exit 2, report private coordination as `UNKNOWN`/degraded and use structured
-public claim comments only as advisory evidence. Any non-zero exit other than
+or exit 2, report private coordination as `UNKNOWN`/degraded and use Shaka
+`claim` results (open PRs and branches) only as advisory evidence. Any non-zero exit other than
 `CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
 exits 0, private coordination state is authoritative. Refused claims
 (`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
@@ -489,7 +417,7 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **PR creation**: Use `gh pr create` with a clear title, self-contained why/rationale summary, implementation summary, and test plan. If an issue exists, link it, but do not make reviewers open the issue to understand why the PR exists; include at least a short rationale in the PR description itself.
 
-**PR processing**: Before pushing a review-fix batch, opening a PR, marking a PR ready, requesting hosted CI, requesting force-full hosted CI, or reporting merge-readiness, run the agent PR processing flow in `.agents/workflows/pr-processing.md`: verify the work is worth doing, self-review the diff, run local validation, use the pre-push AI review and simplify gate when appropriate, batch fixes, and document exact verification evidence plus churn notes. After a PR and its reviews exist, wait for configured review agents and triage actionable review feedback before marking ready, requesting merge, or merging.
+**PR processing**: Deliver issue and PR work through installed Shaka (`/shaka` or `$shaka`). Before pushing, opening a PR, marking it ready, requesting hosted CI, or reporting merge-readiness, verify the work is worth doing, self-review the diff, run `.agents/bin/validate` and the local adversarial review, batch fixes, and document exact verification evidence. After a PR and its reviews exist, wait for configured review agents and triage actionable review feedback before marking ready, requesting merge, or merging.
 
 **Hosted CI usage**: Do not use hosted CI as the first real validation pass. Prefer local checks first, then optimized hosted CI when the branch is ready for remote confirmation or final validation. Use the `+ci-*` PR comment commands for an auditable decision: `+ci-status` before deciding, `+ci-run-hosted` after the final push for optimized hosted CI, `+ci-force-full` only when a maintainer intentionally wants every hosted suite to bypass optimized selection, `+ci-stop-hosted` to return an iterating PR to the required gate, `+ci-stop-full` to remove only the force-full override, `+ci-skip-hosted [reason]` only with explicit maintainer approval for a low-risk waiver, and `+ci-help` when syntax is unclear. Put one `+ci-*` command per PR comment. Human/user-token label writes through `bin/request-hosted-ci` or `gh pr edit --add-label ready-for-hosted-ci` are valid, but workflow-token label writes are not a current-head trigger; automation must dispatch workflows explicitly or use `+ci-run-hosted`.
 
@@ -746,7 +674,7 @@ Known residual risk: <none or concise risk>
 Finalized by: <different GitHub account or named check/app, with GitHub review/check or git-log source>
 ```
 
-Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on the exact release-branch SHA being promoted, and get an explicit maintainer release decision before publishing the final release.
+Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: audit the PRs merged into the release line for missed review findings, unaddressed late bot comments, and changelog gaps, update the changelog/release notes as needed, confirm required checks on the exact release-branch SHA being promoted, and get an explicit maintainer release decision before publishing the final release.
 
 Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, using the larger deduction when unsure, and at least 2 points for any failed or unexplained check. Missing required validation for a changed surface is at least a 2-point deduction. Any unresolved non-trivial concern disqualifies auto-merge regardless of score. A missing independent finalizer disqualifies auto-merge regardless of score.
 
@@ -767,11 +695,13 @@ Releases use a release-train branching model. Full mechanics (cut, stabilize, fo
 
 The **merge gate is a function of the target branch's release phase**. Resolve the phase, then apply its row plus the mode rules above:
 
-| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                 |
-| --------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                        |
-| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
-| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
+| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                              |
+| --------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                     |
+| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`.                                                                                                             |
+| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion**. No confidence-only auto-merge. |
+
+**Gate terms.** Adversarial review means a Shaka local review by a reviewer that did not write the change, attested on the PR for the head being merged. An open MUST-FIX is a recorded `defect` finding, from that review or a human reviewer, that is neither fixed nor dismissed with evidence. Shaka does not read release phase or tracker state, so the agent applying the gate resolves the phase as described below.
 
 **Reading the phase.** The active phase per release line is published through the private `agent-coord` state backend so agents read the current gate without being told. For a PR or issue lane, read it with targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` after `agent-coord doctor --json`; for batch dependency state, use `agent-coord status --batch-id <batch-id> --json`. Treat published phase as available only when the targeted status exits 0 (the backend schema, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the exact field and backend contract). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is unavailable or degraded here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
 
@@ -809,7 +739,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
   waive or record the optional item in a triage reply or decision log instead of
   spending another CI/review cycle.
 - During accelerated-RC auto-merge, the default waiver-soak window is 10 minutes after the latest final waiver or triage reply before merge. A distinct finalizer or maintainer may override that default only with an explicit auditable acknowledgement: a PR comment, GitHub review, or issue/release-tracker comment that names the final waiver set and immediate-merge decision. For auto-merge, that acknowledgement must satisfy the independent-finalizer rule above.
-- The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout route into the next post-merge audit intake by default.
+- The batch coordinator or merge finalizer owns the closeout sweep for late post-merge bot findings before final batch handoff. Findings that arrive after closeout follow Shaka's reviews-after-merge procedure by default.
 
 For auto-merge, all GitHub checks for the current head SHA must be complete.
 An empty full `gh pr checks <PR>` list is `UNKNOWN` / not ready, not a
@@ -827,7 +757,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Wait for the first full review pass to finish before pushing follow-up commits.
 - Before merge, wait for configured review agents such as Claude review, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA, then triage their reviews/comments. A green or skipped check is not enough if actionable comments exist.
 - Treat AI review systems as advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. AI approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they are not required maintainer approvals or special merge gates.
-- If the user requests Claude review from a Codex-run PR process, prefer the repo-local `/adversarial-pr-review <PR_URL>` handoff after a draft PR exists. `/pr-review-toolkit:review-pr` is useful input, but it is not by itself the merge gate. Classify and resolve or waive Claude's actionable findings before final readiness.
+- If the user requests Claude review from a Codex-run PR process, run Claude as a Shaka local reviewer (`shaka review run --reviewer anthropic/claude`) on the committed head. `/pr-review-toolkit:review-pr` is useful input, but it is not by itself the merge gate. Classify and resolve or waive Claude's actionable findings before final readiness.
 - Batch review fixes into one follow-up push when practical. Do not create a new commit for each minor comment.
 - Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.
@@ -1041,8 +971,9 @@ Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, b
 
 ### Changelog classification taxonomy
 
-The installed/shared `$update-changelog` skill classifies each merged PR by
-`Category` for ordinary mainline changelog work. Use the repo-local
+Changelog work classifies each merged PR by `Category`;
+`.agents/skills/update-changelog/bin/changelog-merged-prs` lists
+the merged PRs in a range. Use the repo-local
 `$react-on-rails-update-changelog` skill when changelog work must target
 `release/X.Y.Z`. Allowed values (copy exactly, including spaces, hyphens, and
 casing):

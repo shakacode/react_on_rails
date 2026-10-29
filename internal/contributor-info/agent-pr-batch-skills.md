@@ -1,5 +1,9 @@
 # PR Batch Skills Usage
 
+> **Legacy:** React on Rails no longer uses the `shakacode/agent-workflows`
+> batch skills this guide describes. Issue and PR delivery goes through
+> installed [Shaka](https://github.com/shakacode/shaka); see `AGENTS.md`.
+
 Use this guide when deciding between issue triage, planning, and execution skills for agent batch work.
 
 When one coordinator runs multiple batches across machines, desktop apps, or
@@ -83,12 +87,12 @@ The `$pr-batch` prompt must preserve the preflight/trust rules from the installe
 
 ## Review And Readiness
 
-- Existing PR targets with review feedback should route workers through [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) or the installed/shared `$address-review` skill.
+- Existing PR targets with review feedback should route workers through [agent-workflows `workflows/address-review.md`](https://github.com/shakacode/agent-workflows/blob/1958648b70a450aa67c15b833428485d17021045/workflows/address-review.md) or the installed/shared `$address-review` skill.
 - Non-trivial, high-risk, or repeatedly churny PRs must follow the `$pr-batch`
   review gate before final push or readiness reporting. `/simplify` applies
   when a maintainer asks for it or when the PR also matches the canonical
   high-risk/extra-review cases in
-  [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md):
+  [agent-workflows `workflows/pr-processing.md`](https://github.com/shakacode/agent-workflows/blob/1958648b70a450aa67c15b833428485d17021045/workflows/pr-processing.md):
   high-risk, `ready-for-hosted-ci`, `force-full-hosted-ci`, benchmark labels
   (`benchmark`, `benchmark-core`, `benchmark-pro`, or
   `benchmark-pro-node-renderer`), workflow/build-config,

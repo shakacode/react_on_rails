@@ -2015,11 +2015,11 @@ The merge-gate strictness for an agent-merged PR is a **function of the target b
 This formalizes the attention-contract gating levels (#3975): maintainer attention is spent only on
 judgment; everything machine-checkable is handled autonomously with evidence.
 
-| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                        |
-| --------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                               |
-| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`.                                                                                  |
-| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge. |
+| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                     |
+| --------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                            |
+| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`.                                                                                  |
+| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge. |
 
 The same selection as the decision an agent runs per PR — the table above is the canonical wording;
 this diagram mirrors it (`agent-coord` first, the deterministic branch-derived fallback when it is
@@ -2031,7 +2031,7 @@ flowchart TD
     T -->|"main"| BETA["beta gate · lowest<br/>confidence note<br/>+ green required checks"]
     T -->|"release/*"| AC{"agent-coord phase?<br/>doctor + status exit 0"}
     T -->|"cannot determine"| NOAM["report UNKNOWN<br/>do not auto-merge<br/>maintainer decision"]
-    AC -->|"rc"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial-pr-review<br/>+ zero open MUST-FIX"]
+    AC -->|"rc"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial review<br/>+ zero open MUST-FIX"]
     AC -->|"final"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
     AC -->|"UNKNOWN / no entry"| FB{"tracker in<br/>final-release mode?"}
     FB -->|"no"| RC
@@ -2081,14 +2081,14 @@ mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 3. Cannot determine the target or applicable tracker → report `UNKNOWN` and do not auto-merge; fall
    back to standard `AGENTS.md` merge qualification with a maintainer decision.
 
-Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-FIX handling),
-`adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). None carries a
-skill-level phase **table** of its own — the table lives only in `AGENTS.md` and this runbook. `pr-batch`
-and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`; `address-review` and
-`pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention Contract they already
-follow. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical source) —
-including the gate-selection diagram above, which mirrors the table and is illustrative only — rather
-than adding per-skill phase tables.
+The `rc`/`final` adversarial review is a Shaka local review by a reviewer that
+did not write the change, attested on the PR for the head being merged. An open
+MUST-FIX is a recorded `defect` finding that is neither fixed nor dismissed with
+evidence. Shaka does not read release phase or tracker state, so the agent
+applying the gate resolves the phase from the table; it lives only in
+`AGENTS.md` and this runbook. If the gate tiers ever change, update
+`AGENTS.md` and this runbook (the canonical source), including the
+gate-selection diagram above, which mirrors the table and is illustrative only.
 
 ### Phase vs. release mode
 

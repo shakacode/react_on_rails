@@ -284,5 +284,4 @@ dispatcher, and docs together:
    `+ci-run-hosted` or `+ci-force-full` should dispatch it for the exact current
    head SHA.
 9. Update `internal/contributor-info/ci-optimization.md`, `CONTRIBUTING.md`,
-   `AGENTS.md`, and `.agents/workflows/pr-processing.md` when the request or
-   readiness process changes.
+   and `AGENTS.md` when the request or readiness process changes.

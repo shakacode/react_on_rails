@@ -1,5 +1,9 @@
 # Multi-Batch Operations
 
+> **Legacy:** React on Rails no longer uses the `shakacode/agent-workflows`
+> batch skills this guide describes. Issue and PR delivery goes through
+> installed [Shaka](https://github.com/shakacode/shaka); see `AGENTS.md`.
+
 Use this playbook when one coordinator is running multiple agent batches across
 machines, launch surfaces, or repositories. It sits above the per-lane workflow
 rules in [AGENTS.md](../../AGENTS.md),
@@ -57,8 +61,8 @@ should use this PR branch or `main` for the current workflow docs.
    command below with `"$HOME/.local/bin/agent-coord"`.
 
 4. If `doctor --json` fails, or targeted status exits non-zero (exit 2 means
-   degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use the
-   structured public claim comment fallback where dependency rules allow it. Do
+   degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use
+   Shaka `claim` as advisory evidence where dependency rules allow it. Do
    not start a dependency-sensitive lane when the lane declares `depends_on` and
    private status cannot be checked.
 5. Before dependent lanes start, the coordinator creates or updates batch state
@@ -157,8 +161,8 @@ Do not let conductor become an invisible side channel. If conductor takes a PR,
 record the claim in the private `agent-coord` state backend with the same repo
 and target identity that batch workers use, then refresh heartbeats while
 conductor owns the lane. If `agent-coord` is not installed in the conductor
-environment, install it with the CLI bootstrap first or use the structured
-public claim comment fallback until the host is configured; do not treat an
+environment, install it with the CLI bootstrap first or use Shaka `claim` as
+advisory evidence until the host is configured; do not treat an
 unbootstrapped conductor session as a private claim override.
 
 ## Coordination Lifecycle
@@ -201,10 +205,11 @@ Use this lifecycle for every lane:
    and validation evidence, then releases or lets the claim expire according to
    the backend policy.
 
-If the private `agent-coord` state backend is unavailable, use the structured
-public claim comment fallback from
-[pr-processing.md](../../.agents/workflows/pr-processing.md#coordination-state),
-but do not use a public comment to override a refused private claim.
+If the private `agent-coord` state backend is unavailable, use Shaka `claim`,
+which checks open PRs and branches, as the public fallback that `AGENTS.md`
+names. Its result is advisory evidence only: it does not prove that no private
+claim exists. The structured public claim-comment fallback is retired, and
+nothing overrides a refused private claim.
 
 ## Batch Sizing And Routing
 

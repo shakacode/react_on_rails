@@ -1,9 +1,12 @@
 # Agent Coordination Backend
 
-React on Rails uses the portable coordination model described in
-[.agents/docs/coordination-backend.md](../../.agents/docs/coordination-backend.md)
-and selects a private `agent-coord` backend through the coordination policy in
-[AGENTS.md](../../AGENTS.md).
+React on Rails coordinates agent lanes through a private `agent-coord` backend,
+selected by the coordination policy in [AGENTS.md](../../AGENTS.md). The model
+began as agent-workflows
+[`docs/coordination-backend.md`](https://github.com/shakacode/agent-workflows/blob/1958648b70a450aa67c15b833428485d17021045/docs/coordination-backend.md),
+but its public `codex-claim` comment fallback is retired: when the private
+backend is unavailable, the public fallback is Shaka `claim`, as `AGENTS.md`
+states.
 
 `shakacode/agent-coordination` is the public CLI/bootstrap source repository.
 Runtime coordination state lives in the backend reported by
@@ -224,7 +227,7 @@ contract:
   treat comments as a drain signal.
 - A cancelled worker drains at its next safe checkpoint and then runs
   `agent-coord release` for the lane. See
-  [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md)
+  [agent-workflows `workflows/pr-processing.md`](https://github.com/shakacode/agent-workflows/blob/1958648b70a450aa67c15b833428485d17021045/workflows/pr-processing.md)
   -> **Cancelling Or Stopping A Batch** for the worker drain rule, the hard
   process-level escape hatch for wedged workers, and the rule that restarting
   with updated skills requires fresh worker processes from an updated checkout.
