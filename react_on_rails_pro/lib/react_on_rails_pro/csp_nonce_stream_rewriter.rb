@@ -27,9 +27,10 @@ module ReactOnRailsPro
     end
 
     # Returns the chunk with every complete placeholder replaced, minus any trailing
-    # partial placeholder, keeping the chunk's html_safe flag.
+    # partial placeholder, keeping the chunk's html_safe flag. Raises for a non-String
+    # chunk; the caller's fail-open path then emits the held-back tail ahead of it.
     def rewrite(chunk)
-      return chunk unless chunk.is_a?(String)
+      raise TypeError, "expected a String stream chunk, got #{chunk.class}" unless chunk.is_a?(String)
 
       text = String.new(@held_back) << chunk.to_str
       text.gsub!(@placeholder) { @nonce }

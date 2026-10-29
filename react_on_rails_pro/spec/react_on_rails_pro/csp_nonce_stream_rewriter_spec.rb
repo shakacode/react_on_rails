@@ -58,11 +58,15 @@ RSpec.describe ReactOnRailsPro::CspNonceStreamRewriter do
     expect(rewriter.flush).to be_html_safe
   end
 
-  it "keeps each chunk's html_safe flag and passes non-String chunks through" do
-    hash_chunk = { "html" => "PLACEHOLDER" }
-
+  it "keeps each chunk's html_safe flag" do
     expect(rewriter.rewrite("<p>PLACEHOLDER</p>".html_safe)).to be_html_safe
     expect(rewriter.rewrite("<p>plain</p>")).not_to be_html_safe
-    expect(rewriter.rewrite(hash_chunk)).to equal(hash_chunk)
+  end
+
+  it "rejects a non-String chunk without losing the held-back tail" do
+    rewriter.rewrite("text PLACE")
+
+    expect { rewriter.rewrite({ "html" => "x" }) }.to raise_error(TypeError)
+    expect(rewriter.flush).to eq("PLACE")
   end
 end
