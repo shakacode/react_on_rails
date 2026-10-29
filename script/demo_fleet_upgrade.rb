@@ -782,17 +782,20 @@ module DemoFleetUpgrade
   module Registry
     module_function
 
+    # Every coordinated gem and npm package, since the run pins all of them.
     def missing(version)
-      gem_versions = fetch_json("https://rubygems.org/api/v1/versions/react_on_rails.json").map { |v| v["number"] }
-      missing = gem_versions.include?(version.gem) ? [] : ["gem react_on_rails #{version.gem}"]
-      COORDINATED_NPM.each do |name|
-        uri = URI("https://registry.npmjs.org/#{name}/#{version.npm}")
-        missing << "npm #{name} #{version.npm}" unless Net::HTTP.get_response(uri).is_a?(Net::HTTPSuccess)
-      end
-      missing
+      gems = COORDINATED_GEMS.reject { |name| gem_versions(name).include?(version.gem) }
+      npm = COORDINATED_NPM.reject { |name| npm_published?(name, version.npm) }
+      gems.map { |name| "gem #{name} #{version.gem}" } + npm.map { |name| "npm #{name} #{version.npm}" }
     end
 
-    def fetch_json(url) = JSON.parse(Net::HTTP.get(URI(url)))
+    def gem_versions(name)
+      JSON.parse(Net::HTTP.get(URI("https://rubygems.org/api/v1/versions/#{name}.json"))).map { |v| v["number"] }
+    end
+
+    def npm_published?(name, version)
+      Net::HTTP.get_response(URI("https://registry.npmjs.org/#{name}/#{version}")).is_a?(Net::HTTPSuccess)
+    end
   end
 
   # Command-line entry point.

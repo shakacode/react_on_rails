@@ -67,47 +67,6 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     assert_match(/workspace:\*/, errors.first)
   end
 
-  def test_child_env_drops_version_manager_installs_ahead_of_shims
-    path = "/home/u/.local/share/mise/installs/ruby/4.0.5/bin:/usr/bin:/home/u/.local/share/mise/shims:" \
-           "/home/u/.local/share/mise/installs/ruby/3.4.6/bin"
-    env = DemoFleetUpgrade::CommandRunner.child_env(path)
-
-    assert_equal "/usr/bin:/home/u/.local/share/mise/shims:/home/u/.local/share/mise/installs/ruby/3.4.6/bin",
-                 env.fetch("PATH")
-    assert_nil env.fetch("BUNDLE_GEMFILE")
-  end
-
-  def test_command_runner_kills_a_child_that_ignores_term
-    runner = DemoFleetUpgrade::CommandRunner.new(term_grace: 1)
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    result = runner.run(["sh", "-c", "trap '' TERM; echo started; sleep 30"], chdir: Dir.tmpdir, timeout: 1)
-
-    refute result.success
-    assert_match(/Timed out after 1s/, result.output)
-    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
-  end
-
-  def test_command_runner_times_out_a_background_child_holding_output
-    runner = DemoFleetUpgrade::CommandRunner.new(term_grace: 1)
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    result = runner.run(["sh", "-c", "sleep 30 & echo parent done"], chdir: Dir.tmpdir, timeout: 1)
-
-    refute result.success
-    assert_match(/parent done/, result.output)
-    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
-  end
-
-  def test_manifest_selects_each_repo_once
-    manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
-    assert_equal 1, manifest.select(["demo-a", "shakacode/demo-a"]).size
-  end
-
-  def test_jobs_must_be_positive
-    assert_raises(OptionParser::InvalidArgument) do
-      DemoFleetUpgrade::CLI.new(["17.2.1", "--jobs", "0"], manifest: DemoFleetUpgrade::Manifest.new("repos" => [])).run
-    end
-  end
-
   def test_package_json_ignores_non_dependency_values_under_a_package_name
     text = %({ "scripts": { "react-on-rails": "node bin/setup.js" }, "dependencies": { "react": "19.3.0" } }\n)
     npm = { "react-on-rails" => "17.2.1-rc.1" }
@@ -157,6 +116,62 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
                  new_text
   end
 
+  private
+
+  def pins(version) = %w[react_on_rails react_on_rails_pro].to_h { |name| [name, version] }
+end
+
+class DemoFleetUpgradeCliTest < Minitest::Test
+  def test_child_env_drops_version_manager_installs_ahead_of_shims
+    path = "/home/u/.local/share/mise/installs/ruby/4.0.5/bin:/usr/bin:/home/u/.local/share/mise/shims:" \
+           "/home/u/.local/share/mise/installs/ruby/3.4.6/bin"
+    env = DemoFleetUpgrade::CommandRunner.child_env(path)
+
+    assert_equal "/usr/bin:/home/u/.local/share/mise/shims:/home/u/.local/share/mise/installs/ruby/3.4.6/bin",
+                 env.fetch("PATH")
+    assert_nil env.fetch("BUNDLE_GEMFILE")
+  end
+
+  def test_command_runner_kills_a_child_that_ignores_term
+    runner = DemoFleetUpgrade::CommandRunner.new(term_grace: 1)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result = runner.run(["sh", "-c", "trap '' TERM; echo started; sleep 30"], chdir: Dir.tmpdir, timeout: 1)
+
+    refute result.success
+    assert_match(/Timed out after 1s/, result.output)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
+  end
+
+  def test_command_runner_times_out_a_background_child_holding_output
+    runner = DemoFleetUpgrade::CommandRunner.new(term_grace: 1)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result = runner.run(["sh", "-c", "sleep 30 & echo parent done"], chdir: Dir.tmpdir, timeout: 1)
+
+    refute result.success
+    assert_match(/parent done/, result.output)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
+  end
+
+  def test_manifest_selects_each_repo_once
+    manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
+    assert_equal 1, manifest.select(["demo-a", "shakacode/demo-a"]).size
+  end
+
+  def test_jobs_must_be_positive
+    assert_raises(OptionParser::InvalidArgument) do
+      DemoFleetUpgrade::CLI.new(["17.2.1", "--jobs", "0"], manifest: DemoFleetUpgrade::Manifest.new("repos" => [])).run
+    end
+  end
+
+  def test_registry_check_requires_the_pro_gem_too
+    version = DemoFleetUpgrade::Version.parse("17.2.1.rc.1")
+    gems = { "react_on_rails" => ["17.2.1.rc.1"] }
+
+    missing = with_registry(gems) { DemoFleetUpgrade::Registry.missing(version) }
+
+    assert_equal ["gem react_on_rails_pro 17.2.1.rc.1"], missing
+  end
+
   def test_unfiltered_selection_lists_each_repo_once
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" },
                                                           { "name" => "shakacode/demo-a" }])
@@ -177,7 +192,16 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
 
   private
 
-  def pins(version) = %w[react_on_rails react_on_rails_pro].to_h { |name| [name, version] }
+  # Answers registry lookups from a fixed table instead of the network; every npm package counts as published.
+  def with_registry(gem_versions)
+    registry = DemoFleetUpgrade::Registry.singleton_class
+    originals = %i[gem_versions npm_published?].to_h { |name| [name, registry.instance_method(name)] }
+    registry.define_method(:gem_versions) { |name| gem_versions.fetch(name, []) }
+    registry.define_method(:npm_published?) { |_name, _version| true }
+    yield
+  ensure
+    originals.each { |name, method| registry.define_method(name, method) }
+  end
 end
 
 # Simulates bundle, the JS package manager, and gh; runs real git against local fixture repos.
