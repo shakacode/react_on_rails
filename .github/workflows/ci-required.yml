@@ -108,7 +108,6 @@ jobs:
           node --test .github/workflows/ci-commands.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
-          ruby .agents/bin/agent-coord-bounded-test.rb
           ruby .agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs-test.rb
 
       - name: Check mirrored blocks

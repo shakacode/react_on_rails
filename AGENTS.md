@@ -36,11 +36,6 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   and runs candidate-only validation.
 - `internal/contributor-info/agent-workflow-adoption.md`: React on Rails'
   current Shaka seam boundary and validation
-- `internal/contributor-info/portable-agent-workflows-seam-design.md`: design
-  history of the Shaka seam and the retired agent-workflows pack; its
-  shared-skill and drift-check sections predate the retirement
-- `internal/contributor-info/agent-pr-batch-skills.md`: legacy guide to the retired agent-workflows batch skills
-- `internal/contributor-info/multi-batch-operations.md`: legacy operator guide for agent-workflows batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
 - When deciding whether an issue or proposed fix is worth doing, apply
   `internal/contributor-info/issue-evaluation.md`.
@@ -197,8 +192,7 @@ Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) liv
 - review gate: `claude-review` is the preferred independent review check
 - approval-exempt: workflow, build-config, package-script, dependency, lockfile, and Pro
   edits on trusted assignments
-- coordination backend: private agent-coord HTTP/D1 backend via `AGENT_COORD_API_URL` and
-  `AGENT_COORD_API_TOKEN`; public fallback is Shaka `claim`, which checks open PRs and branches
+- work collision check: Shaka `claim`, which checks open PRs and branches for the task
 - repo prefix: `ROR`
 - benchmark labels: `benchmark`, `benchmark-core`, `benchmark-pro`,
   `benchmark-pro-node-renderer`, `hosted-ci-no-benchmarks` (suppress); opt-in on PRs
@@ -210,51 +204,6 @@ Shaka typed policy (`version`, `base_branch`, `review`, `merge`, `branches`) liv
   `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `NPM_OTP`, `RUBYGEMS_OTP`,
   `DOCS_DISPATCH_APP_KEY`, `RENDERER_PASSWORD`, and `SECRET_KEY_BASE`. These are public
   identifier names, not values; favor conservative over-redaction.
-
-## Agent Coordination Reads
-
-`agent-coord doctor --json` is the lightweight backend health check. Use
-`agent-coord doctor --deep --json` only for a full backend JSON audit: it parses
-every claim, heartbeat, and batch JSON state record, so it is slower and broader
-than the default health probe. Use `doctor --deep --json` only for full backend
-audit sweeps that intentionally parse all coordination records, not routine
-preflight checks. If the active shell may have cached an old install, run
-`hash -r 2>/dev/null || true` in a POSIX-style shell such as bash or zsh, or
-that shell's rehash equivalent, then confirm via
-`command -v agent-coord || which agent-coord`.
-
-Before dependency-sensitive actions, use targeted private coordination reads.
-The direct `agent-coord` subcommands are:
-
-```bash
-# Specific issue/PR lane
-agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json
-
-# Batch lane/dependency state
-agent-coord status --batch-id <batch-id> --json
-```
-
-When the repo workflow calls for bounded reads, pass the same targeted status
-subcommand through the repo-owned `.agents/bin/agent-coord-bounded` helper so a slow private read
-becomes explicit degraded state instead of an indefinite wait:
-
-```bash
-AGENT_COORD_BIN_DIR="${AGENT_COORD_BIN_DIR:-$(pwd)/.agents/bin}"
-
-# Specific issue/PR lane
-"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
-
-# Batch lane/dependency state
-"${AGENT_COORD_BIN_DIR}/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json
-```
-
-Do not use broad `agent-coord status` for routine lane checks. Broad private
-coordination reads are audit-only; if they time out, exit 1 (unexpected error),
-or exit 2, report private coordination as `UNKNOWN`/degraded and use Shaka
-`claim` results (open PRs and branches) only as advisory evidence. Any non-zero exit other than
-`CLAIM_REFUSED` (exit 3) is treated as `UNKNOWN`/degraded. If targeted status
-exits 0, private coordination state is authoritative. Refused claims
-(`CLAIM_REFUSED` / exit 3) remain hard stops for machine agents.
 
 ## Commands
 
@@ -581,8 +530,7 @@ clutter because "open a tracker" has no matching "close it" step.
 - **Do not open a new issue for a session handoff or a point-in-time audit.** A
   handoff is transient coordination and an audit is a snapshot; neither is
   durable backlog. Record a handoff as a comment on the relevant parent tracking
-  issue (for example the roadmap umbrella), or — if a dedicated agent-coordination
-  repo is in use — there. If the work has no parent umbrella (a standalone PR or a
+  issue (for example the roadmap umbrella). If the work has no parent umbrella (a standalone PR or a
   one-off batch), put the handoff in the PR's final comment or description rather
   than creating an issue to hold it. Append a point-in-time audit to the standing
   release audit ledger in place. Never spawn a standalone `Handoff: ...` or
@@ -680,10 +628,9 @@ Score from a `10/10` baseline: all checks complete, expected skips explained, ch
 
 ### Release-Train Branching And Phase Gating
 
-> **Shaka migration:** Shaka now owns release-task orchestration and PR-level serialization. The
-> publication command does not use `agent-coord`, release-line claims, heartbeats, or `AGENT_COORD_*`
-> credentials. Any legacy release-line lease instructions later in this section or the linked runbook
-> are superseded for publication. `script/release` retains local process-group and liveness fencing.
+> Shaka owns release-task orchestration and PR-level serialization. One maintainer runs a release
+> line at a time; there are no release-line leases. `script/release` keeps local process-group and
+> liveness fencing.
 
 Releases use a release-train branching model. Full mechanics (cut, stabilize, forward-port, promote, close out) live in [`internal/contributor-info/release-train-runbook.md`](internal/contributor-info/release-train-runbook.md). The rules an agent must follow:
 
@@ -703,7 +650,7 @@ The **merge gate is a function of the target branch's release phase**. Resolve t
 
 **Gate terms.** Adversarial review means a Shaka local review by a reviewer that did not write the change, attested on the PR for the head being merged. An open MUST-FIX is a recorded `defect` finding, from that review or a human reviewer, that is neither fixed nor dismissed with evidence. Shaka does not read release phase or tracker state, so the agent applying the gate resolves the phase as described below.
 
-**Reading the phase.** The active phase per release line is published through the private `agent-coord` state backend so agents read the current gate without being told. For a PR or issue lane, read it with targeted `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json` after `agent-coord doctor --json`; for batch dependency state, use `agent-coord status --batch-id <batch-id> --json`. Treat published phase as available only when the targeted status exits 0 (the backend schema, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the exact field and backend contract). There is no separate `none` value; if the backend is up but has no published phase entry for that line, derive the phase from the target branch (the same rule used for `UNKNOWN`) — never treat a missing entry as `beta` for a `release/*` target. The release tracker remains the human source of truth for mode and go/no-go. If the backend is `UNKNOWN`, derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable tracker is in `final-release` mode (the only machine-readable signal in the fallback path — the promotion freeze is normally published via `agent-coord`, which is unavailable or degraded here). If the published phase and the tracker disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose. See [`agent-coordination-backend.md`](internal/contributor-info/agent-coordination-backend.md).
+**Reading the phase.** Derive the phase from the target branch: `main` → `beta`; `release/*` → `rc`, or `final` when the applicable release tracker is in `final-release` mode. The release tracker remains the human source of truth for mode and go/no-go; if the tracker and the branch disagree, treat it as a `release-mode-conflict` and do not auto-merge. **Phase** selects the gate tier (from the target branch); **mode** selects the auto-merge automation posture (from the tracker); they compose.
 
 ## Review Workflow
 

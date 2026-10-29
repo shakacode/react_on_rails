@@ -3186,12 +3186,9 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_match(/Child\s+agents must not spawn more agents/, pack)
     assert_includes pack, "Do not select a candidate independently"
     assert_includes pack, "independently released `react-on-rails-rsc`"
-    assert_includes pack, "the claim is the"
-    assert_includes pack,
-                    "fallback_claim_target_template: " \
-                    "adhoc:fleet-RESOLVED_TAG-shakacode-react-on-rails-demo-flagship"
-    assert_includes pack, "fallback_claim_repo: shakacode/react_on_rails"
-    assert_includes pack, "adhoc:fleet-snapshot-RESOLVED_TAG"
+    assert_includes pack, "run Shaka `claim` for that target"
+    refute_includes pack, "agent-coord"
+    refute_includes pack, "fallback_claim"
     assert_includes pack, "Search the open `Release gate: react_on_rails X.Y.Z`"
     assert_includes pack, "workflow=.github/workflows/cpflow-deploy-review-app.yml, status_check=deploy / deploy"
     assert_includes pack, "one execution subagent for the assigned monorepo generator/install gate"
@@ -3380,7 +3377,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       pack = build_generator(manifest_path:).render_pack
 
       assert_includes pack, "- owner/example!: owner-example"
-      refute_includes pack, "fallback_claim_target_template: adhoc:fleet-RESOLVED_TAG-owner-example-"
+      refute_includes pack, "owner-example-\n"
     end
   end
 

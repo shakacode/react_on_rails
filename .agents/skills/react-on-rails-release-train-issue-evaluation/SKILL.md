@@ -21,28 +21,20 @@ violates release policy.
 When one or more merged `main` PRs qualify for `release/X.Y.Z`, default to one
 source PR per release backport PR:
 
-- Before branching, search open release-targeted PRs, targeted private
-  coordination for the source, and remote branches with verified ownership and
-  source binding. Reuse or skip a valid source-atomic lane, or an explicitly
+- Before branching, search open release-targeted PRs, Shaka `claim` for the
+  source, and remote branches with verified ownership and source binding. Reuse or skip a valid source-atomic lane, or an explicitly
   maintainer-approved aggregate whose sources meet the inseparability exception
   below. Stop rather than duplicate work when a candidate branch's ownership or
   source binding is `UNKNOWN`. If an unapproved aggregate violates this shape,
   recommend separate replacements; close it only with explicit write
   authorization and retain its branch unless deletion is also authorized.
-- Process them serially under the canonical `release-line:X.Y.Z` coordination
-  lease defined in the release-train runbook, held by one dedicated release
-  coordinator across discovery, validation, and merge. Every writer targeting
-  that release branch, including a release-first stabilizing fix or metadata PR,
-  must participate in the same lease; source-scoped claims do not provide this
-  serialization. Chain later batch lanes with `depends_on`, and do not launch
-  them until the preceding merge is terminal. A writer that cannot participate
-  in the canonical lease must stop; the repository's merge-group CI does not
-  rerun source-liveness, provenance, attribution, manual QA, or review gates and
-  is not an alternative. Refresh the dedicated heartbeat at the runbook cadence
-  during long gates, and immediately before merge require the canonical claim to
-  be active, unexpired, and owned by the expected coordinator with a live
-  matching heartbeat. Stop if the guard is unavailable or its state is
-  `UNKNOWN`. Merge one release-targeted change,
+- Process them serially with one active release-targeted lane at a time, as the
+  release-train runbook's "Serialize every release-line write" section
+  describes. Every writer targeting that release branch, including a
+  release-first stabilizing fix or metadata PR, waits for the preceding merge
+  to be terminal. The repository's merge-group CI does not rerun
+  source-liveness, provenance, attribution, manual QA, or review gates and is
+  not an alternative. Merge one release-targeted change,
   fetch the new release tip, then update a reused PR onto that tip or branch the
   next. Rerun validation, QA, and review on the updated head before merging.
 - Before updating or branching, confirm each selected source patch is still live
@@ -96,24 +88,18 @@ source PR per release backport PR:
    Use the refreshed release ref for ancestry, prior-backport, and supersession checks.
 2. Resolve candidates from live GitHub. For strict 48-hour windows, search by date then timestamp-filter locally because GitHub search is date-granular.
 3. Exclude started lanes. For an ordinary issue candidate, an assignee,
-   linked/open implementation PR, private claim/heartbeat/branch, or
-   implementation comment means the lane is started. A merged `main` source PR
+   linked/open implementation PR, remote branch, or implementation comment
+   means the lane is started. A merged `main` source PR
    is completed input, not a started release-backport lane: its linked issue,
-   assignee, merged implementation PR, and generic source coordination state do
-   not exclude it. Its backport lane is started by a valid source-atomic
+   assignee, and merged implementation PR do not exclude it. Its backport lane is started by a valid source-atomic
    release-targeted implementation PR or branch; an explicitly
    maintainer-approved aggregate whose sources are behaviorally inseparable; a
-   backport implementation comment for either valid shape; or private
-   coordination state that explicitly identifies that valid release/backport
-   lane. An unapproved, shape-violating aggregate does not exclude its source
+   or a backport implementation comment for either valid shape. An unapproved, shape-violating aggregate does not exclude its source
    candidates; keep them eligible so the **Backport Shape** replacement can be
    recommended.
-   Run `agent-coord doctor --json`, then run
-   `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`
-   for each candidate. Dead or expired ordinary-issue claims and explicitly
-   identified backport claims count as started-but-stalled, not non-started;
-   generic source claims do not prove that a backport started.
-4. Read release context: active `Release gate:` tracker, `release` + `TRACKING` labels, the `Agent Release Mode` block, `agent-coord` phase when available, source PR base branches, and whether source commits are already on `origin/release/X.Y.Z`.
+   Run Shaka `claim` for each candidate to find open PRs and branches that
+   already own it.
+4. Read release context: active `Release gate:` tracker, `release` + `TRACKING` labels, the `Agent Release Mode` block, source PR base branches, and whether source commits are already on `origin/release/X.Y.Z`.
 5. Evaluate each candidate with `internal/contributor-info/issue-evaluation.md`: evidence source, impact, complexity, process gap disposition, and priority.
 6. Choose the target:
    - `release/X.Y.Z`: verified RC/final stabilizer such as an RC regression, hard-gate failure, install/upgrade blocker, security/data-loss/wrong-output bug, release-branch CI/release tooling blocker, or final-only public API/breaking-change decision.
