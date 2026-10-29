@@ -16,6 +16,7 @@
 import { createElement, type ReactElement } from 'react';
 import type {
   DehydratedRouterState,
+  HttpResponse,
   TanStackHistory,
   TanStackRouter,
   TanStackSsrMatch,
@@ -76,6 +77,9 @@ function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
     s: candidate.status,
   };
 
+  if (candidate.globalNotFound === true) {
+    dehydratedMatch.g = true;
+  }
   // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
   if (candidate.__beforeLoadContext !== undefined) {
     // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
@@ -106,9 +110,77 @@ function buildSsrRouterState(router: TanStackRouter): TanStackSsrRouterState {
   };
 }
 
+/**
+ * Reads the HTTP response metadata from the router after load().
+ *
+ * Supports two TanStack Router API generations:
+ *
+ * 1. <=1.170.18 (router-core <=1.171.15): `router.state.statusCode` and
+ *    `router.state.redirect` on the state object.
+ *
+ * 2. >=1.170.19 (router-core >=1.171.16): `router._serverResult` set by
+ *    `loadServerRoute()` (called internally by `router.load()` on the server).
+ *    This is a discriminated union: `{ type: 'render', status, matches }` or
+ *    `{ type: 'redirect', redirect }`.
+ *
+ * Returns undefined for normal 200 responses (no metadata needed).
+ */
+function extractHttpResponse(router: TanStackRouter): HttpResponse | undefined {
+  // Try the new API first (>=1.170.19): router._serverResult
+  // eslint-disable-next-line no-underscore-dangle -- TanStack Router private API for server load results.
+  const serverResult = (router as { _serverResult?: { type: string; status?: number; redirect?: unknown } })
+    ._serverResult;
+  if (serverResult) {
+    if (serverResult.type === 'redirect') {
+      const redirectObj = serverResult.redirect as
+        | {
+            headers?: { get?: (name: string) => string | null };
+            status?: number;
+            options?: { href?: string };
+          }
+        | undefined;
+      const location = redirectObj?.headers?.get?.('Location') ?? redirectObj?.options?.href ?? undefined;
+      return {
+        status: redirectObj?.status || 307,
+        location,
+      };
+    }
+    if (
+      serverResult.type === 'render' &&
+      typeof serverResult.status === 'number' &&
+      serverResult.status !== 200
+    ) {
+      return { status: serverResult.status };
+    }
+    return undefined;
+  }
+
+  // Fall back to old API (<=1.170.18): router.state.statusCode / router.state.redirect
+  const { statusCode, redirect } = router.state;
+
+  // Redirect: router.state.redirect is a Web API Response object.
+  // Its Location is at .headers.get('Location'), NOT .href (which doesn't exist on Response).
+  if (redirect) {
+    const location = redirect.headers?.get('Location') ?? undefined;
+    return {
+      status: redirect.status || statusCode || 307,
+      location,
+    };
+  }
+
+  // Non-200 without redirect (notFound, loader error).
+  if (typeof statusCode === 'number' && statusCode !== 200) {
+    return { status: statusCode };
+  }
+
+  return undefined;
+}
+
 export interface TanStackServerRenderResult {
   appElement: ReactElement;
   dehydratedState: DehydratedRouterState;
+  /** HTTP response metadata for Rails to set status and Location header. Absent for normal 200. */
+  httpResponse?: HttpResponse;
 }
 
 /**
@@ -136,6 +208,8 @@ export async function serverRenderTanStackAppAsync(
   // depend on router.ssr.
   await router.load();
 
+  const httpResponse = extractHttpResponse(router);
+
   const dehydratedState: DehydratedRouterState = {
     url,
     dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
@@ -144,8 +218,16 @@ export async function serverRenderTanStackAppAsync(
     ssrRouter: buildSsrRouterState(router),
   };
 
+  // For redirects, the router's matches array is empty — there is nothing to render.
+  // Return a minimal placeholder instead of building an empty component tree.
+  const isRedirect = httpResponse && httpResponse.status >= 300 && httpResponse.status < 400;
+  const appElement = isRedirect
+    ? createElement('span')
+    : buildAppElement(router, RouterProvider, options.AppWrapper, props);
+
   return {
-    appElement: buildAppElement(router, RouterProvider, options.AppWrapper, props),
+    appElement,
     dehydratedState,
+    httpResponse,
   };
 }
