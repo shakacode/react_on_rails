@@ -26,6 +26,7 @@ module DemoFleetUpgrade
   COORDINATED_GEMS = %w[react_on_rails react_on_rails_pro].freeze
   COORDINATED_NPM = %w[react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer].freeze
   COMMIT_TRAILER = "Demo-Fleet-Upgrade"
+  SMOKE_MARKER = /<!-- demo-fleet-upgrade:smoke=(.*?) -->/
   LOCKFILES = {
     "package-lock.json" => "npm", "pnpm-lock.yaml" => "pnpm", "yarn.lock" => "yarn"
   }.freeze
@@ -53,6 +54,10 @@ module DemoFleetUpgrade
   # Rewrites exact version pins in a Gemfile, keeping quotes and an existing "=" operator.
   module GemfileEditor
     module_function
+
+    def declares?(text, names)
+      names.any? { |name| text.match?(/^\s*gem\s*\(?\s*(["'])#{Regexp.escape(name)}\1/) }
+    end
 
     # Returns [new_text, changes, errors]; changes are [name, from, to] triples.
     def rewrite(text, pins)
@@ -96,6 +101,8 @@ module DemoFleetUpgrade
 
     PROTOCOL_PREFIX = /\A(?:workspace|file|link|portal|npm|git|github|https?):/
 
+    def declares?(text, names) = names.any? { |name| text.match?(/"#{Regexp.escape(name)}"\s*:/) }
+
     def rewrite(text, pins)
       changes = []
       errors = []
@@ -138,10 +145,11 @@ module DemoFleetUpgrade
     def select(filters)
       return repos if filters.empty?
 
-      filters.map do |filter|
+      selected = filters.map do |filter|
         repos.find { |repo| [repo["name"], repo["name"].split("/").last].include?(filter) } ||
           raise(Error, "No manifest repo matches #{filter.inspect}")
       end
+      selected.uniq { |repo| repo["name"] }
     end
   end
 
@@ -381,8 +389,10 @@ module DemoFleetUpgrade
       files = file_contents(ref, chdir:)
       changes = []
       errors = []
+      declared = false
       files.each do |path, text|
         editor = path.end_with?("Gemfile") ? GemfileEditor : PackageJsonEditor
+        declared ||= editor.declares?(text, path.end_with?("Gemfile") ? COORDINATED_GEMS : COORDINATED_NPM)
         pins = path.end_with?("Gemfile") ? gem_pins : npm_pins
         _text, file_changes, file_errors = editor.rewrite(text, pins)
         changes.concat(file_changes.map do |name, from, to|
@@ -390,7 +400,7 @@ module DemoFleetUpgrade
                        end)
         errors.concat(file_errors)
       end
-      errors << "No Gemfile or package.json pins any React on Rails package" if files.empty?
+      errors << "No root or one-level Gemfile or package.json declares a React on Rails package" unless declared
       { changes:, errors:, files: }
     end
 
@@ -598,7 +608,7 @@ module DemoFleetUpgrade
       end
       if pr
         result.pr_url = pr["url"]
-        comment_rerun(pr) if @pushed_now || result.smoke != "skipped"
+        comment_rerun(pr) if @pushed_now || (result.smoke != "skipped" && last_reported_smoke(pr) != result.smoke)
         return finish("pr reused", nil)
       end
 
@@ -619,6 +629,17 @@ module DemoFleetUpgrade
 
     # A rerun never rewrites the PR description, which people may have edited; it adds this
     # run's evidence as a comment so the PR does not keep showing the first run's results.
+    # The smoke result the PR last reported, from the hidden marker in its body and rerun comments.
+    def last_reported_smoke(pull_request)
+      outcome = runner.run(["gh", "pr", "view", pull_request.fetch("number").to_s, "--repo", @slug,
+                            "--json", "body,comments"], chdir: @worktree, timeout: 120)
+      return nil unless outcome.success
+
+      data = JSON.parse(outcome.output)
+      texts = [data["body"].to_s, *Array(data["comments"]).map { |comment| comment["body"].to_s }]
+      texts.join("\n").scan(SMOKE_MARKER).flatten.last
+    end
+
     def comment_rerun(pull_request)
       head = git("rev-parse", "--short", "HEAD", chdir: @worktree).output.strip
       body_path = File.join(@log_dir, "pr-rerun-comment.md")
@@ -644,6 +665,7 @@ module DemoFleetUpgrade
         #{js_lock_summary}
 
         Local smoke: **#{result.smoke}**.
+        <!-- demo-fleet-upgrade:smoke=#{result.smoke} -->
       MARKDOWN
     end
 
@@ -710,11 +732,16 @@ module DemoFleetUpgrade
       repos = manifest.select(options[:repos])
       results = run_repos(repos, options, manifest.branch_prefix)
       @out.puts(Table.render(results))
-      File.write(options[:json], JSON.pretty_generate(results.map(&:to_h))) if options[:json]
+      write_json(options[:json], results) if options[:json]
       results.any? { |r| FAILING_STATUSES.include?(r.status) || r.smoke.start_with?("fail") } ? 1 : 0
     end
 
     private
+
+    def write_json(path, results)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, JSON.pretty_generate(results.map(&:to_h)))
+    end
 
     def run_repos(repos, options, branch_prefix)
       queue = Queue.new
@@ -767,7 +794,11 @@ module DemoFleetUpgrade
         o.on("--work-dir DIR", "Worktrees and logs (default DEMOS_DIR/.fleet-upgrade/VERSION)") do |v|
           options[:work_dir] = v
         end
-        o.on("--jobs N", Integer, "Repos upgraded in parallel (default 4)") { |v| options[:jobs] = v }
+        o.on("--jobs N", Integer, "Repos upgraded in parallel (default 4)") do |v|
+          raise OptionParser::InvalidArgument, "--jobs must be at least 1" if v < 1
+
+          options[:jobs] = v
+        end
         o.on("--timeout SECONDS", Integer, "Per-command timeout (default 900)") { |v| options[:timeout] = v }
         o.on("--issue-url URL", "Release tracking issue linked from each PR") { |v| options[:issue_url] = v }
         o.on("--json PATH", "Also write results as JSON") { |v| options[:json] = v }

@@ -97,6 +97,17 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
   end
 
+  def test_manifest_selects_each_repo_once
+    manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
+    assert_equal 1, manifest.select(["demo-a", "shakacode/demo-a"]).size
+  end
+
+  def test_jobs_must_be_positive
+    assert_raises(OptionParser::InvalidArgument) do
+      DemoFleetUpgrade::CLI.new(["17.2.1", "--jobs", "0"], manifest: DemoFleetUpgrade::Manifest.new("repos" => [])).run
+    end
+  end
+
   def test_manifest_selects_by_short_or_full_name
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
     assert_equal(["shakacode/demo-a"], manifest.select(["demo-a"]).map { |r| r["name"] })
@@ -155,16 +166,23 @@ class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
     result("ok", true)
   end
 
+  def fake_pr_view(number)
+    pr = @prs.find { |entry| entry["number"].to_s == number }
+    result(JSON.generate("body" => pr&.fetch("body", ""), "comments" => @comments.map { |c| { "body" => c } }), true)
+  end
+
   def fake_gh(argv)
     case argv[1..2]
     when %w[pr list] then result(JSON.generate(@prs), true)
+    when %w[pr view] then fake_pr_view(argv[3])
     when %w[pr comment]
       @comments << File.read(argv[argv.index("--body-file") + 1])
       result("ok", true)
     when %w[pr create]
       url = "https://github.com/shakacode/demo-app/pull/#{@prs.size + 1}"
       head = argv[argv.index("--head") + 1]
-      @prs << { "number" => @prs.size + 1, "url" => url, "state" => "OPEN", "headRefName" => head,
+      body = File.read(argv[argv.index("--body-file") + 1])
+      @prs << { "number" => @prs.size + 1, "url" => url, "state" => "OPEN", "headRefName" => head, "body" => body,
                 "title" => "Upgrade React on Rails" }
       result("#{url}\n", true)
     else result("unexpected gh call", false)
@@ -314,6 +332,7 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     assert_equal 0, code, out
     assert_match(/pr reused/, out)
     assert_equal first_sha, remote_branch_sha
+    assert_empty @runner.comments, "an unchanged rerun must not comment"
     assert_equal(1, @runner.calls.count { |argv| argv[0..2] == %w[gh pr create] })
   end
 
@@ -438,6 +457,24 @@ class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
     comment = @runner.comments.first
     assert_match(/Local smoke: \*\*fail \(js-install\)\*\*/, comment)
     assert_match(/pushed new commits/, comment)
+  end
+
+  def test_repo_without_any_coordinated_pin_needs_an_agent
+    push_to_main(write: { "Gemfile" => %(gem "rails", "8.0.0"\n),
+                          "package.json" => %({ "dependencies": { "react": "19.3.0" } }\n) })
+
+    out, code = run_cli
+
+    assert_equal 1, code
+    assert_match(/needs agent.*declares a React on Rails package/, out)
+  end
+
+  def test_json_report_creates_its_directory
+    path = File.join(@tmp, "reports", "nested", "fleet.json")
+
+    run_cli("--json", path)
+
+    assert_equal "demo-app", JSON.parse(File.read(path)).first.fetch("repo")
   end
 
   def test_rejecting_commit_hook_fails_the_repo_without_pushing
