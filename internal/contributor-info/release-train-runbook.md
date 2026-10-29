@@ -136,10 +136,15 @@ remote branch updates. `script/release` provides process-local supervision for
 publication. It does not use an external coordination lease.
 
 Set the release version once in the coordinator shell for the command examples
-below. The branch name is derived from that value; no per-run identity or lease
-variables are required:
+below, in a fresh shell. The branch name is derived from that value; no per-run
+identity or lease variables are required, and the snippet refuses to run when
+the canonical variables already exist:
 
 ```bash
+if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_BRANCH+x}" = x ]; then
+  echo "canonical release variables are already set; start a fresh shell" >&2
+  return 1 2>/dev/null || exit 1
+fi
 RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"
 [[ "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
   echo "release version must be X.Y.Z; stop" >&2
@@ -615,8 +620,8 @@ there are multiple selections, process the sequence in order:
    }
    ```
 
-   The head, base, branch, freshly fetched `main`, source-audit, and release-line
-   ownership checks are preflight checks. They retain the narrow
+   The head, base, branch, freshly fetched `main`, and source-audit checks are
+   preflight checks. They retain the narrow
    preflight-to-mutation race, so use this path only while one release lane is
    active, per [Serialize every release-line write](#serialize-every-release-line-write);
    otherwise stop.
@@ -943,7 +948,7 @@ jq -e '.data.mergePullRequest.pullRequest.merged == true' \
 }
 ```
 
-These base and ownership checks reduce stale-write risk but do not eliminate a
+These base checks reduce stale-write risk but do not eliminate a
 change after the last preflight and before the mutation. Run them only while one release lane is
 active, per [Serialize every release-line write](#serialize-every-release-line-write);
 otherwise stop.

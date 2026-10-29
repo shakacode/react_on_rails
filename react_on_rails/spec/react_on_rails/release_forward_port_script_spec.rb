@@ -86,7 +86,7 @@ RSpec.describe "script/release-forward-port" do
   end
 
   def documented_release_line_variables_snippet
-    documented_bash_snippet('RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"')
+    documented_bash_snippet('if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_BRANCH+x}" = x ]; then')
   end
 
   def documented_backport_merge_snippet
@@ -591,6 +591,26 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stdout).to include("17.0.0 release/17.0.0")
+    end
+
+    it "refuses either pre-existing canonical variable before any release command" do
+      [{ "RELEASE_VERSION" => "17.0.0" }, { "RELEASE_BRANCH" => "release/17.0.0" }].each do |preexisting|
+        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle("exit 72", preexisting)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("canonical release variables are already set; start a fresh shell")
+        expect(calls).to be_empty
+      end
+    end
+
+    it "refuses re-pasting the release variables in the same shell" do
+      _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+        documented_release_line_variables_snippet
+      )
+
+      expect(status).not_to be_success
+      expect(stderr).to include("canonical release variables are already set; start a fresh shell")
+      expect(calls).to be_empty
     end
 
     it "documents one canonical release version and branch assignment" do
