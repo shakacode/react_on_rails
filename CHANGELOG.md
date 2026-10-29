@@ -35,6 +35,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5184](https://github.com/shakacode/react_on_rails/issues/5184).
   [PR 5185](https://github.com/shakacode/react_on_rails/pull/5185) by [justin808](https://github.com/justin808).
 
+#### Security
+
+- **[Pro]** **Refresh `react-server-dom-webpack` for React's October 14 RSC advisories**: React published
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) (critical, remote
+  code execution) and [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)
+  (high, denial of service) against `react-server-dom-webpack` 19.0.0 through 19.3.0. React on Rails does not pin that
+  package, so fresh installs already resolve a fixed version, but existing lockfiles keep the old one. **Action
+  required for upgraders:** RSC apps should update `react`, `react-dom`, and `react-server-dom-webpack` together to
+  19.3.1 (or all three to 19.2.9 on the 19.2 line) and commit the refreshed lockfile. Check with
+  `pnpm why react-server-dom-webpack` (or the npm or Yarn equivalent).
+  [PR 5276](https://github.com/shakacode/react_on_rails/pull/5276) by [justin808](https://github.com/justin808).
+
 ### [17.2.1.rc.1] - 2026-10-28
 
 #### Fixed
