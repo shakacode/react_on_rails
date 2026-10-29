@@ -261,6 +261,7 @@ function applyDehydratedMatchData(
         ...m,
         status: ssrMatch.s,
         updatedAt: ssrMatch.u,
+        ...(ssrMatch.g === true ? { globalNotFound: true } : {}),
         ...(ssrMatch.l !== undefined ? { loaderData: ssrMatch.l } : {}),
         ...(ssrMatch.b !== undefined ? { __beforeLoadContext: ssrMatch.b } : {}),
         ...(ssrMatch.e !== undefined ? { error: restoreRouteError(ssrMatch) } : {}),

@@ -281,6 +281,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
             internal_option: nil,
             streaming?: true,
             rsc_payload_streaming?: true,
+            ppr_prerender?: false,
+            ppr_resume?: false,
             dom_id: "TestComponent-0",
             trace: false
           )

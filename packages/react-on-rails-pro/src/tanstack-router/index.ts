@@ -118,11 +118,12 @@ export function createTanStackRouterRenderFunction(
         railsContext as RailsContext & { serverSide: true },
         RouterProvider,
         createMemoryHistory,
-      ).then(({ appElement, dehydratedState }) => ({
+      ).then(({ appElement, dehydratedState, httpResponse }) => ({
         renderedHtml: appElement,
         clientProps: {
           __tanstackRouterDehydratedState: dehydratedState,
         },
+        httpResponse,
       }));
     }
 

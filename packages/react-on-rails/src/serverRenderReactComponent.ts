@@ -23,7 +23,7 @@ type ProcessedRenderState = Omit<RenderState, 'result'> & {
 };
 
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): ProcessedRenderState {
-  const { redirectLocation, routeError } = result;
+  const { redirectLocation, routeError, httpResponse } = result;
   const hasErrors = !!routeError;
   const { clientProps } = result;
 
@@ -48,7 +48,7 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
       : result.renderedHtml;
   }
 
-  return { result: htmlResult ?? null, hasErrors, clientProps };
+  return { result: htmlResult ?? null, hasErrors, clientProps, httpResponse };
 }
 
 function processReactElement(result: ReactElement): string {

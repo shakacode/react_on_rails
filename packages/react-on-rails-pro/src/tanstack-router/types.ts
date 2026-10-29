@@ -74,6 +74,10 @@ export interface TanStackRouter {
     };
     resolvedLocation: unknown;
     matches: unknown[];
+    /** HTTP status code set by TanStack Router after load() (200, 301, 307, 404, 500). */
+    statusCode?: number;
+    /** Redirect Response set by TanStack Router when a loader throws redirect(). */
+    redirect?: Response;
   };
   options?: {
     /** Called once on the server after router.load(); the result is passed to `hydrate` on the client. */
@@ -108,6 +112,8 @@ export interface TanStackSsrMatch {
   u: number;
   /** status — match resolution status */
   s: string;
+  /** globalNotFound — true when this match is the global not-found boundary */
+  g?: boolean;
   /** beforeLoadContext */
   b?: unknown;
   /** loaderData */
@@ -148,6 +154,17 @@ export interface TanStackRouterOptions {
    * The router's RouterProvider will be rendered as children of this component.
    */
   AppWrapper?: ComponentType<{ children?: ReactNode } & Record<string, unknown>>;
+}
+
+/**
+ * HTTP response metadata extracted from TanStack Router state after load().
+ * Propagated through the wire format so Rails can set the real HTTP status and Location header.
+ */
+export interface HttpResponse {
+  /** HTTP status code (e.g. 301, 307, 404, 500). */
+  status: number;
+  /** Redirect target URL. Present only for redirect responses. */
+  location?: string;
 }
 
 /**

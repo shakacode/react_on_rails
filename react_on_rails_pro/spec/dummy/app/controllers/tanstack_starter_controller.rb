@@ -17,6 +17,8 @@
 # (see config/routes.rb) renders the same view for every starter URL, so the
 # initial route is server-rendered and subsequent navigation is client-side.
 class TanstackStarterController < ApplicationController
+  include ReactOnRails::SsrStatusHandler
+
   # Production apps should choose their own ReactOnRails::PrerenderError handling policy.
   def index; end
 end
