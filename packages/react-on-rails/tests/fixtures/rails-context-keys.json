@@ -26,6 +26,9 @@
     "serverSideRSCPayloadParameters",
     "reactClientManifestFileName",
     "reactServerClientManifestFileName",
-    "getRSCPayloadStream"
+    "getRSCPayloadStream",
+    "pprSettleBudgetMs",
+    "pprPostponedState",
+    "pprShellAssets"
   ]
 }

@@ -550,6 +550,14 @@ module ReactOnRailsProHelper
       raw_cache_options = render_options[:cache_options] || {}
       cached_entry = ppr_read_cache_entry(cache_key, raw_cache_options, component_name)
 
+      # The single cache-effectiveness branch point (issue #5102): exactly ONE
+      # `ppr.cache.lookup` event fires per invocation, decided by the validated cache read
+      # above. Emitting here — not inside the path methods — keeps the pre-flush degradation
+      # fallback (which re-enters ppr_cache_miss) from double-counting: a degraded hit stays a
+      # hit, identified by the `ppr.cache.lookup{outcome: :hit}` +
+      # `ppr.resume.degraded_pre_flush` pair.
+      ppr_instrument_non_fatal(component_name, :lookup, cached_entry ? :hit : :miss)
+
       if cached_entry
         ppr_cache_hit_with_fallback(
           component_name, render_options, cached_entry, cache_key, raw_cache_options, &block
@@ -558,6 +566,15 @@ module ReactOnRailsProHelper
         ppr_cache_miss(component_name, render_options, cache_key, raw_cache_options, &block)
       end
     end
+  rescue StandardError => e
+    # Attribution, not handling: the raise is re-raised unchanged. Without this event, an
+    # invocation that dies before the cache read (a raising cache_key proc, an option/streaming
+    # validation error) emits nothing — and when an app-level rescue_from turns that raise into
+    # a 2xx, the page becomes indistinguishable from one with no ppr_react_component at all, or
+    # (next to a sibling hit) from an all-hits page (#5106 review). A post-lookup raise also
+    # lands here, giving direct evidence for what the warmer otherwise infers from a bare miss.
+    ppr_instrument_non_fatal(component_name, :abort, e)
+    raise
   end
 
   if defined?(ScoutApm)
@@ -2003,7 +2020,7 @@ module ReactOnRailsProHelper
     ppr_write_cache_entry(component_name, prerender_result, cache_key, raw_cache_options, render_options)
 
     ppr_serve_shell(component_name, options, prerender_result,
-                    cache_hit: false, cache_key:, raw_cache_options:)
+                    cache_key:, raw_cache_options:)
   end
 
   # Pre-flush fallback wrapper (issue #4891 Layer 3a). The cache-hit path runs BEFORE the shell
@@ -2040,7 +2057,7 @@ module ReactOnRailsProHelper
     prerender_result = ppr_hit_prerender_result(component_name, options, cached_entry)
 
     ppr_serve_shell(component_name, options, prerender_result,
-                    cache_hit: true, cache_key:, raw_cache_options:)
+                    cache_key:, raw_cache_options:)
   end
 
   # Builds the warm path's per-request render context (render options + component specification
@@ -2169,15 +2186,22 @@ module ReactOnRailsProHelper
   end
 
   # Emits a PPR instrumentation event without allowing a subscriber error to propagate.
-  # Used in code paths that must remain non-fatal (cache read fallback, cache write skip).
-  def ppr_instrument_non_fatal(component_name, event, detail)
+  # Used in code paths that must remain non-fatal (cache read fallback, cache write skip,
+  # the lookup and static-shell counters — pure observability must never break a render).
+  def ppr_instrument_non_fatal(component_name, event, detail = nil)
     case event
+    when :lookup
+      ReactOnRailsPro::Ppr.instrument_cache_lookup(component_name:, outcome: detail)
+    when :static_shell
+      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:)
     when :write
-      ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, cache_key: detail)
+      ReactOnRailsPro::Ppr.instrument_cache_write(component_name:, **detail)
     when :write_refused
       ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name:, reason: detail)
     when :read_error
       ReactOnRailsPro::Ppr.instrument_cache_read_error(component_name:, error: detail)
+    when :abort
+      ReactOnRailsPro::Ppr.instrument_render_abort(component_name:, error: detail)
     end
   rescue StandardError
     nil # subscriber errors must not break non-fatal cache paths
@@ -2249,19 +2273,25 @@ module ReactOnRailsProHelper
       return
     end
 
-    # The envelope is now persisted. Tag registration and the write-success event both run
-    # regardless of which one raises — the write event reflects the persisted state (accurate
-    # counter) and tag registration is never skipped by a subscriber error. All instrument
-    # calls are routed through the non-fatal wrapper so subscriber errors cannot escape into
-    # the caller's rescue and produce contradictory counters.
-    tag_error = nil
+    # The envelope is now persisted — from here on, exactly one ppr.cache.write fires and
+    # nothing may misreport the persisted entry as refused. A tag-registration failure is
+    # non-fatal I/O: the entry stays cached (TTL-only eviction, revalidate_tag cannot reach it)
+    # and that state rides on the write event as tags_registered: false. It must NOT also emit
+    # ppr.cache.write_refused — a refusal event for a persisted write makes any
+    # `writes - refusals` arithmetic (the cache warmer's cold-component count, an operator's
+    # dashboard) miscount by one, which can exactly cancel a genuinely cold component on the
+    # same page (#5106 review).
+    tags_registered = true
     begin
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     rescue StandardError => e
-      tag_error = e
+      tags_registered = false
+      Rails.logger.warn do
+        "[ReactOnRailsPro] PPR cache-tag registration failed (non-fatal, entry stays cached " \
+          "without tag-index entries, so revalidate_tag cannot evict it): #{ppr_redacted_error_for_log(e)}"
+      end
     end
-    ppr_instrument_non_fatal(component_name, :write, cache_key)
-    raise tag_error if tag_error
+    ppr_instrument_non_fatal(component_name, :write, { cache_key:, tags_registered: })
   end
 
   # Serves the shell as the helper's synchronous return value (wrapped in the component div with
@@ -2269,10 +2299,12 @@ module ReactOnRailsProHelper
   # dynamic holes, starts the resume phase that streams them. A shell with no PostponedState is a
   # fully static page: SUCCESS with no resume request, counted by the ppr.static_shell counter —
   # unless the prerender reported a render error, which is a failed render, not a static page.
+  # Cache state is NOT re-reported here: the hit/miss axis fired once already as
+  # `ppr.cache.lookup` at the read branch (issue #5102).
   #
   # cache_key and raw_cache_options are threaded through to ppr_enqueue_resume_stream so the
   # post-flush degradation handler (Layer 3b) can evict the entry on resume failure.
-  def ppr_serve_shell(component_name, options, prerender_result, cache_hit:,
+  def ppr_serve_shell(component_name, options, prerender_result,
                       cache_key: nil, raw_cache_options: nil)
     shell_result = build_react_component_result_for_server_rendered_string(
       server_rendered_html: prerender_result[:shell_html],
@@ -2287,7 +2319,9 @@ module ReactOnRailsProHelper
                                 cache_key:, raw_cache_options:,
                                 asset_manifest: prerender_result[:asset_manifest])
     elsif !prerender_result[:had_render_error]
-      ReactOnRailsPro::Ppr.instrument_static_shell(component_name:, cache_hit:)
+      # Non-fatal like every other render-path emission: a raising subscriber here previously
+      # escaped into the pre-flush fallback, evicting a valid entry and failing the render.
+      ppr_instrument_non_fatal(component_name, :static_shell)
     end
 
     shell_result
@@ -2475,21 +2509,8 @@ module ReactOnRailsProHelper
         result = with_csp_nonce_placeholder do |placeholder|
           csp_nonce_placeholder = placeholder
           rendered = react_component(component_name, options)
-          unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-            cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-            # Capture httpResponse from the task-local request.env slot immediately
-            # after react_component returns — before another concurrent async task
-            # can overwrite the shared CURRENT_ENV_KEY.
-            hr = defined?(request) && request.respond_to?(:env) &&
-                 request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
-            hr = nil unless hr.is_a?(Hash)
-            # Never cache 5xx error responses — the next request retries rendering.
-            unless current_http_response_server_error?(http_response: hr)
-              Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
-              ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
-              write_http_response_sidecar(cache_key, cache_options, http_response: hr)
-            end
-          end
+          write_async_render_cache_entry(rendered, placeholder, cache_key, raw_cache_options,
+                                         normalized_cache_tags)
           rendered
         end
         # Swapped outside the placeholder scope, so a nested render targets the outer one.
@@ -2498,6 +2519,26 @@ module ReactOnRailsProHelper
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
+  end
+
+  # Cache write for the async miss path, run inside the async task right after
+  # react_component returns. Skipped when the cache options expired mid-render.
+  def write_async_render_cache_entry(rendered, placeholder, cache_key, raw_cache_options, normalized_cache_tags)
+    return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    # Capture httpResponse from the task-local request.env slot immediately
+    # after react_component returns — before another concurrent async task
+    # can overwrite the shared CURRENT_ENV_KEY.
+    hr = defined?(request) && request.respond_to?(:env) &&
+         request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
+    hr = nil unless hr.is_a?(Hash)
+    # Never cache 5xx error responses — the next request retries rendering.
+    return if current_http_response_server_error?(http_response: hr)
+
+    Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+    write_http_response_sidecar(cache_key, cache_options, http_response: hr)
   end
 
   def prepare_async_render_options(raw_options)
