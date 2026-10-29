@@ -834,8 +834,10 @@ describe('pprServerRenderedReactComponent', () => {
       const resumeHtml = resumeChunks.map((chunk) => chunk.html).join('');
       const warmHtml = shellHtml + resumeHtml;
 
-      // The warm response (shell + resume stream) carries MORE pushes for the same key than
-      // the cached shell — the postponed payload streams fresh on every warm hit ...
+      // With the shell's push count pinned to 0 above, this requires the resume stream to
+      // deliver at least one push for the same key — the postponed payload streams fresh on
+      // every warm hit. (The #5019-A "shell caches no pushes" work is done by the toBe(0)
+      // assertion; this line proves the warm side actually delivers.)
       const warmPushCount = countByKey(PUSH_RE, warmHtml).get(payloadKey) ?? 0;
       expect(warmPushCount).toBeGreaterThan(shellPushCount);
       expect(resumeHtml).toContain(RSC_PAYLOAD_MARKER);

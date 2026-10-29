@@ -35,6 +35,15 @@ import { test, expect } from '@playwright/test';
 
 const WARM_SHELL_TTFB_BUDGET_MS = 400;
 
+// Chromium only: the wall-clock TTFB budget needs one browser against the single-process
+// server (three parallel engines contend past 400ms), and reading a streamed main-frame
+// navigation body via response.text() is only verified reliable on Chromium. File-level
+// annotation so other projects skip without launching their browser.
+test.skip(
+  ({ browserName }) => browserName !== 'chromium',
+  'Warm-hit timing and streamed-body reads are pinned to Chromium.',
+);
+
 test('warm PPR hit reuses the cached shell, streams fresh server content, and hydrates the server DOM in place', async ({
   page,
 }) => {
@@ -106,7 +115,9 @@ test('warm PPR hit reuses the cached shell, streams fresh server content, and hy
   // JSON also contains freshValue, so a whole-document search would prove nothing.
   const renderedValues = [...html.matchAll(/id="ppr-dynamic-value"[^>]*>([^<]*)</g)].map((match) => match[1]);
   expect(renderedValues).toContain(freshValue);
-  expect(renderedValues).not.toContain(warmupValue);
+  // The warm-up request's value must appear NOWHERE in this response — not in the rendered
+  // hole, not leaked through the cached shell, not in the per-request props JSON.
+  expect(html).not.toContain(warmupValue);
   expect(html.indexOf('id="ppr-hole-fallback"')).toBeLessThan(html.indexOf('id="ppr-hole-content"'));
 
   // ---- 3. Hydration without replacing the server DOM ----
@@ -130,4 +141,21 @@ test('warm PPR hit reuses the cached shell, streams fresh server content, and hy
   await expect(page.locator('#ppr-dynamic-value')).toHaveText(freshValue);
   expect(hydrationWarnings).toEqual([]);
   expect(pageErrors).toEqual([]);
+
+  // ---- Cold control: prove the TTFB budget still discriminates on THIS server ----
+  // The warm budget only means "shell reuse" while a cold prerender cannot beat it (the
+  // settle timer floors cold first-byte around 500ms). If the dummy ever lowers
+  // ppr_settle_budget_ms below the budget, this control navigation — a never-warmed cache
+  // key — comes in fast and fails here, instead of letting the warm assertion lie.
+  const coldUrl =
+    `/ppr_page_for_testing?cacheKey=e2e-cold-${randomUUID()}` +
+    `&holeDelayMs=1000&dynamicValue=cold-${randomUUID()}`;
+  const coldResponse = await page.goto(coldUrl);
+  if (!coldResponse) throw new Error('cold-control navigation returned no response');
+  expect(coldResponse.ok()).toBe(true);
+  const coldResponseStart = await page.evaluate(() => {
+    const [nav] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    return nav ? nav.responseStart : Number.NaN;
+  });
+  expect(coldResponseStart).toBeGreaterThanOrEqual(WARM_SHELL_TTFB_BUDGET_MS);
 });
