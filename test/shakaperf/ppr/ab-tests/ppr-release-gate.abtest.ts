@@ -19,9 +19,59 @@ const STREAMING_SSR_PATH = process.env.SHAKAPERF_STREAMING_SSR_PATH ?? '/stream_
 // first byte lands in single-digit-to-tens of ms on the benchmark host. A cold miss CANNOT
 // flush the shell before the PPR settle timer postpones the hole at ~500ms. 400ms therefore
 // cleanly separates the two: generous headroom over a warm serve, strictly below the
-// cheapest possible cold serve. Event-based proof via ppr.cache.lookup (#5102) is the
-// planned upgrade; this behavioral bound is what is observable from the browser today.
+// cheapest possible cold serve. This latency bound composes with the event-based proof
+// below (assertMeasuredLookupWasHit): the event proves the cache outcome, the bound proves
+// the warm serve was actually fast — a cache hit that still took 600ms is a regression the
+// event alone would wave through.
 const WARM_SHELL_TTFB_BUDGET_MS = 400;
+
+type ShakaPerfPage = Parameters<Parameters<typeof abTest>[2]>[0]['page'];
+
+// Event-based warm-hit proof (issue #5103 scope, unblocked by #5102): the dummy app, booted
+// with SHAKAPERF_PPR_CACHE=true, records every ppr.cache.lookup event in a ring buffer keyed
+// by the dynamicValue the fixture renders into #ppr-dynamic-value (fiber-local correlation —
+// see spec/dummy/config/initializers/shakaperf_ppr_lookup_log.rb), served at
+// /shakaperf_ppr_lookups. Reading the measured page's OWN rendered dynamicValue from its DOM
+// and looking up that exact entry attributes a cache outcome to the measured request itself —
+// unambiguous even under simultaneous sampling, where both sides hit the same route at the
+// same moment. Hydration cannot confuse it: client hydration re-renders with this request's
+// own props JSON, so the DOM value identifies this request either way.
+const assertMeasuredLookupWasHit = async (page: ShakaPerfPage, side: string) => {
+  const measuredValue = (await page.locator('#ppr-dynamic-value').textContent())?.trim();
+  if (!measuredValue) {
+    throw new Error(
+      `${side} measured page rendered an empty #ppr-dynamic-value — cannot correlate the ` +
+        'measured request with its ppr.cache.lookup event',
+    );
+  }
+  const lookupsUrl = new URL('/shakaperf_ppr_lookups', page.url());
+  const response = await page.request.get(lookupsUrl.toString());
+  if (!response.ok()) {
+    throw new Error(
+      `${side} GET ${lookupsUrl} failed with HTTP ${response.status()} — the lookup recorder ` +
+        'is only mounted when the app boots with SHAKAPERF_PPR_CACHE=true',
+    );
+  }
+  const { lookups } = (await response.json()) as {
+    lookups: { component_name: string; outcome: string; dynamic_value: string | null }[];
+  };
+  const entry = lookups.find((lookup) => lookup.dynamic_value === measuredValue);
+  if (!entry) {
+    throw new Error(
+      `${side} has no recorded ppr.cache.lookup event for the measured request's dynamicValue ` +
+        `(${measuredValue}) — the measured navigation never reached the PPR cache read ` +
+        '(ppr.render.abort path, or the fixture stopped stashing dynamicValue)',
+    );
+  }
+  if (entry.outcome !== 'hit') {
+    throw new Error(
+      `${side} measured request's ppr.cache.lookup outcome was ${JSON.stringify(entry.outcome)}, ` +
+        'not "hit" — the gate measured a cold prerender, so its TTFB/LCP rows are not warm-hit ' +
+        'numbers (cache warm-up failed, the entry expired mid-run, or an eviction struck between ' +
+        'the warming GET and the measured navigation)',
+    );
+  }
+};
 
 // Cache-warming step (issue #5103 scope): fire one plain GET at the side's URL and drain it
 // BEFORE every measured navigation. The first request per run is the cold prerender + cache
@@ -74,6 +124,9 @@ abTest(
     await annotate('waiting for the streamed hole content');
     await page.waitForSelector('#ppr-hole-content', { state: 'visible', timeout: 15_000 });
 
+    await annotate('asserting ppr.cache.lookup outcome was hit');
+    await assertMeasuredLookupWasHit(page, isControl ? 'control' : 'experiment');
+
     // The DOM check above proves the page *ended up* with hole content, but client hydration
     // alone produces that too: DelayedPprHole renders synchronously in the browser, so a dead
     // resume stream still grows `#ppr-hole-content` client-side — and such failures dodge the
@@ -94,9 +147,11 @@ abTest(
     // per-probe value only appears when the server actually rendered this request's props:
     // via the resume phase on a warm hit, or the full stream on a cold miss.
     //
-    // Residual gap: a failure striking ONLY the measured request while both probes stay
-    // healthy is invisible until the ppr.cache.lookup event wiring (#5102), the documented
-    // planned upgrade.
+    // The measured request's own cache outcome is covered separately by
+    // assertMeasuredLookupWasHit above (the #5102 event wiring), so a failure striking ONLY
+    // the measured request no longer hides behind healthy probes; the probes remain the
+    // proof that the hole content is genuinely server-streamed with fresh props — the lookup
+    // event says nothing about resume health.
     const side = isControl ? 'control' : 'experiment';
     const probeServerRenderedHole = async (probeName: string) => {
       const probeUrl = new URL(page.url());
@@ -162,12 +217,20 @@ abTest(
       beforeNavigate: warmRouteBeforeMeasurement,
     },
   },
-  async ({ page, annotate }) => {
+  async ({ page, annotate, isControl }) => {
     // The two sides render different fixtures until #5101, so wait on the one signal both
     // share: the streamed document reaching the load state (the HTML stream has closed, so
     // every streamed hole has been flushed). Note: annotate labels max out at 50 chars.
     await annotate('waiting for the streamed document to load');
     await page.waitForLoadState('load');
+
+    // Acceptance criterion (#5103): EACH measured PPR request is proven to be a cache hit.
+    // The experiment side is the PPR route, so its sampled TTFB/LCP rows are only warm-hit
+    // numbers if this holds; the control side is streaming SSR and emits no lookup events.
+    if (!isControl) {
+      await annotate('asserting ppr.cache.lookup outcome was hit');
+      await assertMeasuredLookupWasHit(page, 'experiment');
+    }
   },
 );
 

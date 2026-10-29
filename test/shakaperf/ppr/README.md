@@ -19,13 +19,20 @@ React on Rails Pro dummy app.
   prerender recovery. Each probe also pins a unique `dynamicValue` (same cache key) and
   requires it in the raw hole HTML, so a settle-budget regression that caches the fully
   settled page — fast warm hits serving **stale** hole content with no resume — fails too.
-  Absolute assertions — fails even when both sides are the same broken build. Residual gap:
-  a failure striking only the measured request while both probes stay healthy needs the
-  `ppr.cache.lookup` event wiring (#5102), the planned upgrade.
+  On top of the behavioral bounds, every measured sample asserts its own `ppr.cache.lookup`
+  event (#5102) recorded outcome `hit`: the dummy app logs each lookup keyed by the
+  dynamicValue the fixture renders into `#ppr-dynamic-value`
+  (`spec/dummy/config/initializers/shakaperf_ppr_lookup_log.rb`, served at
+  `/shakaperf_ppr_lookups`), and the gate reads the measured page's own rendered value from
+  its DOM — attributing a cache outcome to the measured request itself, unambiguous even
+  under simultaneous sampling. Absolute assertions — fails even when both sides are the same
+  broken build.
 - `ppr warm hit vs streaming ssr ttfb and lcp`: the A/B pair. Control =
   `/stream_async_components_for_testing` (streaming SSR), experiment = `/ppr_page_for_testing`
-  (PPR warm hit), same server. The statistics stage fails the run on any significant
-  regression; the §6 ratio is read from the report's TTFB rows (see Enforcement status).
+  (PPR warm hit), same server. Each measured PPR sample asserts its own `ppr.cache.lookup`
+  outcome was `hit` (acceptance criterion: each measured PPR request is proven to be a cache
+  hit). The statistics stage fails the run on any significant regression; the §6 ratio is
+  read from the report's TTFB rows (see Enforcement status).
 
 ## Enforcement status
 
@@ -33,6 +40,10 @@ What the automated run can and cannot fail on today:
 
 - **Enforced — warm-hit behavior**: the guard's absolute assertions (400ms shell budget +
   server-streamed hole content in the raw HTML).
+- **Enforced — measured-request cache outcome**: every measured PPR sample, in both tests,
+  must have a recorded `ppr.cache.lookup` event with outcome `hit` for its own rendered
+  dynamicValue — a run that silently measured a cold prerender fails instead of reporting
+  cold numbers as warm ones.
 - **Enforced — "no worse" on TTFB/LCP**: shaka-perf 0.1.3 exits 1 on any statistically
   significant slower-direction TTFB/LCP delta. Its `regressionThreshold` is an absolute
   tolerance in _milliseconds_ feeding only the console alert and a `report.json` field — it
@@ -58,8 +69,7 @@ SHAKAPERF_PPR_PATH=/new_ppr_route SHAKAPERF_STREAMING_SSR_PATH=/new_streaming_ro
 ```
 
 The PPR-vs-plain-SSR secondary pair is absent until #5101 resolves the "plain SSR cannot await
-the async hole" wrinkle. The warm-hit proof is behavioral (TTFB bound); wiring the
-`ppr.cache.lookup` events (#5102) into an externally checkable assertion is the planned upgrade.
+the async hole" wrinkle.
 
 Known measurement caveat, also owned by the #5101 fixture: both current routes render through
 the dummy app's shared layout, which loads Prism CSS/JS from `cdnjs.cloudflare.com`, and the
@@ -68,6 +78,18 @@ fetches. The load is identical on both sides and paired-simultaneous sampling co
 noise (an offline runner fails loudly rather than skewing silently), but the #5101
 equivalent-tree fixture should serve its assets locally so the pair measures delivery mode
 only.
+
+## CI
+
+`.github/workflows/shakaperf-release-gates.yml` carries the `ppr` job: it boots the dummy app
+in PPR mode (`SHAKAPERF_PPR_CACHE=true`, `WEB_CONCURRENCY=0`) on the dedicated self-hosted M1
+benchmark runner (`[self-hosted, macOS, ARM64, rork-bench]`, #4073) and runs this gate with
+`--categories perf`, uploading the report and server logs as artifacts. The job is
+**advisory** (`continue-on-error: true`): per #3169 a new benchmark gate must record three
+consecutive green runs before being promoted to blocking, at which point its result also
+joins the release-evidence JSON (`rakelib/release.rake` validates the evidence key set
+exactly, so the promotion PR must update both together). The workflow is dispatch-only —
+no `pull_request` trigger ever reaches the self-hosted box (#4073 security rule).
 
 ## Local Run
 

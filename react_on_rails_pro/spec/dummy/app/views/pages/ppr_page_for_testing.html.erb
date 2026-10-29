@@ -24,6 +24,11 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
       app-level rescue_from that turns a PPR failure into a 2xx page. %>
 <%
   fully_static = params[:fullyStatic] == "true"
+  dynamic_value = params[:dynamicValue].presence || Time.current.iso8601(6)
+  # ShakaPerf event-based warm-hit proof (#5103): map this request's rendered dynamicValue to
+  # the ppr.cache.lookup event the helper below is about to emit, fiber-locally — see
+  # config/initializers/shakaperf_ppr_lookup_log.rb. No-op unless SHAKAPERF_PPR_CACHE=true.
+  ShakaperfPprLookupLog.current_dynamic_value = dynamic_value if defined?(ShakaperfPprLookupLog)
   throw_async_error = params[:throwAsyncError] == "true"
   page_cache_key =
     if params[:raiseInCacheKey] == "true"
@@ -43,7 +48,7 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
 ) do
   {
     headerText: "PPR header for testing",
-    dynamicValue: params[:dynamicValue].presence || Time.current.iso8601(6),
+    dynamicValue: dynamic_value,
     holeDelayMs: (params[:holeDelayMs].presence || 1000).to_i,
     fullyStatic: fully_static,
     throwAsyncError: throw_async_error,
