@@ -106,7 +106,12 @@ for (const version of GUARD_REACT_VERSIONS) {
   });
   if (jest.error) throw jest.error;
   if ((jest.status ?? 1) !== 0) {
-    console.error(`[react-floor-guard] FAILED against react@${version}`);
+    console.error(
+      `[react-floor-guard] FAILED against react@${version}. If the suite reported "Tests: 0 total" ` +
+        `with ERR_REQUIRE_ESM from jest-environment-jsdom, the failure is the local Node environment ` +
+        `(the workspace's jsdom chain needs a Node with require(esm) enabled — 20.19+/22.12+, same as ` +
+        `every other jsdom lane in this package), not a React-floor violation.`,
+    );
     exitCode = jest.status ?? 1;
   }
 }
