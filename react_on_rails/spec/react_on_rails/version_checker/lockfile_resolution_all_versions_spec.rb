@@ -134,11 +134,15 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
             resolution: {integrity: sha512-abc}
           localhost+4873/react-server-dom-webpack/19.2.8:
             resolution: {integrity: sha512-ghi}
+          pkgs.example.com/react-server-dom-webpack/19.3.1.tgz:
+            resolution: {tarball: https://pkgs.example.com/react-server-dom-webpack/19.3.1.tgz}
           registry.example.com/react-server-dom-webpack-extra/1.0.0:
             resolution: {integrity: sha512-def}
       YAML
 
-      expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly("19.3.0", "19.2.8")
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
+        "19.3.0", "19.2.8", "pkgs.example.com/react-server-dom-webpack/19.3.1.tgz"
+      )
     end
 
     it "keeps pnpm 5 and 6 git and tarball copies that name the package only in their entry" do

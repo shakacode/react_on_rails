@@ -93,10 +93,12 @@ module ReactOnRails
 
         # Keys under packages/snapshots name every installed copy:
         #   9.0: "name@1.2.3" or "name@1.2.3(peer@4.5.6)"; 6.0: "/name@1.2.3(...)"; 5.x: "/name/1.2.3_peer@4.5.6"
-        #   5.x from a non-default registry: "registry.example.com/name/1.2.3" or "localhost+4873/name/1.2.3"
+        #   5.x and 6.0 from a non-default registry: "registry.example.com/name/1.2.3",
+        #   "localhost+4873/name/1.2.3", or "registry.example.com/name@1.2.3"
         # Tarball, git, and file: copies keep their resolution, so callers report them as unknown instead of
         # skipping them. 9.0 keys them as "name@https://...tgz(peer@4.5.6)"; 5.x and 6.0 key them by source
         # ("github.com/org/repo/sha", "file:vendor/pkg.tgz") and record the package only in the entry's name.
+        # A remainder naming a tarball file ("19.3.1.tgz") is a resolution too, not a version.
         def self.all_versions(path, package_name)
           doc = project_document(path)
           return [] unless doc
@@ -119,7 +121,11 @@ module ReactOnRails
           rest = key[key_pattern, 1]
           return (key if entry.is_a?(Hash) && entry["name"] == package_name) unless rest
 
-          rest.match?(/\A\d/) ? strip_peer_suffix(rest) : rest.sub(/\(.*\z/, "")
+          return rest.sub(/\(.*\z/, "") unless rest.match?(/\A\d/)
+          # Gem::Version accepts "19.3.1.tgz", so keep the whole key to make it read as unknown, not a version.
+          return key.sub(/\(.*\z/, "") if rest.match?(/\.(?:tgz|tar\.gz)(?:\(|\z)/)
+
+          strip_peer_suffix(rest)
         end
 
         def self.dependencies(doc)
