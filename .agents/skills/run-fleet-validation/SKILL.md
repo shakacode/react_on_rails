@@ -53,7 +53,7 @@ script/demo-fleet-upgrade 17.2.1.rc.1 --execute --json tmp/fleet-upgrade.json
 ```
 
 It never merges, deploys, or force-pushes, and reruns reuse the branch and PR. Give lanes only
-the rows whose status is `failed`, `needs agent`, or `skipped`, or whose smoke failed. Every PR
+the rows whose status is `failed`, `needs agent`, `pr closed`, or `skipped`, or whose smoke failed. Every PR
 still needs its review-app deploy, smoke, and teardown from a lane.
 
 ## Generate public standing-health evidence

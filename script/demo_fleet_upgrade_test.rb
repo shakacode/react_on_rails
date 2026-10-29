@@ -172,6 +172,17 @@ class DemoFleetUpgradeCliTest < Minitest::Test
     assert_equal ["gem react_on_rails_pro 17.2.1.rc.1"], missing
   end
 
+  def test_registry_check_includes_explicit_bumps
+    version = DemoFleetUpgrade::Version.parse("17.2.1.rc.1")
+    gems = { "react_on_rails" => ["17.2.1.rc.1"], "react_on_rails_pro" => ["17.2.1.rc.1"], "shakapacker" => ["10.3.2"] }
+
+    missing = with_registry(gems) do
+      DemoFleetUpgrade::Registry.missing(version, { "gem" => { "shakapacker" => "10.4.0" } })
+    end
+
+    assert_equal ["gem shakapacker 10.4.0"], missing
+  end
+
   def test_unfiltered_selection_lists_each_repo_once
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" },
                                                           { "name" => "shakacode/demo-a" }])
@@ -200,7 +211,7 @@ class DemoFleetUpgradeCliTest < Minitest::Test
     registry.define_method(:npm_published?) { |_name, _version| true }
     yield
   ensure
-    originals.each { |name, method| registry.define_method(name, method) }
+    originals&.each { |name, method| registry.define_method(name, method) }
   end
 end
 
@@ -454,6 +465,26 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
 
     assert_equal 1, code
     assert_match(/needs agent.*package.json does not parse/, out)
+  end
+
+  def test_stale_gemfile_lock_behind_its_pin_is_regenerated
+    push_to_main(write: { "Gemfile" => %(source "https://rubygems.org"\ngem "react_on_rails_pro", "= 17.2.1.rc.1"\n),
+                          "package.json" => %({ "dependencies": { "react-on-rails-pro": "17.2.1-rc.1" } }\n) })
+
+    out, = run_cli
+
+    assert_match(/planned/, out)
+    assert_match(/react_on_rails 17\.2\.0 -> 17\.2\.1\.rc\.1/, out)
+  end
+
+  def test_closed_upgrade_pr_fails_the_run
+    run_cli("--execute")
+    @runner.prs.each { |pr| pr["state"] = "CLOSED" }
+
+    out, code = run_cli("--execute")
+
+    assert_equal 1, code
+    assert_match(/pr closed/, out)
   end
 
   def test_repo_already_on_target_is_up_to_date

@@ -486,7 +486,23 @@ module DemoFleetUpgrade
         errors.concat(file_errors)
       end
       errors << "No root or one-level Gemfile or package.json declares a React on Rails package" unless declared
+      changes.concat(stale_lock_changes(ref, chdir, changes))
       { changes:, errors:, files: }
+    end
+
+    # Gemfile.lock entries still behind their pins, as after a hand edit of the Gemfile alone, so the
+    # run regenerates the lock instead of reporting the repo up to date.
+    def stale_lock_changes(ref, chdir, changes)
+      lock = show(ref, "Gemfile.lock", chdir:)
+      return [] unless lock
+
+      pinned = changes.map { |change| change["name"] }
+      GemfileEditor.locked_versions(lock, gem_pins.keys).filter_map do |name, locked|
+        target = gem_pins.fetch(name)
+        next if locked == target || pinned.include?(name)
+
+        { "file" => "Gemfile.lock", "name" => name, "from" => locked, "to" => target }
+      end
     end
 
     def file_contents(ref, chdir:)
@@ -787,11 +803,12 @@ module DemoFleetUpgrade
   module Registry
     module_function
 
-    # Every coordinated gem and npm package, since the run pins all of them.
-    def missing(version)
-      gems = COORDINATED_GEMS.reject { |name| gem_versions(name).include?(version.gem) }
-      npm = COORDINATED_NPM.reject { |name| npm_published?(name, version.npm) }
-      gems.map { |name| "gem #{name} #{version.gem}" } + npm.map { |name| "npm #{name} #{version.npm}" }
+    # Every coordinated gem and npm package, plus each --bump, since the run pins all of them.
+    def missing(version, extra_bumps = {})
+      gems = COORDINATED_GEMS.to_h { |name| [name, version.gem] }.merge(extra_bumps.fetch("gem", {}))
+      npm = COORDINATED_NPM.to_h { |name| [name, version.npm] }.merge(extra_bumps.fetch("npm", {}))
+      gems.reject { |name, wanted| gem_versions(name).include?(wanted) }.map { |name, v| "gem #{name} #{v}" } +
+        npm.reject { |name, wanted| npm_published?(name, wanted) }.map { |name, v| "npm #{name} #{v}" }
     end
 
     def gem_versions(name)
@@ -805,7 +822,8 @@ module DemoFleetUpgrade
 
   # Command-line entry point.
   class CLI
-    FAILING_STATUSES = ["failed", "needs agent"].freeze
+    # A closed, unmerged upgrade PR also needs someone to decide whether to reopen or replace it.
+    FAILING_STATUSES = ["failed", "needs agent", "pr closed"].freeze
     def initialize(argv, runner: CommandRunner.new, out: $stdout, manifest: nil)
       @argv = argv
       @runner = runner
@@ -851,7 +869,7 @@ module DemoFleetUpgrade
     def check_registry(options)
       return if options[:offline] || options[:skip_registry_check]
 
-      missing = Registry.missing(options[:version])
+      missing = Registry.missing(options[:version], options[:extra_bumps])
       return if missing.empty?
       raise Error, "Not published yet: #{missing.join(', ')}" unless options[:dry_run]
 
