@@ -344,8 +344,9 @@ gate or its evidence fails, tagging and package publication remain blocked. Fina
 same strict final-release gates and cannot use the prerelease-only CI override.
 
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
-sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so
-agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase-tiered-merge-gating)).
+sets the mode to `accelerated-rc` or `strict-rc`. Agents apply the RC gate to every PR that targets
+the new `release/X.Y.Z` branch; nothing else needs publishing (see
+[Phase-tiered merge gating](#phase-tiered-merge-gating)).
 
 `main` keeps moving the entire time. Nothing about cutting the RC freezes it.
 
@@ -1142,7 +1143,8 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 
 Keep closeout in the single Shaka release-coordinator task through guarded
 branch deletion. Refetch and recheck the expected refs immediately before every
-remote transaction, and finish only after closeout and phase clear are durable.
+remote transaction, and finish only after closeout and the release branch
+deletion are durable; deleting the branch ends the RC/final gate for this line.
 
 Before running the closeout helper, fetch `origin/main` and repeat the
 retained-source audit. If a retained backport's main origin was reverted,
