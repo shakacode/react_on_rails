@@ -21,7 +21,6 @@ import * as React from 'react';
 import {
   Component,
   createContext,
-  use,
   useCallback,
   useContext,
   useEffect,
@@ -144,8 +143,14 @@ export function useCurrentRSCRoute(): RSCRouteHandle {
 }
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
-  // use is available in React 18.3+
-  const promiseResult = use(promise);
+  // React.use via NAMESPACE access, deliberately not a named import: the
+  // package ships native ESM, and Node statically verifies named imports
+  // against CommonJS react at link time — `import { use } from 'react'` on
+  // React 18 dies with "SyntaxError: Named export 'use' not found" before the
+  // branded floor guard below can run. Namespace properties are not verified,
+  // so the module links everywhere and the guard owns the failure. Pinned by
+  // scripts/packed-esm-floor.test.mjs against the packed artifact.
+  const promiseResult = React.use(promise);
 
   // In case that an error happened during the rendering of the RSC payload before the rendering of the component itself starts
   // RSC bundle will return an error object serialized inside the RSC payload
@@ -202,7 +207,11 @@ type RSCContextValue = ReturnType<typeof useRSC>;
 //    facebook/react#34831) — a trap for any future adoption that also
 //    reintroduces forwardRef or React.memo here (test 2c pins callback
 //    freshness).
-type RouteHandleRef = { ref?: Ref<RSCRouteHandle> };
+// `| undefined` is load-bearing: consumers compiling with
+// exactOptionalPropertyTypes pass conditional refs (`cond ? ref : undefined`),
+// which TS rejects against a bare optional property (TS2375). Guarded by
+// scripts/check-public-ref-types.test.mjs against the shipped declarations.
+type RouteHandleRef = { ref?: Ref<RSCRouteHandle> | undefined };
 type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue } & RouteHandleRef;
 
 function RSCRouteContent({
@@ -376,13 +385,15 @@ function RSCRouteContentWithErrorBoundary({
  * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
  * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
  */
-// React added `use` (and ref-as-prop) in 19.0; on older React the named import
-// above resolves to undefined and the render path would die with a bare
-// "use is not a function" (or, depending on tree shape, an unrelated-looking
-// provider error) instead of naming the real requirement. This is the RSC
-// client path's actual runtime floor — guarded in CI by test:react-floor-guard.
+// React added `use` (and ref-as-prop) in 19.0; on older React `React.use` is
+// undefined and the render path would die with a bare "use is not a function"
+// (or, depending on tree shape, an unrelated-looking provider error) instead
+// of naming the real requirement. `React.use` is read off the namespace — see
+// PromiseWrapper — so even a native-ESM consumer reaches this guard instead of
+// a link-time SyntaxError. This is the RSC client path's actual runtime floor,
+// guarded in CI by test:react-floor-guard and scripts/packed-esm-floor.test.mjs.
 function assertReactSupportsRSCRoute(): void {
-  if (typeof use !== 'function') {
+  if (typeof React.use !== 'function') {
     throw new Error(
       `[React on Rails Pro] <RSCRoute> requires React >= 19 (found ${React.version}): the RSC client ` +
         `path uses React's \`use\` and ref-as-prop, which were added in React 19. Upgrade react and ` +
