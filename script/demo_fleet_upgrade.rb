@@ -448,7 +448,8 @@ module DemoFleetUpgrade
         return finish("no changes", "Regeneration left nothing to commit")
       end
 
-      push unless head == pushed
+      @pushed_now = head != pushed
+      push if @pushed_now
       ensure_pr
     end
 
@@ -595,7 +596,11 @@ module DemoFleetUpgrade
         result.pr_url = pr["url"]
         return finish("pr #{pr['state'].downcase}", "Existing PR is #{pr['state'].downcase}; not reopening")
       end
-      return finish("pr reused", nil).tap { result.pr_url = pr["url"] } if pr
+      if pr
+        result.pr_url = pr["url"]
+        comment_rerun(pr) if @pushed_now || result.smoke != "skipped"
+        return finish("pr reused", nil)
+      end
 
       create_pr
     end
@@ -612,11 +617,25 @@ module DemoFleetUpgrade
       finish("pr opened", nil)
     end
 
-    def pr_body
-      rows = result.changes.map { |c| "| `#{c['file']}` | `#{c['name']}` | `#{c['from']}` | `#{c['to']}` |" }
-      <<~MARKDOWN
-        Upgrades React on Rails to `#{options.fetch(:version).gem}` (npm `#{options.fetch(:version).npm}`).
+    # A rerun never rewrites the PR description, which people may have edited; it adds this
+    # run's evidence as a comment so the PR does not keep showing the first run's results.
+    def comment_rerun(pull_request)
+      head = git("rev-parse", "--short", "HEAD", chdir: @worktree).output.strip
+      body_path = File.join(@log_dir, "pr-rerun-comment.md")
+      File.write(body_path, <<~MARKDOWN)
+        Rerun of `script/demo-fleet-upgrade` at `#{head}`#{@pushed_now ? ' pushed new commits' : ''}. \
+        These results replace the table and smoke line in the PR description.
 
+        #{run_evidence}
+      MARKDOWN
+      argv = ["gh", "pr", "comment", pull_request.fetch("number").to_s, "--repo", @slug, "--body-file", body_path]
+      outcome = runner.run(argv, chdir: @worktree, timeout: 120)
+      raise Error, "gh pr comment failed: #{outcome.output.strip}" unless outcome.success
+    end
+
+    def run_evidence
+      rows = result.changes.map { |c| "| `#{c['file']}` | `#{c['name']}` | `#{c['from']}` | `#{c['to']}` |" }
+      <<~MARKDOWN.chomp
         | File | Package | Before | After |
         | --- | --- | --- | --- |
         #{rows.empty? ? '| (no pin changes on this run) | | | |' : rows.join("\n")}
@@ -625,6 +644,14 @@ module DemoFleetUpgrade
         #{js_lock_summary}
 
         Local smoke: **#{result.smoke}**.
+      MARKDOWN
+    end
+
+    def pr_body
+      <<~MARKDOWN
+        Upgrades React on Rails to `#{options.fetch(:version).gem}` (npm `#{options.fetch(:version).npm}`).
+
+        #{run_evidence}
         #{options[:issue_url] ? "\nRelease tracking: #{options[:issue_url]}\n" : ''}
         Still needed before merge: this repo's CI, the review-app deploy and smoke (then shut it down),
         and any baseline fixes. Opened as a draft by `script/demo-fleet-upgrade` in shakacode/react_on_rails.

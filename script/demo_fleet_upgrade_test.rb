@@ -116,13 +116,14 @@ end
 
 # Simulates bundle, the JS package manager, and gh; runs real git against local fixture repos.
 class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
-  attr_reader :calls, :prs
+  attr_reader :calls, :prs, :comments
   attr_accessor :fail_steps
 
   def initialize
     super
     @calls = []
     @prs = []
+    @comments = []
     @fail_steps = []
   end
 
@@ -157,6 +158,9 @@ class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
   def fake_gh(argv)
     case argv[1..2]
     when %w[pr list] then result(JSON.generate(@prs), true)
+    when %w[pr comment]
+      @comments << File.read(argv[argv.index("--body-file") + 1])
+      result("ok", true)
     when %w[pr create]
       url = "https://github.com/shakacode/demo-app/pull/#{@prs.size + 1}"
       head = argv[argv.index("--head") + 1]
@@ -218,7 +222,8 @@ module FleetFixture
     File.write(File.join(seed, "Gemfile"), %(source "https://rubygems.org"\ngem "react_on_rails_pro", "= 17.2.0"\n))
     File.write(File.join(seed, "Gemfile.lock"),
                "GEM\n  specs:\n    react_on_rails (17.2.0)\n    react_on_rails_pro (17.2.0)\n      react_on_rails\n")
-    package = { "packageManager" => "npm@10.8.2", "dependencies" => { "react-on-rails-pro" => "17.2.0" },
+    package = { "packageManager" => "npm@10.8.2",
+                "dependencies" => { "react-on-rails-pro" => "17.2.0", "react-on-rails-rsc" => "19.3.0" },
                 "overrides" => { "react-on-rails" => "17.2.0" } }
     File.write(File.join(seed, "package.json"), "#{JSON.pretty_generate(package)}\n")
     File.write(File.join(seed, "package-lock.json"), "{}\n")
@@ -418,6 +423,21 @@ class DemoFleetUpgradeEdgeCaseTest < Minitest::Test
     assert_equal 1, code
     assert_match(/needs agent.*without an exact version/, out)
     assert_equal pushed, remote_branch_sha
+  end
+
+  def test_rerun_on_a_reused_pr_comments_its_new_evidence
+    run_cli("--execute")
+    assert_empty @runner.comments
+
+    @runner.fail_steps = ["npm ci"]
+    out, code = run_cli("--execute", "--smoke", "install", "--bump", "npm:react-on-rails-rsc=19.3.1")
+
+    assert_equal 1, code
+    assert_match(/pr reused/, out)
+    assert_equal 1, @runner.comments.size
+    comment = @runner.comments.first
+    assert_match(/Local smoke: \*\*fail \(js-install\)\*\*/, comment)
+    assert_match(/pushed new commits/, comment)
   end
 
   def test_rejecting_commit_hook_fails_the_repo_without_pushing
