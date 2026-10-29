@@ -36,6 +36,21 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808). Fixes
   [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
 
+#### Changed
+
+- **[Pro]** **`RSCRoute` takes `ref` as a regular prop instead of `forwardRef`**: The public
+  `<RSCRoute ref={…}>` handle API and `onRefetchError` behavior are unchanged, and no minimum React
+  version changes — the core package still supports React >= 16, and the RSC client path keeps its
+  existing React 19 floor (now enforced: rendering `<RSCRoute>` on older React fails fast with a
+  branded error naming the React >= 19 requirement and the version it found, instead of a cryptic
+  `use is not a function`, and CI re-runs the RSC client suite against real pinned React installs —
+  18.3.1 below the floor plus 19.0.x/19.1.x/19.2.x — with no mocks). `useEffectEvent` was deliberately not adopted to keep that floor. Calling
+  `useEffectEvent`, `useFormStatus`, or `useFormState` in a server component without `'use client'`
+  now gets the branded missing-directive diagnostic. Implements
+  [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
+  [PR 5031](https://github.com/shakacode/react_on_rails/pull/5031) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
@@ -85,8 +100,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   NUL/NEL-only errors count as nonblank, while BOM-only errors do not. Clean-chunk replay is unchanged. See [Issue 4991](https://github.com/shakacode/react_on_rails/issues/4991).
 
 - **[Pro]** **Fix CSP nonce handling in fragment-cached components**: The `cached_*` helpers now refresh executable inline script nonces on cache hits, preventing CSP from blocking hydration, console replay, and streaming scripts.
-  **Upgrade notes:** Do not embed request nonces in cached props or text; only matching double-quoted `nonce="…"` attributes are refreshed. Overrides of `normalize_cached_pro_attribution` or `normalize_cached_pro_attribution_html` must accept and forward the new `cached_csp_nonce` parameter. See [CSP caching caveats](docs/pro/strict-csp.md#caching-caveats) for details.
-  Fixes [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021). [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+  Only nonces the framework emitted are refreshed. A cached render gives framework scripts a random placeholder nonce, and every response swaps it for its own nonce. App markup that carries the request's nonce, such as stored HTML injected while the nonce generator is session-derived, keeps its stale nonce for CSP to block on cache hits.
+  **Upgrade notes:** App code that needs a nonce inside a cached component should read `railsContext.cspNonce`; a nonce passed in through props or Rails helpers is not refreshed. Overrides of these private Pro helpers must accept and forward their new parameters: `normalize_cached_pro_attribution` and `normalize_cached_pro_attribution_html` (`cached_csp_nonce`), `append_cached_csp_nonce_marker` (`placeholder`), `consumer_stream_async` (`live_chunk_rewriter:` keyword), and `process_stream_chunks` (`live_chunk_rewriter`); `fetch_cache_entry` now returns a fourth value. Framework emitters read the nonce through `ReactOnRails::Helper#csp_nonce`, which returns the placeholder during cached renders; code that overrides or stubs it should use the new `request_csp_nonce` for the request's own nonce. Component cache keys use a new `csp-nonce-placeholder` partition segment, so nonce-rendered entries written before upgrading are not reused. See [CSP caching caveats](docs/pro/strict-csp.md#caching-caveats) for details.
+  Fixes [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021) and [Issue 5267](https://github.com/shakacode/react_on_rails/issues/5267). [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by [AbanoubGhadban](https://github.com/AbanoubGhadban) and [PR 5270](https://github.com/shakacode/react_on_rails/pull/5270) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **`unstable_cache` no longer crashes on RSC payload-endpoint requests**: `BUILD_ID` was initialized only
   on page-render requests, so any `/rsc_payload/*` request (e.g. `RSCRoute.refetch()`) that landed on a renderer
