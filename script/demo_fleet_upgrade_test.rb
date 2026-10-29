@@ -239,7 +239,7 @@ end
 # Simulates bundle, the JS package manager, and gh; runs real git against local fixture repos.
 class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
   attr_reader :calls, :prs, :comments
-  attr_accessor :fail_steps, :fail_outputs
+  attr_accessor :fail_steps, :fail_outputs, :raise_on
 
   def initialize
     super
@@ -248,11 +248,13 @@ class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
     @comments = []
     @fail_steps = []
     @fail_outputs = {}
+    @raise_on = nil
   end
 
   def run(argv, chdir:, env: {}, timeout: 900)
     @calls << argv
     return super if argv.first == "git"
+    raise "simulated crash" if raise_on && argv.join(" ").include?(raise_on)
 
     failure = injected_failure(argv.join(" "))
     return failure if failure
@@ -558,6 +560,16 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
 
     assert_equal 0, code, out
     assert_match(/pr opened/, out)
+  end
+
+  def test_unexpected_error_still_restores_the_worktree
+    @runner.raise_on = "bundle lock"
+
+    out, code = run_cli("--execute")
+
+    assert_equal 1, code
+    assert_match(/failed.*RuntimeError: simulated crash/, out)
+    assert_empty sh("git", "-C", File.join(@tmp, "work", "demo-app"), "status", "--porcelain", "--untracked-files=no")
   end
 
   def test_pnpm_release_age_violation_is_named_in_the_smoke_result

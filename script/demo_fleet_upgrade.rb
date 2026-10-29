@@ -577,14 +577,16 @@ module DemoFleetUpgrade
       regenerate_js_lock
       run_smoke
       commit_changes
-    rescue Error
+    rescue StandardError
       restore_own_edits
       raise
     end
 
+    # Best effort: a cleanup failure must not replace the error that is being reported.
     def restore_own_edits
-      changed = git("diff", "--name-only", "HEAD", chdir: @worktree).output.lines.map(&:strip).reject(&:empty?)
-      git("checkout", "HEAD", "--", *changed, chdir: @worktree) unless changed.empty?
+      diff = git("diff", "--name-only", "HEAD", chdir: @worktree, allow_failure: true)
+      changed = diff.success ? diff.output.lines.map(&:strip).reject(&:empty?) : []
+      git("checkout", "HEAD", "--", *changed, chdir: @worktree, allow_failure: true) unless changed.empty?
     end
 
     def publish
