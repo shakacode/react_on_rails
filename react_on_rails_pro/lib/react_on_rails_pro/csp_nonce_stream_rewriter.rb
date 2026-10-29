@@ -33,11 +33,13 @@ module ReactOnRailsPro
       raise TypeError, "expected a String stream chunk, got #{chunk.class}" unless chunk.is_a?(String)
 
       text = String.new(@held_back) << chunk.to_str
-      text.gsub!(@placeholder) { @nonce }
-      split_at = text.length - partial_placeholder_suffix_length(text)
-      @held_back = text[split_at..]
+      emitted, rest = replace_complete_placeholders(text)
+      # Only original text after the last replacement can start a placeholder, so the
+      # substituted nonce is never held back and re-matched with the next chunk.
+      split_at = rest.length - partial_placeholder_suffix_length(rest)
+      @held_back = rest[split_at..]
       @held_back_html_safe = chunk.html_safe?
-      emitted = text[0...split_at]
+      emitted << rest[0...split_at]
       chunk.html_safe? ? emitted.html_safe : emitted
     end
 
@@ -49,6 +51,17 @@ module ReactOnRailsPro
     end
 
     private
+
+    # Returns [text before and through the last replacement, original text after it].
+    def replace_complete_placeholders(text)
+      replaced = +""
+      cursor = 0
+      while (match_at = text.index(@placeholder, cursor))
+        replaced << text[cursor...match_at] << @nonce
+        cursor = match_at + @placeholder.length
+      end
+      [replaced, text[cursor..]]
+    end
 
     def partial_placeholder_suffix_length(text)
       (@placeholder.length - 1).downto(1).find { |length| text.end_with?(@placeholder[0, length]) } || 0
