@@ -27,6 +27,9 @@ module DemoFleetUpgrade
   COORDINATED_NPM = %w[react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer].freeze
   COMMIT_TRAILER = "Demo-Fleet-Upgrade"
   SMOKE_MARKER = /<!-- demo-fleet-upgrade:smoke=(.*?) -->/
+  # mise refuses a config file nobody has trusted yet, such as the copy in a new worktree.
+  UNTRUSTED_CONFIG = /Config files? in (\S+?)\.? (?:is|are) not trusted/
+  RELEASE_AGE_VIOLATION = "ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION"
   LOCKFILES = {
     "package-lock.json" => "npm", "pnpm-lock.yaml" => "pnpm", "yarn.lock" => "yarn"
   }.freeze
@@ -560,14 +563,28 @@ module DemoFleetUpgrade
 
     def execute
       prepare_worktree
+      committed = upgrade_worktree
+      return finish(committed ? "committed locally" : "no changes", nil) if options[:no_push]
+
+      publish
+    end
+
+    # The worktree starts clean, so on failure every tracked change is the script's own; putting
+    # those files back lets a rerun start over instead of refusing a dirty worktree.
+    def upgrade_worktree
       apply_pins
       regenerate_gem_lock
       regenerate_js_lock
       run_smoke
-      committed = commit_changes
-      return finish(committed ? "committed locally" : "no changes", nil) if options[:no_push]
+      commit_changes
+    rescue Error
+      restore_own_edits
+      raise
+    end
 
-      publish
+    def restore_own_edits
+      changed = git("diff", "--name-only", "HEAD", chdir: @worktree).output.lines.map(&:strip).reject(&:empty?)
+      git("checkout", "HEAD", "--", *changed, chdir: @worktree) unless changed.empty?
     end
 
     def publish
@@ -682,13 +699,29 @@ module DemoFleetUpgrade
     def run_smoke
       return result.smoke = "skipped" if options[:smoke] == "none"
 
+      checks = smoke_checks
+      checks.each do |name, argv, chdir, env|
+        outcome = step(name, argv, chdir:, env:)
+        next if outcome.success
+
+        return result.smoke = "fail (#{name}#{smoke_hint(outcome.output)})"
+      end
+      result.smoke = "pass (#{checks.map(&:first).join(', ')})"
+    end
+
+    def smoke_checks
       checks = [["bundle-install", %w[bundle install], @worktree, { "BUNDLE_FROZEN" => "true" }]]
       js_projects.each_with_index do |project, index|
         checks << [numbered("js-install", index), project.frozen_install_command, project.dir, {}]
       end
       manifest_checks.each { |name| checks << [name, ["bash", "-c", repo[name]], @worktree, {}] }
-      failed = checks.find { |name, argv, chdir, env| !step(name, argv, chdir:, env:) }
-      result.smoke = failed ? "fail (#{failed.first})" : "pass (#{checks.map(&:first).join(', ')})"
+      checks
+    end
+
+    def smoke_hint(output)
+      return "" unless output.include?(RELEASE_AGE_VIOLATION)
+
+      ": pnpm minimumReleaseAge blocks the new release; rerun once it is old enough"
     end
 
     def manifest_checks
@@ -701,9 +734,14 @@ module DemoFleetUpgrade
       log = File.join(@log_dir, "#{name}.log")
       File.write(log, "$ #{argv.shelljoin}\n#{outcome.output}")
       result.logs << log
+      untrusted = outcome.output[UNTRUSTED_CONFIG, 1] unless outcome.success
+      if untrusted
+        raise NeedsAgent,
+              "mise config #{untrusted} is not trusted; review it, run `mise trust #{untrusted}`, then rerun"
+      end
       raise Error, "#{name} failed (see #{log})" if fatal && !outcome.success
 
-      outcome.success
+      outcome
     end
 
     def commit_changes

@@ -239,7 +239,7 @@ end
 # Simulates bundle, the JS package manager, and gh; runs real git against local fixture repos.
 class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
   attr_reader :calls, :prs, :comments
-  attr_accessor :fail_steps
+  attr_accessor :fail_steps, :fail_outputs
 
   def initialize
     super
@@ -247,12 +247,15 @@ class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
     @prs = []
     @comments = []
     @fail_steps = []
+    @fail_outputs = {}
   end
 
   def run(argv, chdir:, env: {}, timeout: 900)
     @calls << argv
     return super if argv.first == "git"
-    return result("", false) if fail_steps.any? { |pattern| argv.join(" ").include?(pattern) }
+
+    failure = injected_failure(argv.join(" "))
+    return failure if failure
 
     case argv.first
     when "bundle" then fake_bundle(argv, chdir)
@@ -267,6 +270,14 @@ class FakeFleetRunner < DemoFleetUpgrade::CommandRunner
   private
 
   def result(output, success) = Result.new(output:, success:)
+
+  # A failing result for a command matching fail_steps (no output) or fail_outputs (given output).
+  def injected_failure(command)
+    return result("", false) if fail_steps.any? { |pattern| command.include?(pattern) }
+
+    output = fail_outputs.find { |pattern, _output| command.include?(pattern) }&.last
+    result(output, false) if output
+  end
 
   def fake_bundle(argv, chdir)
     if argv[1] == "lock"
@@ -530,6 +541,32 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     assert_equal 1, code
     assert_match(/needs agent.*Existing PR is closed; new commits/, out)
     assert_equal pushed, remote_branch_sha, "a closed PR's branch must not move"
+  end
+
+  def test_untrusted_mise_config_needs_an_agent_and_a_rerun_starts_clean
+    @runner.fail_outputs = { "bundle lock" => "mise ERROR Config files in /work/demo-app/mise.toml are not trusted.\n" }
+
+    out, code = run_cli("--execute")
+
+    assert_equal 1, code
+    assert_match(%r{needs agent.*run `mise trust /work/demo-app/mise.toml`}, out)
+    worktree = File.join(@tmp, "work", "demo-app")
+    assert_empty sh("git", "-C", worktree, "status", "--porcelain", "--untracked-files=no")
+
+    @runner.fail_outputs = {}
+    out, code = run_cli("--execute")
+
+    assert_equal 0, code, out
+    assert_match(/pr opened/, out)
+  end
+
+  def test_pnpm_release_age_violation_is_named_in_the_smoke_result
+    @runner.fail_outputs = { "npm ci" => "ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION react-on-rails-pro@17.2.1-rc.1\n" }
+
+    out, code = run_cli("--execute", "--smoke", "install")
+
+    assert_equal 1, code
+    assert_match(/fail \(js-install: pnpm minimumReleaseAge blocks the new release/, out)
   end
 
   def test_repo_already_on_target_is_up_to_date
