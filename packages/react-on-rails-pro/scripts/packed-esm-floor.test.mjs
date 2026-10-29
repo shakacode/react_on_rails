@@ -31,9 +31,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installIsolatedReact } from './isolated-react-install.mjs';
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(scriptsDir, '..');
@@ -49,43 +50,15 @@ const packOutput = execFileSync('pnpm', ['pack', '--pack-destination', cacheRoot
 const tarball = packOutput.trim().split('\n').pop();
 assert.ok(tarball && existsSync(tarball), `pnpm pack did not produce a tarball (got: ${tarball})`);
 
-const installedVersion = (dir, name) => {
-  const manifest = path.join(dir, 'node_modules', name, 'package.json');
-  if (!existsSync(manifest)) return null;
-  try {
-    return JSON.parse(readFileSync(manifest, 'utf8')).version;
-  } catch {
-    return null;
-  }
-};
-
 const prepareConsumer = (reactVersion) => {
   const dir = path.join(cacheRoot, `consumer-${reactVersion}`);
-  mkdirSync(dir, { recursive: true });
-  if (
-    installedVersion(dir, 'react') !== reactVersion ||
-    installedVersion(dir, 'react-dom') !== reactVersion
-  ) {
-    execFileSync(
-      'npm',
-      [
-        'install',
-        '--prefix',
-        dir,
-        '--no-save',
-        '--no-audit',
-        '--no-fund',
-        '--loglevel=error',
-        '--legacy-peer-deps',
-        `react@${reactVersion}`,
-        `react-dom@${reactVersion}`,
-      ],
-      { stdio: 'inherit' },
-    );
-  }
+  // pnpm (the repository's pinned package manager) installs the exact
+  // react/react-dom pair into the isolated consumer; stale or foreign layouts
+  // are rebuilt from scratch by the helper.
+  installIsolatedReact(dir, reactVersion);
   // Unpack the freshly packed artifact in place of any previous copy: the
-  // version number does not change between runs, so npm must not be allowed
-  // to "already installed" its way past new contents.
+  // version number does not change between runs, so the install cache must not
+  // be allowed to "already installed" its way past new contents.
   const packageDir = path.join(dir, 'node_modules', 'react-on-rails-pro');
   rmSync(packageDir, { recursive: true, force: true });
   mkdirSync(packageDir, { recursive: true });

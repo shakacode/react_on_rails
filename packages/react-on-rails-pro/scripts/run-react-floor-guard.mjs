@@ -43,10 +43,10 @@
  * vacuously, and each version must install exactly as requested.
  */
 
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installIsolatedReact, installedVersion } from './isolated-react-install.mjs';
 
 const GUARD_REACT_VERSIONS = (process.env.REACT_FLOOR_GUARD_VERSIONS || '18.3.1,19.0.9,19.1.10,19.2.7')
   .split(',')
@@ -67,42 +67,11 @@ const RSC_CLIENT_SUITE = ['tests/imperativeRefetch.client.test.tsx', FLOOR_TEST]
 const scriptPath = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(scriptPath), '..');
 
-const installedVersion = (installedModules, name) => {
-  const manifest = path.join(installedModules, name, 'package.json');
-  if (!existsSync(manifest)) return null;
-  try {
-    return JSON.parse(readFileSync(manifest, 'utf8')).version;
-  } catch {
-    return null;
-  }
-};
-
 let exitCode = 0;
 for (const version of GUARD_REACT_VERSIONS) {
   const installRoot = path.join(packageRoot, 'node_modules', '.cache', `react-floor-guard-${version}`);
-  const installedModules = path.join(installRoot, 'node_modules');
-
-  if (
-    installedVersion(installedModules, 'react') !== version ||
-    installedVersion(installedModules, 'react-dom') !== version
-  ) {
-    console.log(`[react-floor-guard] Installing react@${version} into ${installRoot}`);
-    execFileSync(
-      'npm',
-      [
-        'install',
-        '--prefix',
-        installRoot,
-        '--no-save',
-        '--no-audit',
-        '--no-fund',
-        '--loglevel=error',
-        `react@${version}`,
-        `react-dom@${version}`,
-      ],
-      { stdio: 'inherit' },
-    );
-  }
+  console.log(`[react-floor-guard] Ensuring react@${version} in ${installRoot}`);
+  const installedModules = installIsolatedReact(installRoot, version);
 
   const reactVersion = installedVersion(installedModules, 'react');
   const reactDomVersion = installedVersion(installedModules, 'react-dom');

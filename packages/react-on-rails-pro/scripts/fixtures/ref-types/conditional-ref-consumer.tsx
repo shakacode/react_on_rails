@@ -28,8 +28,9 @@ export function ConditionalRefConsumer({ withRef }: { withRef: boolean }) {
 }
 
 // The forwardRef-era helper patterns must keep seeing the handle through the
-// shipped types.
+// shipped types. Pure type-level checks: nothing here dereferences a value at
+// runtime (the fixture is compiled with --noEmit, but keep it runtime-safe
+// anyway so an accidental import cannot throw).
 type PublicProps = React.ComponentProps<typeof RSCRoute>;
-export const refFromComponentProps: React.Ref<RSCRouteHandle> | undefined = (null as unknown as PublicProps)
-  .ref;
-export const handleFromElementRef: RSCRouteHandle = null as unknown as React.ElementRef<typeof RSCRoute>;
+export const refFromComponentProps: React.Ref<RSCRouteHandle> | undefined = undefined as PublicProps['ref'];
+export const handleFromElementRef: RSCRouteHandle | null = null as React.ElementRef<typeof RSCRoute> | null;
