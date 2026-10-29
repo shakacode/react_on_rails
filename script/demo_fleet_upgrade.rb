@@ -567,15 +567,29 @@ module DemoFleetUpgrade
       committed = commit_changes
       return finish(committed ? "committed locally" : "no changes", nil) if options[:no_push]
 
+      publish
+    end
+
+    def publish
       head = git("rev-parse", "HEAD", chdir: @worktree).output.strip
       pushed = remote_branch? ? git("rev-parse", "origin/#{@branch}").output.strip : nil
       if pushed.nil? && head == git("rev-parse", "origin/#{@default_branch}").output.strip
         return finish("no changes", "Regeneration left nothing to commit")
       end
 
+      # A closed or merged PR's branch is left alone; someone decides whether to reopen or replace it.
+      pull_request = existing_pr
+      return finish_inactive_pr(pull_request) if pull_request && pull_request["state"] != "OPEN"
+
       @pushed_now = head != pushed
       push if @pushed_now
-      ensure_pr
+      ensure_pr(pull_request)
+    end
+
+    def finish_inactive_pr(pull_request)
+      result.pr_url = pull_request["url"]
+      state = pull_request["state"].downcase
+      finish("pr #{state}", "Existing PR is #{state}; branch not pushed and PR not reopened")
     end
 
     def prepare_worktree
@@ -715,15 +729,12 @@ module DemoFleetUpgrade
       prs.find { |pr| pr["state"] == "OPEN" } || prs.first
     end
 
-    def ensure_pr
-      pr = existing_pr
-      if pr && pr["state"] != "OPEN"
-        result.pr_url = pr["url"]
-        return finish("pr #{pr['state'].downcase}", "Existing PR is #{pr['state'].downcase}; not reopening")
-      end
-      if pr
-        result.pr_url = pr["url"]
-        comment_rerun(pr) if @pushed_now || (result.smoke != "skipped" && last_reported_smoke(pr) != result.smoke)
+    def ensure_pr(pull_request)
+      if pull_request
+        result.pr_url = pull_request["url"]
+        if @pushed_now || (result.smoke != "skipped" && last_reported_smoke(pull_request) != result.smoke)
+          comment_rerun(pull_request)
+        end
         return finish("pr reused", nil)
       end
 

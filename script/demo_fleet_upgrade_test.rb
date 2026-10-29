@@ -195,11 +195,13 @@ class DemoFleetUpgradeCliTest < Minitest::Test
     version = DemoFleetUpgrade::Version.parse("17.2.1.rc.1")
     gems = { "react_on_rails" => ["17.2.1.rc.1"], "react_on_rails_pro" => ["17.2.1.rc.1"], "shakapacker" => ["10.3.2"] }
 
-    missing = with_registry(gems) do
-      DemoFleetUpgrade::Registry.missing(version, { "gem" => { "shakapacker" => "10.4.0" } })
+    bumps = { "gem" => { "shakapacker" => "10.4.0" }, "npm" => { "react-on-rails-rsc" => "19.3.1" } }
+
+    missing = with_registry(gems, unpublished_npm: ["react-on-rails-rsc@19.3.1"]) do
+      DemoFleetUpgrade::Registry.missing(version, bumps)
     end
 
-    assert_equal ["gem shakapacker 10.4.0"], missing
+    assert_equal ["gem shakapacker 10.4.0", "npm react-on-rails-rsc 19.3.1"], missing
   end
 
   def test_unfiltered_selection_lists_each_repo_once
@@ -223,11 +225,11 @@ class DemoFleetUpgradeCliTest < Minitest::Test
   private
 
   # Answers registry lookups from a fixed table instead of the network; every npm package counts as published.
-  def with_registry(gem_versions)
+  def with_registry(gem_versions, unpublished_npm: [])
     registry = DemoFleetUpgrade::Registry.singleton_class
     originals = %i[gem_versions npm_published?].to_h { |name| [name, registry.instance_method(name)] }
     registry.define_method(:gem_versions) { |name| gem_versions.fetch(name, []) }
-    registry.define_method(:npm_published?) { |_name, _version| true }
+    registry.define_method(:npm_published?) { |name, version| !unpublished_npm.include?("#{name}@#{version}") }
     yield
   ensure
     originals&.each { |name, method| registry.define_method(name, method) }
@@ -496,14 +498,16 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     assert_match(/react_on_rails 17\.2\.0 -> 17\.2\.1\.rc\.1/, out)
   end
 
-  def test_closed_upgrade_pr_fails_the_run
+  def test_closed_upgrade_pr_fails_the_run_without_pushing
     run_cli("--execute")
+    pushed = remote_branch_sha
     @runner.prs.each { |pr| pr["state"] = "CLOSED" }
 
-    out, code = run_cli("--execute")
+    out, code = run_cli("--execute", "--bump", "npm:react-on-rails-rsc=19.3.1")
 
     assert_equal 1, code
     assert_match(/pr closed/, out)
+    assert_equal pushed, remote_branch_sha, "a closed PR's branch must not move"
   end
 
   def test_repo_already_on_target_is_up_to_date
