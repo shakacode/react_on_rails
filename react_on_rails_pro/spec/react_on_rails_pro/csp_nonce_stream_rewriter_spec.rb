@@ -38,6 +38,13 @@ RSpec.describe ReactOnRailsPro::CspNonceStreamRewriter do
     expect(emitted.first).to eq(%(<script nonce="))
   end
 
+  it "replaces a placeholder when the nonce ends with a placeholder prefix" do
+    rewriter = described_class.new("PLACEHOLDER", "nonce-P")
+    emitted = [rewriter.rewrite("a PLACEHOLDER"), rewriter.rewrite(" b"), rewriter.flush]
+
+    expect(emitted.join).to eq("a nonce-P b")
+  end
+
   it "flushes a held-back tail that never completes a placeholder" do
     emitted = stream(["text PLACE", "D"])
 
