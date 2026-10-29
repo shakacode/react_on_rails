@@ -941,8 +941,8 @@ a fresh code; all printed OTP values remain redacted.
 
 ### If Release Fails
 
-`script/release` is locally supervised and has no `agent-coord` lease to retain
-or reacquire. Coordinate the recovery through the Shaka release task and keep
+`script/release` is locally supervised and holds no external lease to retain or
+reacquire. Coordinate the recovery through the Shaka release task and keep
 the existing branch, tag, and registry identity checks below.
 
 If the release fails partway through (e.g., during NPM publish):

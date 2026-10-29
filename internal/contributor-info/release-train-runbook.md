@@ -10,7 +10,6 @@ because it coordinates maintainer-only go/no-go decisions and private validation
 - [`releasing.md`](releasing.md) — the mechanical `rake release` steps (version bumps, publishing, tags).
 - [`rc-testing-plan.md`](rc-testing-plan.md) — the hard-gate / smoke-evidence validation that decides whether an RC is good.
 - [`release-verification-runbook.md`](release-verification-runbook.md) — the behavioral verification lanes (upgrade dry-run, debut-feature abuse pass, stress/soak, changelog and artifact audits) run against each RC.
-- [`agent-coordination-backend.md`](agent-coordination-backend.md) — how the current phase is published to agents.
 
 `AGENTS.md` carries the short, canonical policy (the phase→gate table and the branching rules an agent
 must follow). If this runbook ever conflicts with `AGENTS.md`, `AGENTS.md` wins.
@@ -76,7 +75,7 @@ Rationale:
   branch would force tooling to ask "which cycle is this branch in right now?" instead.
 
 Cost we accept: branch names are not a fixed string, so tooling keys off the `release/*` glob plus the
-published phase rather than one hard-coded ref. If a single stable name is ever needed (for a dashboard
+release tracker's mode rather than one hard-coded ref. If a single stable name is ever needed (for a dashboard
 or webhook), point a `releases` **tag or symbolic ref** at the active release branch instead of making
 it the working branch.
 
@@ -137,10 +136,15 @@ remote branch updates. `script/release` provides process-local supervision for
 publication. It does not use an external coordination lease.
 
 Set the release version once in the coordinator shell for the command examples
-below. The branch name is derived from that value; no per-run identity or lease
-variables are required:
+below, in a fresh shell. The branch name is derived from that value; no per-run
+identity or lease variables are required, and the snippet refuses to run when
+the canonical variables already exist:
 
 ```bash
+if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_BRANCH+x}" = x ]; then
+  echo "canonical release variables are already set; start a fresh shell" >&2
+  return 1 2>/dev/null || exit 1
+fi
 RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"
 [[ "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
   echo "release version must be X.Y.Z; stop" >&2
@@ -190,245 +194,6 @@ preserve any required `RELEASE_TRACKER`, and rerun `script/release`. Registry,
 tag, and GitHub-release checks resume without republishing artifacts that
 already exist.
 
-#### Retired agent-coord automation reference
-
-> **Historical reference only:** The following lease procedure documents the
-> retired publication design. Do not run it. Shaka now owns orchestration, and
-> `script/release` uses only its local supervisor contract.
-
-<details>
-<summary>Former agent-coord publication protocol</summary>
-
-Automation that already coordinates a broader sequence of release-line writes
-may keep the externally supplied identity path below. This is not the normal
-publication setup. Such automation must use one non-reusable identity for the lifetime of the coordinator process and
-its supervised child processes. Generate a fresh UUID-backed agent id on every
-restart or handoff; never copy an old process's id into its replacement. Carry
-the same instance id in the claim and heartbeat as defense in depth. These
-identities make stale ownership visible, but they do not fence a GitHub or Git
-write: neither remote accepts the coordination claim generation as part of its
-mutation. The bounded status and claim operations fail closed on timeout,
-`UNKNOWN`, or `CLAIM_REFUSED`:
-
-```bash
-if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ] || [ "${RELEASE_BRANCH+x}" = x ]; then
-  echo "canonical release variables are already set; start a fresh shell before acquiring a release-line lease" >&2
-  return 1 2>/dev/null || exit 1
-fi
-RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact stable X.Y.Z release version}"
-if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  echo "release version must be a stable X.Y.Z version; stop" >&2
-  return 1 2>/dev/null || exit 1
-fi
-RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
-RELEASE_BRANCH="${RELEASE_BRANCH_INPUT:-release/${RELEASE_VERSION}}"
-if [ "${RELEASE_BRANCH}" != "main" ] && [ "${RELEASE_BRANCH}" != "release/${RELEASE_VERSION}" ]; then
-  echo "release branch must be main or release/${RELEASE_VERSION}; stop" >&2
-  return 1 2>/dev/null || exit 1
-fi
-readonly RELEASE_VERSION RELEASE_LINE_TARGET RELEASE_BRANCH
-export RELEASE_VERSION RELEASE_LINE_TARGET RELEASE_BRANCH
-RELEASE_COORDINATOR_INSTANCE_ID="$(
-  ruby -rsecurerandom -e 'print SecureRandom.uuid'
-)" || {
-  echo "could not generate a release coordinator process identity" >&2
-  return 1 2>/dev/null || exit 1
-}
-test -n "${RELEASE_COORDINATOR_INSTANCE_ID}" || {
-  echo "empty release coordinator process identity" >&2
-  return 1 2>/dev/null || exit 1
-}
-RELEASE_COORDINATOR_ID="release-${RELEASE_VERSION}-${RELEASE_COORDINATOR_INSTANCE_ID}"
-readonly RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
-export RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
-PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
-
-heartbeat_release_line_lease() {
-  agent-coord heartbeat \
-    --agent-id "${RELEASE_COORDINATOR_ID}" \
-    --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
-    --repo shakacode/react_on_rails \
-    --target "${RELEASE_LINE_TARGET}" \
-    --branch "${RELEASE_BRANCH}" \
-    --phase release-write-serialization \
-    --status in_progress \
-    --ttl 900
-}
-
-require_live_release_line_lease() {
-  command -v jq >/dev/null || return 1
-  lease_json="$(
-    "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
-      --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
-  )" || return 1
-  jq -e \
-    --arg holder "${RELEASE_COORDINATOR_ID}" \
-    --arg instance "${RELEASE_COORDINATOR_INSTANCE_ID}" \
-    --arg target "shakacode/react_on_rails#${RELEASE_LINE_TARGET}" \
-    --arg branch "${RELEASE_BRANCH}" \
-    '(.claims | length == 1) and
-     (.claims[0].status == "active") and
-     (.claims[0].agent_id == $holder) and
-     (.claims[0].instance_id == $instance) and
-     (.claims[0].branch == $branch) and
-     (.claims[0].expires_at != "UNKNOWN") and
-     ((.claims[0].expires_at | fromdateiso8601) > now) and
-     (.heartbeats | length == 1) and
-     (.heartbeats[0].agent_id == $holder) and
-     (.heartbeats[0].instance_id == $instance) and
-     (.heartbeats[0].branch == $branch) and
-     (.heartbeats[0].target == $target) and
-     (.heartbeats[0].liveness == "live")' \
-    >/dev/null <<<"${lease_json}"
-}
-
-acquire_release_line_lease() {
-  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
-    --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json \
-    >/dev/null || return 1
-  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
-    --agent-id "${RELEASE_COORDINATOR_ID}" \
-    --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
-    --repo shakacode/react_on_rails \
-    --target "${RELEASE_LINE_TARGET}" \
-    --branch "${RELEASE_BRANCH}" \
-    --ttl 14400 || return 1
-  heartbeat_release_line_lease || return 1
-  require_live_release_line_lease
-}
-
-acquire_release_line_lease
-lease_status=$?
-if [ "${lease_status}" -ne 0 ]; then
-  echo "release-line lease unavailable or UNKNOWN; stop" >&2
-  return "${lease_status}" 2>/dev/null || exit "${lease_status}"
-fi
-```
-
-Set `RELEASE_VERSION_INPUT` only in a fresh shell. The bootstrap refuses to run
-when `RELEASE_VERSION`, `RELEASE_LINE_TARGET`, or `RELEASE_BRANCH` already exists, including when
-it is pasted again into a stale interactive shell. After validation,
-`RELEASE_VERSION`, `RELEASE_LINE_TARGET`, and `RELEASE_BRANCH` are the canonical, readonly lease
-identity for this shell lifecycle. Do not reassign them. `RELEASE_BRANCH` defaults to the matching
-`release/X.Y.Z` branch used by the release train. For an ordinary stable publication that intentionally
-runs from `main`, start a fresh shell with `RELEASE_BRANCH_INPUT=main`; do not use `main` for an RC or
-accelerated-RC reconciliation. Later
-backport, synchronous-closeout, and selective-closeout inputs use their own
-names and must equal `RELEASE_VERSION` before any GitHub or Git mutation.
-
-The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
-the claim at least hourly with the bounded `claim` command from
-`acquire_release_line_lease`, and run `heartbeat_release_line_lease` at every
-release phase transition **and at least every five minutes while CI, validation,
-QA, review, publication, or another gate remains in one phase**. A
-transition-only heartbeat is insufficient. If either refresh fails, stop all
-release-line writes until `acquire_release_line_lease` succeeds and the live
-assertion passes again.
-
-`script/release` is the sole supported live entry point for the compound
-publication task. Normal invocations automatically acquire the exact
-`release-line:X.Y.Z` claim for the current branch under a fresh per-process UUID
-and the stable `AGENT_COORD_MACHINE_ID`. If both
-`RELEASE_COORDINATOR_ID` and `RELEASE_COORDINATOR_INSTANCE_ID` are supplied,
-the wrapper preserves the advanced pre-acquired identity path and does not claim
-or release on the automation's behalf. The wrapper starts the helper in a
-dedicated process group, maintains a heartbeat below the five-minute maximum,
-renews its own exact active claim at least hourly with a conditional write, and
-supplies a private liveness channel. An identity mismatch, concurrent claim
-change, or failed heartbeat/renewal stops the supervised process group.
-Immediately before every outward write, the helper performs a new authoritative
-targeted status read and verifies the exact claim, identity, branch, heartbeat,
-supervisor, and process group.
-
-That fence is a point-in-time pre-write ownership check. An independent death
-watch holds a second private pipe and immediately kills the dedicated release
-process group if the supervisor disappears, including while a publish
-subprocess is already running. During ordinary supervised shutdown, the wrapper
-terminates that same process group and proves it absent before closing the
-death-watch channel or allowing an operator handoff. On Linux, subreaper support
-also lets the supervisor adopt and reap orphaned descendants. macOS has no
-subreaper equivalent, so launchd reaps orphans there; the wrapper's dedicated
-process-group kill and `kill(0, -pgid)` absence check remain the authoritative
-handoff proof on both platforms.
-
-Do not invoke live `bundle exec rake "release[...]"`, `sync_github_release`,
-or `release:reconcile_accelerated_rc` directly. They fail closed without the
-private wrapper contract; setting environment variables is not a substitute.
-Direct Rake is supported only for dry runs. A normal wrapper invocation releases
-only the claim it acquired. If it stops, it first terminates and proves its
-printed process group absent, then attempts claim cleanup. A cleanup failure is
-reported as an error and must be reconciled before retrying. Advanced automation
-retains ownership and cleanup responsibility for its externally supplied claim.
-
-If the supervisor loses child ownership or otherwise cannot prove the process
-group absent, it deliberately leaves its managed claim active and reports that
-explicit reconciliation is required. Claim expiry is not permission for a new
-normal wrapper to take over that record; reconcile the old process group and
-lease before retrying.
-
-```bash
-# On release/17.0.0 with a prepared ### [17.0.0.rc.0] section:
-script/release
-
-# Dry runs need no coordination identity or claim:
-script/release --dry-run
-
-# Reconcile a previously accelerated RC under the same supervised contract:
-RELEASE_TRACKER=4842 script/release --reconcile-accelerated-rc
-```
-
-`release:start`, `script/release-finish`, and release-line branch management are
-not publication-wrapper entry points. Keep their live compound forms **BLOCKED**
-until they receive the same lifetime/per-write contract; use their dry runs and
-the separately fenced runbook steps only.
-
-Immediately before each write or merge, rerun `require_live_release_line_lease`
-in the shell where the functions above are defined. It is a fail-closed
-**preflight read**: it proves that the canonical claim is active, unexpired, and
-owned by the process-unique `RELEASE_COORDINATOR_ID` at the instant of the read,
-with a matching live heartbeat and instance id. It does not atomically bind
-that ownership to the subsequent GitHub mutation or Git remote transaction.
-GitHub's `expectedHeadOid` and Git's `--force-with-lease`/compare-and-swap bind
-resource identity and reduce stale-write risk, but neither carries the
-coordination generation. Individual commands therefore remain a best-effort
-single-controller protocol with a narrow preflight-to-write race.
-
-Operational exclusivity is mandatory: do not release, transfer, or take over the
-claim until the prior coordinator process group and every child are positively
-known terminated. Claim expiry, heartbeat staleness, or backend permission to
-take over is not proof of termination and is insufficient by itself. If that
-positive termination evidence or another durable ownership guarantee cannot be
-established, stop pending resource-bound fencing instead of taking over. In a
-batch, chain each later release-targeted lane with `depends_on` and do not launch
-it until the preceding merge is terminal. A merge queue that reruns only the
-repository's current merge-group CI is not an alternative. If the preflight is
-unavailable or `UNKNOWN`, stop rather than let two release writers race from the
-same release tip.
-
-Keep the lease across the whole release train when practical. Release it only
-after branch deletion and release-line closeout are complete, or after a
-cancellation/handoff is durably recorded **and** the coordinator process group
-and every child are positively known terminated:
-
-```bash
-agent-coord release \
-  --agent-id "${RELEASE_COORDINATOR_ID}" \
-  --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
-  --repo shakacode/react_on_rails \
-  --target "${RELEASE_LINE_TARGET}"
-```
-
-On handoff, the replacement must generate a fresh process identity and acquire
-this same canonical target after the old release and positive process-group
-termination evidence are visible; it must not reuse the old id, invent another
-target, or bypass a refusal. If the old process crashed but its termination and
-children cannot be established, remain stopped even after TTL expiry or backend
-takeover becomes available. A fresh identity helps reject later preflights from
-a resumed old process; it cannot revoke a write already between preflight and
-mutation.
-
-</details>
-
 #### Partial-publication recovery
 
 If a compound release stops after any outward write, stop the helper. Preserve
@@ -468,7 +233,7 @@ proved; GitHub issue search is not a completeness oracle.
   whose read-only probes preserve immutable versions and whose every retry is
   fenced.
 
-If the lease, branch, tag, registry, or helper evidence is missing,
+If the branch, tag, registry, or helper evidence is missing,
 contradictory, or `UNKNOWN`, remain stopped. A maintainer-approved plan must
 identify every remaining outward write; approval alone does not make an
 unfenced command safe.
@@ -579,8 +344,9 @@ gate or its evidence fails, tagging and package publication remain blocked. Fina
 same strict final-release gates and cannot use the prerelease-only CI override.
 
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
-sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so
-agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase-tiered-merge-gating)).
+sets the mode to `accelerated-rc` or `strict-rc`. Agents apply the RC gate to every PR that targets
+the new `release/X.Y.Z` branch; nothing else needs publishing (see
+[Phase-tiered merge gating](#phase-tiered-merge-gating)).
 
 `main` keeps moving the entire time. Nothing about cutting the RC freezes it.
 
@@ -589,9 +355,9 @@ agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase
 During the RC phase, **only stabilizing fixes** target `release/X.Y.Z`. New features keep targeting
 `main` and wait for the next version.
 
-The writer lease above remains mandatory: acquire or renew it before creating or
-updating a stabilizer branch, and require it to be live immediately before any
-merge into `release/X.Y.Z`.
+Serialize stabilizer branches as described in
+[Serialize every release-line write](#serialize-every-release-line-write): one
+active release-targeted lane at a time, merged against the expected release tip.
 
 Author each stabilizing fix as a PR **targeting `release/X.Y.Z`** (not `main`):
 
@@ -620,11 +386,12 @@ fixed by republishing.
 #### Backport merged `main` PRs one at a time
 
 When maintainers select one or more merged `main` PRs for the release train,
-use **one source PR -> one release PR**. Process them under the writer lease
-above; when there are multiple selections, serialize the sequence:
+use **one source PR -> one release PR**. Serialize them as described in
+[Serialize every release-line write](#serialize-every-release-line-write); when
+there are multiple selections, process the sequence in order:
 
-1. Search open PRs targeting the release branch, targeted private coordination
-   for the selected source, and remote branches with verified ownership and
+1. Search open PRs targeting the release branch, Shaka `claim` for the selected
+   source, and remote branches with verified ownership and
    source-commit binding. If a valid source-atomic lane or an explicitly
    maintainer-approved aggregate whose sources meet the inseparability exception
    below already exists, treat that lane as started and reuse it (or skip it when
@@ -667,7 +434,7 @@ above; when there are multiple selections, serialize the sequence:
 7. Run the release-phase validation, QA, and review gates on the current head.
    Immediately before merge, fetch and prune `origin/main` and the target release
    branch again. Repeat the source-liveness, presence, and supersession checks.
-   Confirm that the release-line lease is still held. Merge-group CI is not an
+   Confirm that no other release-targeted lane merged since. Merge-group CI is not an
    alternative because it does not rerun the release-specific gates.
    If the source's relevant `main` state changed, or the release tip advanced
    beyond the tip incorporated into the backport branch, update the branch and
@@ -854,11 +621,11 @@ above; when there are multiple selections, serialize the sequence:
    }
    ```
 
-   The head, base, branch, freshly fetched `main`, source-audit, and release-line
-   ownership checks are preflight checks. They retain the narrow
-   preflight-to-mutation race, so use this path only under the
-   positive-termination/single-controller rule above; otherwise stop pending
-   resource-bound fencing.
+   The head, base, branch, freshly fetched `main`, and source-audit checks are
+   preflight checks. They retain the narrow
+   preflight-to-mutation race, so use this path only while one release lane is
+   active, per [Serialize every release-line write](#serialize-every-release-line-write);
+   otherwise stop.
 
 8. Fetch the new release tip before updating or branching the next selected
    source PR.
@@ -1182,10 +949,10 @@ jq -e '.data.mergePullRequest.pullRequest.merged == true' \
 }
 ```
 
-These base and ownership checks reduce stale-write risk but do not eliminate a
-change after the last preflight and before the mutation. Run them only under the
-single-controller/positive-termination rule above; if that operational
-ownership is not durable, stop pending resource-bound fencing.
+These base checks reduce stale-write risk but do not eliminate a
+change after the last preflight and before the mutation. Run them only while one release lane is
+active, per [Serialize every release-line write](#serialize-every-release-line-write);
+otherwise stop.
 
 Fetch the new `origin/main` immediately after each successful merge before
 planning the next source-change PR or the final changelog PR.
@@ -1363,7 +1130,7 @@ git diff --name-only "${ACCEPTED_RC_TAG}" "v${RELEASE_VERSION}"
 `final` is the strictest phase: no new features, only cherry-picked fully-verified fixes if an RC must
 be re-spun, and an explicit human sign-off on the promotion itself (see
 [Phase-tiered merge gating](#phase-tiered-merge-gating)). Set the mode to `final-release` on the tracker
-and publish phase `final` for the release line during the promotion freeze.
+during the promotion freeze; that tracker mode is what selects the `final` phase.
 
 Final promotion must fail closed. Do not set `RELEASE_CI_STATUS_OVERRIDE=true`, pass the fourth
 `override_ci_status` argument, or use an accelerated asynchronous/deferred-gate option when publishing
@@ -1376,7 +1143,8 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 
 Keep closeout in the single Shaka release-coordinator task through guarded
 branch deletion. Refetch and recheck the expected refs immediately before every
-remote transaction, and finish only after closeout and phase clear are durable.
+remote transaction, and finish only after closeout and the release branch
+deletion are durable; deleting the branch ends the RC/final gate for this line.
 
 Before running the closeout helper, fetch `origin/main` and repeat the
 retained-source audit. If a retained backport's main origin was reverted,
@@ -1977,12 +1745,9 @@ run normal-mode `script/release-forward-port` or
    preserve the branch, inspect or remove the unpushed local closeout tag, and
    restart the audit. The tag records the audited `main` cutoff, release tip, and
    validated evidence digests in the same Git ref transaction that deletes the
-   branch. The Git CAS protects those resource identities; it does not bind the
-   coordination claim generation and retains the narrow preflight-to-push race.
-   Apply the positive-termination single-controller rule above or remain stopped
-   pending resource-bound fencing. Commits merged to `main` after the recorded
-   cutoff belong to later development. After guarded deletion, clear the
-   release-line phase; the release and closeout tags remain the durable record.
+   branch. The Git CAS protects those resource identities. Commits merged to `main` after the recorded
+   cutoff belong to later development. After guarded deletion, the release and
+   closeout tags remain the durable record.
 
 This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
@@ -2002,9 +1767,8 @@ steps; do not mix a partial helper run with an unrecorded selective omission.
 
 See [`releasing.md`](releasing.md) for the next-dev version bump details.
 
-Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and clear the
-published phase for this line (the entry is removed when the branch is deleted) so agents stop applying
-the RC/final gate. This is consistent with the "never down-gate `release/*` to `beta`" rule: phase always
+Mark the release tracker released per [`rc-testing-plan.md`](rc-testing-plan.md), and delete the release
+branch so agents stop applying the RC/final gate. This is consistent with the "never down-gate `release/*` to `beta`" rule: phase always
 derives from the **target branch**, and once `release/X.Y.Z` is deleted the only remaining target for this
 line is `main`, which derives to `beta` — not because the entry is absent, but because no `release/*`
 target exists anymore.
@@ -2015,27 +1779,23 @@ The merge-gate strictness for an agent-merged PR is a **function of the target b
 This formalizes the attention-contract gating levels (#3975): maintainer attention is spent only on
 judgment; everything machine-checkable is handled autonomously with evidence.
 
-| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                        |
-| --------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                               |
-| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial-pr-review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`.                                                                                  |
-| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial-pr-review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge. |
+| Phase     | Target            | Agent merge gate (lowest → highest)                                                                                                                                                                                                     |
+| --------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **beta**  | `main`            | **Lowest.** Confidence note + green required checks. Fast iteration; `main` may be unstable.                                                                                                                                            |
+| **rc**    | `release/*`       | **Higher.** Confidence note + adversarial review + **zero open MUST-FIX**. Only stabilizing fixes reach `release/*`; features still allowed on `main`.                                                                                  |
+| **final** | `release/*` → tag | **Highest.** Everything `rc` requires (adversarial review + **zero open MUST-FIX**) **plus**: only cherry-picked, fully-verified fixes; **no new features**; **human sign-off on the promotion itself**. No confidence-only auto-merge. |
 
 The same selection as the decision an agent runs per PR — the table above is the canonical wording;
-this diagram mirrors it (`agent-coord` first, the deterministic branch-derived fallback when it is
-`UNKNOWN`):
+this diagram mirrors it:
 
 ```mermaid
 flowchart TD
     PR["Agent-merged PR"] --> T{"Target branch?"}
     T -->|"main"| BETA["beta gate · lowest<br/>confidence note<br/>+ green required checks"]
-    T -->|"release/*"| AC{"agent-coord phase?<br/>doctor + status exit 0"}
+    T -->|"release/*"| FB{"tracker in<br/>final-release mode?"}
     T -->|"cannot determine"| NOAM["report UNKNOWN<br/>do not auto-merge<br/>maintainer decision"]
-    AC -->|"rc"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial-pr-review<br/>+ zero open MUST-FIX"]
-    AC -->|"final"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
-    AC -->|"UNKNOWN / no entry"| FB{"tracker in<br/>final-release mode?"}
-    FB -->|"no"| RC
-    FB -->|"yes"| FINAL
+    FB -->|"no"| RC["rc gate · higher<br/>confidence note<br/>+ adversarial review<br/>+ zero open MUST-FIX"]
+    FB -->|"yes"| FINAL["final gate · highest<br/>rc gate + cherry-picked<br/>verified fixes only<br/>+ no new features<br/>+ human sign-off"]
 ```
 
 Reading the gate is mechanical:
@@ -2045,56 +1805,34 @@ Reading the gate is mechanical:
 3. Apply that phase's row above, **plus** the existing mode rules from `AGENTS.md` →
    _Release Mode And Auto-Merge Coordination_.
 
-### How the phase is published (agent-coord)
+### How the phase is resolved
 
-So that every agent reads the current gate without being told, the active phase for each release line is
-published through the private `agent-coord` state backend and read with `agent-coord`. Keep the schema
-and exact subcommand surface in the backend schema and CLI docs; this repo carries only the contract,
-mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
-
-**Contract (public pointer):**
-
-- The backend exposes a **phase** value (`beta` | `rc` | `final`) per release line / target branch.
-  For PR/issue lanes, read it from
-  `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`; the backend
-  schema, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the
-  exact phase field. There is no separate `none` value; a missing entry (no published phase for that
-  line) means "no explicit override is published" — derive the phase from the target branch exactly as
-  in the backend-UNKNOWN fallback below (`main` → `beta`; `release/*` → `rc`, or `final` in
-  `final-release` mode). A missing entry must never down-gate a `release/*` target to `beta`.
-- Treat the published phase as available only when `agent-coord doctor --json` and targeted status exit 0,
-  exactly as for claim/heartbeat state. Otherwise report the phase as `UNKNOWN` and use the fallback.
-  Do not use broad `agent-coord status` for routine phase reads; broad reads are audit-only.
-  For batch-dependency phase state, use `agent-coord status --batch-id <batch-id> --json` instead.
-- The **release tracker remains the human source of truth** for mode and go/no-go; the published phase
-  is the fast machine path so agents do not have to parse the tracker on every PR. If the published
-  phase and the tracker disagree, treat it like a release-mode conflict: do not auto-merge, and report
-  it with a `Release Mode Block:` PR comment per `AGENTS.md`.
-
-**Fallback (backend UNKNOWN) — derive the phase deterministically:**
+Derive the phase deterministically from the target branch:
 
 1. Target is `main` → **beta**.
 2. Target matches `release/*` → **rc**, unless the applicable release tracker is in `final-release`
-   mode, in which case **final**. (`final-release` mode is the only machine-readable signal in the
-   fallback path; the promotion freeze is normally published via `agent-coord`, which is the tool that
-   is unavailable here.)
+   mode, in which case **final**.
 3. Cannot determine the target or applicable tracker → report `UNKNOWN` and do not auto-merge; fall
    back to standard `AGENTS.md` merge qualification with a maintainer decision.
 
-Agents that act on the gate: `pr-batch`, `address-review` (nit-autonomy + MUST-FIX handling),
-`adversarial-pr-review` (required at `rc`/`final`), and `pr-processing` (the worker path). None carries a
-skill-level phase **table** of its own — the table lives only in `AGENTS.md` and this runbook. `pr-batch`
-and `adversarial-pr-review` add a one-line pointer back here and to `AGENTS.md`; `address-review` and
-`pr-processing` inherit the same gate through the `AGENTS.md` Maintainer Attention Contract they already
-follow. If the gate tiers ever change, update `AGENTS.md` and this runbook (the canonical source) —
-including the gate-selection diagram above, which mirrors the table and is illustrative only — rather
-than adding per-skill phase tables.
+The **release tracker remains the human source of truth** for mode and go/no-go. If the tracker and the
+target branch disagree, treat it like a release-mode conflict: do not auto-merge, and report it with a
+`Release Mode Block:` PR comment per `AGENTS.md`.
+
+The `rc`/`final` adversarial review is a Shaka local review by a reviewer that
+did not write the change, attested on the PR for the head being merged. An open
+MUST-FIX is a recorded `defect` finding that is neither fixed nor dismissed with
+evidence. Shaka does not read release phase or tracker state, so the agent
+applying the gate resolves the phase from the table; it lives only in
+`AGENTS.md` and this runbook. If the gate tiers ever change, update
+`AGENTS.md` and this runbook (the canonical source), including the
+gate-selection diagram above, which mirrors the table and is illustrative only.
 
 ### Phase vs. release mode
 
 These are two composable dimensions, not competitors:
 
-- **Phase** (this doc): derived from the **target branch**, published via `agent-coord`. Selects the
+- **Phase** (this doc): derived from the **target branch**. Selects the
   **gate tier** — what evidence a merge requires.
 - **Mode** (`AGENTS.md` → _Release Mode And Auto-Merge Coordination_): derived from the **release
   tracker**. Selects the **auto-merge automation posture** — whether confidence-only auto-merge is

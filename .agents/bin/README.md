@@ -22,14 +22,6 @@ a normal `<base-ref>` argument. See
 [`internal/contributor-info/local-ci-contract.md`](../../internal/contributor-info/local-ci-contract.md)
 for the local CI contract.
 
-Additional helper:
-
-- `shared-skill-dir <skill-name>` resolves a skill directory from an explicit
-  repo-local skill override or repo-pinned helper `bin/` copy first, then
-  `$AGENT_WORKFLOWS_ROOT`, installed Codex or Claude skills, or finally
-  `$HOME/src/agent-workflows`. Use it when a workflow needs a helper script from
-  a shared skill without keeping duplicate local `SKILL.md` copies.
-
 Shaka typed policy lives in `.agents/shaka/config.yml`.
 Installed Shaka is the seam validator; required CI checks out an immutable
 Shaka Git revision and runs `seam check --local` plus the consumer regression

@@ -6160,14 +6160,28 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "when using --rsc with React 19.3.0" do
+  context "when using --rsc with React 19.3.1" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.3.0")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.3.1")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
+    end
+  end
+
+  context "when using --rsc with React 19.3.0" do
+    let(:install_generator) { install_generator_fixture(rsc: true) }
+
+    specify "warn_about_react_version_for_rsc asks for the patched React 19.3.1" do
+      allow(install_generator).to receive(:detect_react_version).and_return("19.3.0")
+
+      install_generator.send(:warn_about_react_version_for_rsc)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("React 19.3.0 is below the recommended minimum")
+      expect(warning_text).to include("react@19.3.1 react-dom@19.3.1 react-server-dom-webpack@19.3.1")
+      expect(warning_text).to include("commit the refreshed lockfile")
     end
   end
 
@@ -6182,7 +6196,8 @@ describe InstallGenerator, type: :generator do
       expect(warning_text).to include("RSC requires React 19.3.x")
       expect(warning_text).to include("detected: 19.2.7")
       expect(warning_text).to include("This generator installs react-on-rails-rsc@19.3.1")
-      expect(warning_text).to include("react@~19.3.0 react-dom@~19.3.0")
+      expect(warning_text).to include("react@~19.3.1 react-dom@~19.3.1 react-server-dom-webpack@~19.3.1")
+      expect(warning_text).not_to include("patch >=")
     end
   end
 
@@ -6222,8 +6237,7 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("below the recommended minimum")
-      expect(warning_text).to include("React 19.3.2")
-      expect(warning_text).to include("react-on-rails-rsc@19.3.1 is coordinated with")
+      expect(warning_text).to include("react@19.3.2 react-dom@19.3.2 react-server-dom-webpack@19.3.2")
     end
   end
 
