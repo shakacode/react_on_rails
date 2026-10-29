@@ -121,7 +121,7 @@ module ReactOnRails
 
         def self.copy_version(key, entry, key_pattern, package_name)
           rest = key[key_pattern, 1]
-          resolution = key.sub(/\(.*\z/, "")
+          resolution = key[0, key.index("(") || key.length]
           return (resolution if entry.is_a?(Hash) && entry["name"] == package_name) unless rest
 
           version = strip_peer_suffix(rest)
