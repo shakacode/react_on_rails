@@ -59,7 +59,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   pre-flush stays a hit, identified by pairing with `ppr.resume.degraded_pre_flush`; invalid
   entries and cache read errors count as misses alongside their diagnostic events.
   `ppr.static_shell` no longer carries `cache_hit:` — the cache axis lives exclusively in the
-  lookup event. A `ppr_react_component` invocation that raises past the helper now emits
+  lookup event — and the private helper `ReactOnRailsProHelper#ppr_serve_shell` loses its
+  required `cache_hit:` keyword, so an application override that prepends or redefines that
+  method must drop the keyword or it will raise `ArgumentError`. A `ppr_react_component` invocation that raises past the helper now emits
   `ppr.render.abort.react_on_rails_pro` (redacted error class name, error re-raised unchanged),
   so an app-level `rescue_from` can no longer make a failed PPR page look like an all-hits or
   no-PPR page; and a persisted write whose cache-tag registration fails reports
