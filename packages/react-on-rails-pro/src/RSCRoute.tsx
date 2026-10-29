@@ -180,11 +180,13 @@ const toServerComponentFetchError = (
 type RefetchErrorState = [string, ServerComponentFetchError];
 type RSCContextValue = ReturnType<typeof useRSC>;
 // React 19 ref-as-prop: `ref` is a regular prop on function components, so no
-// forwardRef wrapper is needed. This keeps the RSC client floor at React 19.0
-// — the same floor PromiseWrapper's `use` already imposes; CI pins it via
-// test:react-floor-guard, which re-runs this file's suite against isolated
-// react/react-dom installs of the floor (19.0.x) and the oldest documented
-// supported RSC line (19.2.x).
+// forwardRef wrapper is needed. This keeps the RSC client runtime floor at
+// React 19.0 — the same floor PromiseWrapper's `use` already imposes (the
+// documented support window starts higher, at react-on-rails-rsc 19.2.x with
+// React >= 19.2.7). CI pins the floor via test:react-floor-guard, which runs
+// real isolated react/react-dom installs: 18.3.1 below the floor (branded
+// error, no mocks), 19.0.x (runtime floor), 19.1.x, and 19.2.7 (oldest
+// documented supported RSC line).
 //
 // Deliberately NOT using useEffectEvent anywhere in this file, for three
 // load-bearing reasons; do not "modernize" these patterns without revisiting

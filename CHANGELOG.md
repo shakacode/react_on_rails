@@ -43,8 +43,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   version changes — the core package still supports React >= 16, and the RSC client path keeps its
   existing React 19 floor (now enforced: rendering `<RSCRoute>` on older React fails fast with a
   branded error naming the React >= 19 requirement and the version it found, instead of a cryptic
-  `use is not a function`, and CI re-runs the refetch suite against pinned React 19.0.x/19.2.x
-  installs). `useEffectEvent` was deliberately not adopted to keep that floor. Calling
+  `use is not a function`, and CI re-runs the RSC client suite against real pinned React installs —
+  18.3.1 below the floor plus 19.0.x/19.1.x/19.2.x — with no mocks). `useEffectEvent` was deliberately not adopted to keep that floor. Calling
   `useEffectEvent`, `useFormStatus`, or `useFormState` in a server component without `'use client'`
   now gets the branded missing-directive diagnostic. Implements
   [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
