@@ -41,20 +41,21 @@ module ReactOnRailsProHelper
   PRO_ATTRIBUTION_COMMENT_PREFIX = "Powered by React on Rails Pro (c) ShakaCode"
   RAILS_CONTEXT_MARKER = "js-react-on-rails-context"
   # CSP nonces are per-request values, so any nonce baked into cached markup is stale on a
-  # cache hit and the browser refuses to run the script (issue #5021). At cache-write time
-  # the framework appends a trailing marker comment recording the originating request's
-  # nonce; on a cache hit, only attributes carrying that exact originating value are
-  # re-stamped with the serving request's nonce. Scope of that match: markup carrying a
-  # guessed or unrelated nonce value is never promoted to the live nonce, and unrelated
-  # cached text is never mutated. It is NOT an XSS boundary: the originating nonce is
-  # visible in that response's CSP header and in every sibling framework script tag, so
-  # content injected into the same fragment through an app-level HTML injection sink can
-  # copy it at render time. Such content already executes on the originating response
-  # (its copied nonce matches that response's policy), and on cache hits its attribute is
-  # re-stamped like the framework's own — neutralizing that requires fixing the injection
-  # sink itself.
-  CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce:"
+  # cache hit and the browser refuses to run the script (issue #5021). A render whose HTML
+  # will be cached therefore gives every framework-emitted script a fresh random
+  # placeholder nonce instead of the request's (see ReactOnRails::Helper#csp_nonce), and
+  # the framework appends a trailing marker comment recording that placeholder. Every
+  # response built from the render, the cache-writing one included, swaps the placeholder
+  # for its own request nonce. Markup that carries the request nonce through any other
+  # path, such as stored HTML injected through an app sink while the app's nonce generator
+  # is predictable, never matches the placeholder, so it keeps its stale nonce and CSP
+  # blocks it on cache hits (issue #5267). App code that reads railsContext.cspNonce at
+  # render time receives the placeholder and is re-stamped like the framework's scripts.
+  CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce-placeholder:"
   CACHED_CSP_NONCE_MARKER_SUFFIX = "-->"
+  # Placeholders match the request nonce's length, so a cached stream's re-stamp keeps its
+  # chunk boundaries, but never drop below 128 bits of entropy.
+  CSP_NONCE_PLACEHOLDER_MIN_LENGTH = 22
   # Single source of truth for the accepted CSP nonce shape — base64/base64url characters
   # with `=` only as trailing padding. The cache-write marker capture and the value
   # validation pattern are both built from it, so the two cannot silently diverge.
@@ -72,12 +73,6 @@ module ReactOnRailsProHelper
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
   # pattern while the CSP header still carries the original, mismatching every script.
   CSP_NONCE_VALUE_PATTERN = /\A#{CSP_NONCE_VALUE_SHAPE}\z/
-  # Escaped HTML ASCII whitespace characters for regexp character classes, derived from
-  # HTML_SPACE_CHARACTERS so the two cannot drift. Deliberately narrower than Ruby's \s:
-  # \v is not HTML whitespace (it parses as part of an attribute name or value).
-  CSP_NONCE_HTML_WS_CHARS = Regexp.escape(HTML_SPACE_CHARACTERS.join).freeze
-  # HTML ASCII whitespace run allowed around an attribute's `=`.
-  CSP_NONCE_ATTR_WS_PATTERN = "[#{CSP_NONCE_HTML_WS_CHARS}]*".freeze
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -201,8 +196,11 @@ module ReactOnRailsProHelper
     # is notified of each chunk's `hasErrors` flag so an error-containing render is
     # not written to the cache. See https://github.com/shakacode/react_on_rails/issues/4581.
     on_chunk_errors = options.delete(:on_chunk_errors)
+    # Set by cached_stream_react_component on a cache miss to swap the placeholder CSP
+    # nonce for the request's in the live stream (issue #5267).
+    live_chunk_rewriter = options.delete(:live_chunk_rewriter)
 
-    consumer_stream_async(on_complete:) do
+    consumer_stream_async(on_complete:, live_chunk_rewriter:) do
       internal_stream_react_component(component_name, options, on_chunk_errors:)
     end
   end
@@ -527,7 +525,7 @@ module ReactOnRailsProHelper
     end
 
     normalized_cache_tags = []
-    result, cache_hit, cache_write_skipped = fetch_cache_entry(
+    result, cache_hit, cache_write_skipped, csp_nonce_placeholder = fetch_cache_entry(
       cache_key,
       cache_write_options,
       cache_write_if:
@@ -538,23 +536,35 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
-    result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, options) if cache_hit
-    result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
+    result = restamp_fetched_cache_entry(result, cache_hit, csp_nonce_placeholder)
 
     add_component_cache_metadata(result, cache_key, cache_hit)
+  end
+
+  # Strips the cache-write marker and swaps the placeholder nonce for the serving request's.
+  # A miss knows the placeholder it rendered with; a hit reads it from the marker.
+  def restamp_fetched_cache_entry(result, cache_hit, csp_nonce_placeholder)
+    result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
+    return normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
+
+    rewrite_cached_csp_nonces_in_value(result, csp_nonce_placeholder)
   end
 
   def fetch_cache_entry(cache_key, cache_write_options, cache_write_if:)
     cache_hit = true
     cache_write_skipped = false
+    csp_nonce_placeholder = nil
     skip_cache_write = Object.new
     result = catch(skip_cache_write) do
       Rails.cache.fetch(cache_key, cache_write_options) do
         cache_hit = false
         # The marker travels with the cached value; both hit and miss consumers strip it
         # with extract_cached_csp_nonce_marker before the value reaches the page.
-        rendered_result = append_cached_csp_nonce_marker(yield)
+        rendered_result = with_csp_nonce_placeholder do |placeholder|
+          csp_nonce_placeholder = placeholder
+          append_cached_csp_nonce_marker(yield, placeholder)
+        end
         next rendered_result unless cache_write_if && !cache_write_if.call
 
         cache_write_skipped = true
@@ -562,7 +572,33 @@ module ReactOnRailsProHelper
       end
     end
 
-    [result, cache_hit, cache_write_skipped]
+    [result, cache_hit, cache_write_skipped, csp_nonce_placeholder]
+  end
+
+  # Runs the block with framework-emitted scripts carrying a fresh random placeholder
+  # nonce, yielding it, so the rendered HTML can be cached with only the framework's own
+  # nonce attributes re-stampable (issue #5267). Yields nil and renders normally when the
+  # request has no usable nonce. The override lives in fiber storage, which async tasks
+  # started inside the block inherit, so a streamed render keeps it for its whole stream.
+  def with_csp_nonce_placeholder
+    placeholder = new_csp_nonce_placeholder
+    return yield(nil) unless placeholder
+
+    key = ReactOnRails::Helper::CSP_NONCE_OVERRIDE_FIBER_KEY
+    previous = Fiber[key]
+    begin
+      Fiber[key] = placeholder
+      yield(placeholder)
+    ensure
+      Fiber[key] = previous
+    end
+  end
+
+  def new_csp_nonce_placeholder
+    nonce = current_csp_nonce_for_cached_html
+    return nil if nonce.nil?
+
+    SecureRandom.alphanumeric([nonce.length, CSP_NONCE_PLACEHOLDER_MIN_LENGTH].max)
   end
 
   def normalize_cached_pro_attribution(result, cached_csp_nonce = nil)
@@ -634,16 +670,15 @@ module ReactOnRailsProHelper
     was_html_safe ? normalized_html : String.new(normalized_html)
   end
 
-  # Appends the trailing marker that records the originating request's CSP nonce on the
-  # value that is about to be cached, so cache hits can re-stamp exactly the attributes
-  # this request emitted (issue #5021). No-op when the current request has no usable
-  # nonce: nonce-free entries live under a separate cache key (see the cache-key segment
-  # in ReactOnRailsPro::Cache.react_component_cache_key) and carry nothing to re-stamp.
-  def append_cached_csp_nonce_marker(value)
-    nonce = current_csp_nonce_for_cached_html
-    return value if nonce.nil?
+  # Appends the trailing marker that records the placeholder nonce the cached render's
+  # framework scripts carry, so cache hits can re-stamp exactly those scripts (issues
+  # #5021 and #5267). No-op without a placeholder: the request had no usable nonce, and
+  # nonce-free entries live under a separate cache key (see the cache-key segment in
+  # ReactOnRailsPro::Cache.react_component_cache_key) and carry nothing to re-stamp.
+  def append_cached_csp_nonce_marker(value, placeholder)
+    return value if placeholder.nil?
 
-    marker = "#{CACHED_CSP_NONCE_MARKER_PREFIX}#{nonce}#{CACHED_CSP_NONCE_MARKER_SUFFIX}"
+    marker = "#{CACHED_CSP_NONCE_MARKER_PREFIX}#{placeholder}#{CACHED_CSP_NONCE_MARKER_SUFFIX}"
     case value
     when Array
       value + [marker]
@@ -660,9 +695,9 @@ module ReactOnRailsProHelper
       value
     end
   rescue StandardError => e
-    # Fail open: cache the value marker-free (hits then serve the originating nonce for
-    # CSP to block — the pre-#5021 behavior) instead of failing the rendering request.
-    warn_cached_csp_nonce_degraded("recording the originating CSP nonce at cache-write time", e)
+    # Fail open: cache the value marker-free (hits then serve the placeholder for CSP to
+    # block, as before #5021) instead of failing the rendering request.
+    warn_cached_csp_nonce_degraded("recording the placeholder CSP nonce at cache-write time", e)
     value
   end
 
@@ -724,11 +759,12 @@ module ReactOnRailsProHelper
     [html[0...match.begin(0)], match[1]]
   end
 
-  # Re-stamps cached `nonce` attributes with the current request's CSP nonce so cache hits
-  # execute under the response's own `script-src 'nonce-...'` policy (issue #5021). Only
-  # attributes carrying the entry's exact originating nonce (from the cache-write marker)
-  # are rewritten: content that arrived with any other nonce value is left for CSP to
-  # block, and no other cached text can match a value only the originating request knew.
+  # Swaps the entry's placeholder nonce for the current request's CSP nonce so cached
+  # framework scripts execute under the response's own `script-src 'nonce-...'` policy
+  # (issue #5021). The placeholder is a random value only the framework saw, so every
+  # occurrence is framework-emitted: script attributes, and the railsContext JSON the
+  # client reads for scripts it inserts later. Content carrying any other nonce value,
+  # the request's own included, is left for CSP to block (issue #5267).
   def rewrite_cached_csp_nonces(html, cached_csp_nonce)
     return html if cached_csp_nonce.nil?
 
@@ -737,24 +773,11 @@ module ReactOnRailsProHelper
 
     # Allocation-free pre-check: the recursive hash/array field walk calls this for every
     # string field and most fields carry no nonce at all. A field that never mentions the
-    # originating value cannot match the attribute pattern, so return the receiver itself
-    # (the identity contract callers detect via equal?).
+    # placeholder returns the receiver itself (the identity contract callers detect via
+    # equal?).
     return html unless html.include?(cached_csp_nonce)
 
-    attribute_pattern = cached_csp_nonce_attribute_pattern(cached_csp_nonce)
-
-    # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
-    # and some versions HTML-escape a non-safe block return), so rewrite a plain copy and
-    # restore the receiver's html_safe flag explicitly. The matched flag keeps the rewrite
-    # single-pass (no separate match? pre-scan), and a substring-present-but-no-attribute
-    # case still returns the receiver itself: callers rely on object identity.
-    matched = false
-    rewritten = String.new(html).gsub(attribute_pattern) do
-      matched = true
-      %(nonce="#{current_nonce}")
-    end
-    return html unless matched
-
+    rewritten = replace_csp_nonce_placeholder(html, cached_csp_nonce, current_nonce)
     html.html_safe? ? rewritten.html_safe : rewritten
   rescue StandardError => e
     # Fail open: an error while matching or replacing (e.g. invalid-encoding cached
@@ -764,36 +787,16 @@ module ReactOnRailsProHelper
     html
   end
 
-  # Builds the attribute pattern for one originating nonce. Only the double-quoted
-  # spelling `nonce="<originating value>"` is matched — the form every framework emitter
-  # produces. The attribute name stays ASCII case-insensitive, HTML whitespace is allowed
-  # around `=` (the HTML set, never Ruby's \s — \v is not HTML whitespace), and the
-  # attribute may start after HTML whitespace, `/`, or a closing quote, all
-  # tokenizer-valid attribute starts (`<script/nonce="...">`, `<script id="x"nonce="...">`).
-  # Unquoted and single-quoted spellings are deliberately NOT matched: cached SSR output
-  # embeds JSON data blocks whose escaping (ERB::Util.json_escape / JSON string rules)
-  # leaves plain text and single quotes intact, so those spellings can occur as inert
-  # text inside a JSON string — rewriting one would inject raw double quotes that break
-  # JSON.parse on every cache hit. The double-quoted form cannot appear unescaped inside
-  # a JSON string (its quotes are `\"`), so this bound is JSON-safe; app-provided raw
-  # markup using another spelling fails closed and keeps its stale nonce for CSP to block.
-  # Compiled once per originating nonce and reused across the hash fields, nested values,
-  # and stream chunks of one entry (value-keyed like @csp_nonce_validation_memo, since
-  # entries with different originating nonces can be served within one request).
-  def cached_csp_nonce_attribute_pattern(cached_csp_nonce)
-    memo = @csp_nonce_attribute_pattern_memo if defined?(@csp_nonce_attribute_pattern_memo)
-    return memo[1] if memo && memo[0] == cached_csp_nonce
-
-    ws = CSP_NONCE_HTML_WS_CHARS
-    html_ws = CSP_NONCE_ATTR_WS_PATTERN
-    escaped_nonce = Regexp.escape(cached_csp_nonce)
-    pattern = %r{(?<=[#{ws}/"'])(?i:nonce)#{html_ws}=#{html_ws}"#{escaped_nonce}"}
-    (@csp_nonce_attribute_pattern_memo = [cached_csp_nonce, pattern])[1]
+  # SafeBuffer#gsub semantics vary across Rails versions (the html_safe flag is dropped,
+  # and some versions HTML-escape a non-safe block return), so this rewrites a plain copy
+  # and the caller restores the receiver's html_safe flag.
+  def replace_csp_nonce_placeholder(html, placeholder, nonce)
+    String.new(html).gsub(placeholder) { nonce }
   end
 
   # Re-stamps nonces across a cached stream's chunk array as one document. React's
-  # streaming writer flushes at fixed-size buffer boundaries, so a `nonce="..."`
-  # attribute can straddle two cached chunks; rewriting each chunk independently would
+  # streaming writer flushes at fixed-size buffer boundaries, so a placeholder can
+  # straddle two cached chunks; rewriting each chunk independently would
   # miss the split attribute and replay the stale nonce — the same boundary problem
   # ReactOnRailsPro::StreamCache::DomNodeIdRewriter solves for cached dom ids. The
   # String chunks are joined, rewritten once, and re-split at the original chunk
@@ -861,7 +864,7 @@ module ReactOnRailsProHelper
   # directly and keeps its own semantics: this guard covers only the cache machinery
   # issue #5021 added, which must never introduce a failure the render itself would not.
   def raw_csp_nonce_for_cached_html
-    csp_nonce
+    request_csp_nonce
   rescue StandardError => e
     warn_cached_csp_nonce_degraded("detecting the request's CSP nonce", e)
     nil
@@ -1171,7 +1174,7 @@ module ReactOnRailsProHelper
   )
     cache_write_options = ReactOnRailsPro::Cache.cache_write_options(cache_options[:cache_options])
     normalized_cache_tags = []
-    result, cache_hit, cache_write_skipped = fetch_cache_entry(
+    result, cache_hit, cache_write_skipped, csp_nonce_placeholder = fetch_cache_entry(
       cache_key,
       cache_write_options,
       cache_write_if:
@@ -1183,12 +1186,10 @@ module ReactOnRailsProHelper
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
-    result, cached_csp_nonce = extract_cached_csp_nonce_marker(result)
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
     cache_diagnostics[:hit] = cache_hit
-    result = normalize_cached_pro_attribution(result, cached_csp_nonce) if cache_hit
-    result
+    restamp_fetched_cache_entry(result, cache_hit, csp_nonce_placeholder)
   end
 
   def strip_static_rsc_payload_scripts(html, diagnostics: nil)
@@ -1646,14 +1647,26 @@ module ReactOnRailsProHelper
     initial_result
   end
 
-  def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
+  def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
+    # The async task streaming this render is started inside the placeholder scope, so it
+    # inherits the placeholder; the live stream swaps it for this request's nonce.
+    with_csp_nonce_placeholder do |placeholder|
+      cache_aware_options = stream_cache_miss_options(raw_options, view_cache_key, placeholder)
+      render_stream_component_with_props(component_name, cache_aware_options, auto_load_bundle, &block)
+    end
+  end
+
+  def stream_cache_miss_options(raw_options, view_cache_key, csp_nonce_placeholder)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     raw_cache_options = raw_options[:cache_options] || {}
     # Shared between the per-chunk error callback and the on_complete cache write.
     # Both run in the same async task/fiber, so by the time on_complete fires the
     # stream is fully consumed and this flag reflects every chunk.
     stream_has_errors = false
-    cache_aware_options = raw_options.merge(
+    raw_options.merge(
+      live_chunk_rewriter: csp_nonce_placeholder && ReactOnRailsPro::CspNonceStreamRewriter.new(
+        csp_nonce_placeholder, current_csp_nonce_for_cached_html
+      ),
       on_chunk_errors: ->(chunk_has_errors) { stream_has_errors ||= chunk_has_errors == true },
       on_complete: lambda { |chunks|
         # Never persist a render that emitted an error chunk. With production
@@ -1667,7 +1680,7 @@ module ReactOnRailsProHelper
         cache_write = ReactOnRailsPro::StreamCacheWrites.build(
           cache_key: view_cache_key,
           # Only the cached copy carries the nonce marker; the live stream already went out.
-          chunks: append_cached_csp_nonce_marker(chunks),
+          chunks: append_cached_csp_nonce_marker(chunks, csp_nonce_placeholder),
           normalized_cache_tags:,
           raw_cache_options:
         )
@@ -1680,13 +1693,6 @@ module ReactOnRailsProHelper
           ReactOnRailsPro::StreamCacheWrites.flush([cache_write])
         end
       }
-    )
-
-    render_stream_component_with_props(
-      component_name,
-      cache_aware_options,
-      auto_load_bundle,
-      &
     )
   end
 
@@ -1776,13 +1782,15 @@ module ReactOnRailsProHelper
     parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
       ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
-        result = react_component(component_name, options)
-        unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-          cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-          Rails.cache.write(cache_key, append_cached_csp_nonce_marker(result), cache_options)
-          ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+        with_csp_nonce_placeholder do |placeholder|
+          result = react_component(component_name, options)
+          unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+            cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+            Rails.cache.write(cache_key, append_cached_csp_nonce_marker(result, placeholder), cache_options)
+            ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+          end
+          rewrite_cached_csp_nonces_in_value(result, placeholder)
         end
-        result
       end
     end
 
@@ -1797,7 +1805,7 @@ module ReactOnRailsProHelper
     )
   end
 
-  def consumer_stream_async(on_complete:)
+  def consumer_stream_async(on_complete:, live_chunk_rewriter: nil)
     if @async_barrier.nil?
       raise ReactOnRails::Error,
             "You must call stream_view_containing_react_components to render the view containing the react component"
@@ -1815,7 +1823,7 @@ module ReactOnRailsProHelper
       ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
         ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
           stream = yield
-          fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
+          fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks, live_chunk_rewriter)
           on_complete&.call(all_chunks) if fully_consumed
         end
       end
@@ -1846,31 +1854,35 @@ module ReactOnRailsProHelper
 
   # Returns true if the stream was fully consumed, false if aborted (client disconnect).
   # When false, callers must NOT invoke on_complete to avoid caching partial data.
-  def process_stream_chunks(stream, first_chunk_promise, all_chunks)
-    is_first = true
-
+  def process_stream_chunks(stream, first_chunk_promise, all_chunks, live_chunk_rewriter = nil)
     stream.each_chunk do |chunk|
       # Client disconnected — abort without caching partial results
       if response.stream.closed?
-        first_chunk_promise.resolve(nil) if is_first
+        first_chunk_promise.resolve(nil) unless first_chunk_promise.resolved?
         return false
       end
 
       all_chunks&.push(chunk)
-
-      if is_first
-        # Store first chunk in promise for synchronous return
-        first_chunk_promise.resolve(chunk)
-        is_first = false
-      else
-        # Enqueue remaining chunks to main output queue
-        @main_output_queue.enqueue(chunk)
-      end
+      emit_stream_chunk(first_chunk_promise, live_chunk_rewriter ? live_chunk_rewriter.rewrite(chunk) : chunk)
     end
 
+    # The rewriter holds back a trailing partial placeholder until the next chunk arrives.
+    held_back = live_chunk_rewriter&.flush
+    emit_stream_chunk(first_chunk_promise, held_back) if held_back.present?
+
     # Handle case where stream has no chunks
-    first_chunk_promise.resolve(nil) if is_first
+    first_chunk_promise.resolve(nil) unless first_chunk_promise.resolved?
     true
+  end
+
+  # The first chunk resolves the promise for synchronous return; the rest go to the main
+  # output queue.
+  def emit_stream_chunk(first_chunk_promise, chunk)
+    if first_chunk_promise.resolved?
+      @main_output_queue.enqueue(chunk)
+    else
+      first_chunk_promise.resolve(chunk)
+    end
   end
 
   def internal_stream_react_component(component_name, options = {}, on_chunk_errors: nil)
