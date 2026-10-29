@@ -31,11 +31,21 @@ describe "CSP nonce on fragment-cached component cache hits", :caching, :server_
     nonce
   end
 
+  def page_rails_context_csp_nonce
+    json = response.body[%r{<script type="application/json" id="js-react-on-rails-context">(.*?)</script>}m, 1]
+    expect(json).to be_present
+    JSON.parse(CGI.unescapeHTML(json))["cspNonce"]
+  end
+
   it "re-stamps cached inline scripts with the serving response's nonce" do
     get "/server_side_redux_app_cached"
     expect(response).to have_http_status(:ok)
     first_nonce = response_csp_nonce
     expect(response.body).to include(%(nonce="#{first_nonce}"))
+    # The cache-writing response swaps its placeholder too (issue #5267): the context the
+    # client reads for scripts it inserts later carries the real nonce.
+    expect(response.body.scan(/nonce="([^"]+)"/).flatten.uniq).to eq([first_nonce])
+    expect(page_rails_context_csp_nonce).to eq(first_nonce)
 
     get "/server_side_redux_app_cached"
     expect(response).to have_http_status(:ok)
@@ -43,11 +53,9 @@ describe "CSP nonce on fragment-cached component cache hits", :caching, :server_
     expect(second_nonce).not_to eq(first_nonce)
 
     # Every nonce ATTRIBUTE in the cache-hit body matches the serving response's header.
-    # (The demo component also prints railsContext.cspNonce as visible table text; stale
-    # *displayed* rails-context content inside a cached fragment is documented fragment-
-    # caching behavior and is not executable, so only attributes are asserted here.)
     attribute_nonces = response.body.scan(/nonce="([^"]+)"/).flatten.uniq
     expect(attribute_nonces).to eq([second_nonce])
+    expect(page_rails_context_csp_nonce).to eq(second_nonce)
 
     # The re-stamped markup was not re-escaped by view auto-escaping (html_safe survived
     # the cache round-trip and rewrite), and the cache-write marker never reaches the page.
