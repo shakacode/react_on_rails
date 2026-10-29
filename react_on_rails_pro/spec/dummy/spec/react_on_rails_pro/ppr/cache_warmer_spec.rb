@@ -124,6 +124,51 @@ describe ReactOnRailsPro::Ppr::CacheWarmer do
   end
 
   describe "outcome classification" do
+    it "F12a: names the residual cold component when a degraded hit's fallback died beside a sibling write" do
+      stub_get(200) do
+        # Component A: lookup hit, pre-flush degradation, fallback raised and the app rescued it
+        # with the abort event undelivered — no write, no refusal, no abort counted.
+        instrument_hit
+        ReactOnRailsPro::Ppr.instrument_degraded_pre_flush(
+          component_name: "Component", error: RuntimeError.new("fallback died")
+        )
+        # Component B: ordinary miss + write.
+        instrument_miss
+        instrument_write
+      end
+
+      summary = described_class.call(paths: ["/mixed"])
+      result = summary.results.first
+
+      expect(result.status).to eq(:warmed)
+      expect(result.writes).to eq(1)
+      # eq, not include: the degraded_pre_flush term of the residual arithmetic must surface
+      # exactly one cold component — dropping the term makes detail nil.
+      expect(result.detail).to eq(
+        "partial — 1 PPR component left no cache entry " \
+        "(prerender raised and the app rescued it, or a degraded hit's fallback failed)"
+      )
+    end
+
+    it "F12b: a refused sibling write is reported once, not double-counted as residual cold" do
+      stub_get(200) do
+        # Component A: miss whose write was refused.
+        instrument_miss
+        ReactOnRailsPro::Ppr.instrument_cache_write_refused(component_name: "Component", reason: "render_error")
+        # Component B: ordinary miss + write.
+        instrument_miss
+        instrument_write
+      end
+
+      summary = described_class.call(paths: ["/mixed"])
+      result = summary.results.first
+
+      expect(result.status).to eq(:warmed)
+      # eq, not include: the refusals term must cancel the refused miss in the residual
+      # arithmetic — dropping it falsely adds "1 PPR component left no cache entry".
+      expect(result.detail).to eq("partial — 1 cache write refused (render_error)")
+    end
+
     it "classifies a request that wrote cache entries as warmed, counting the writes" do
       stub_get(200) do
         # Real requests always emit the lookup before the write (fixtures stay event-realistic).
