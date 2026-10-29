@@ -6248,6 +6248,12 @@ describe InstallGenerator, type: :generator do
       expect(warning_text.tr("\n", " ")).to include("react-server-dom-webpack below 19.3.1 on the 19.3.x line")
       expect(warning_text).not_to include("below 19.3.2")
     end
+
+    specify "the dated advisory sentence still describes the supported React line" do
+      # When the supported line leaves 19.3, drop the advisory sentence from both RSC warnings.
+      expect(ReactOnRails::Generators::RscSetup::RSC_ADVISORY_REACT_LINE)
+        .to eq(ReactOnRails::Generators::RscSetup::RSC_SUPPORTED_REACT_LINE)
+    end
   end
 
   context "when not using --rsc flag" do
