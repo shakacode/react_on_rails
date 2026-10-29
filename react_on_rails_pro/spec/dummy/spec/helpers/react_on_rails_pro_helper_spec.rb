@@ -1177,6 +1177,25 @@ describe ReactOnRailsProHelper do
           .once
       end
 
+      it "streams the held-back tail and the chunk unchanged when the live rewrite raises" do
+        allow(Rails.logger).to receive(:warn)
+        rewriter = ReactOnRailsPro::CspNonceStreamRewriter.new("PLACEHOLDER", "live-BBB=")
+        rewriter.rewrite("first PLACE")
+        allow(rewriter).to receive(:rewrite).and_raise(Encoding::CompatibilityError, "join exploded")
+        queued = []
+        @main_output_queue = instance_double(Async::Queue)
+        allow(@main_output_queue).to receive(:enqueue) { |chunk| queued << chunk }
+        promise = Async::Promise.new
+        promise.resolve("first ")
+
+        result = rewrite_live_stream_chunk(rewriter, "next chunk", promise)
+
+        expect(queued).to eq(["PLACE"])
+        expect(result).to eq("next chunk")
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping CSP nonces in a live cached stream/).once
+      end
+
       it "returns stream chunks unchanged and warns when the cross-chunk rewrite raises" do
         allow(self).to receive(:request_csp_nonce).and_return("live-BBB=")
         allow(Rails.logger).to receive(:warn)

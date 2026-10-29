@@ -1876,7 +1876,7 @@ module ReactOnRailsProHelper
       end
 
       all_chunks&.push(chunk)
-      chunk = rewrite_live_stream_chunk(live_chunk_rewriter, chunk) if live_chunk_rewriter
+      chunk = rewrite_live_stream_chunk(live_chunk_rewriter, chunk, first_chunk_promise) if live_chunk_rewriter
       emit_stream_chunk(first_chunk_promise, chunk)
     end
 
@@ -1890,12 +1890,16 @@ module ReactOnRailsProHelper
   end
 
   # Fails open like the rest of the nonce machinery: a chunk the rewriter cannot process
-  # streams with its placeholder for CSP to block instead of failing the stream.
-  def rewrite_live_stream_chunk(rewriter, chunk)
+  # streams with its placeholder for CSP to block instead of failing the stream. The
+  # held-back tail is emitted on its own first, since joining it to the chunk may be what
+  # raised (incompatible encodings).
+  def rewrite_live_stream_chunk(rewriter, chunk, first_chunk_promise)
     rewriter.rewrite(chunk)
   rescue StandardError => e
     warn_cached_csp_nonce_degraded("re-stamping CSP nonces in a live cached stream", e)
-    rewriter.abandon(chunk)
+    held_back = rewriter.flush
+    emit_stream_chunk(first_chunk_promise, held_back) unless held_back.empty?
+    chunk
   end
 
   # The first chunk resolves the promise for synchronous return; the rest go to the main

@@ -47,16 +47,6 @@ module ReactOnRailsPro
       @held_back_html_safe ? held_back.html_safe : held_back
     end
 
-    # Gives up on rewriting after an error: returns the held-back tail followed by the
-    # chunk unchanged, so no streamed bytes are lost or reordered.
-    def abandon(chunk)
-      tail = flush
-      return chunk if tail.empty? || !chunk.is_a?(String)
-
-      combined = String.new(tail) << chunk.to_str
-      chunk.html_safe? ? combined.html_safe : combined
-    end
-
     private
 
     def partial_placeholder_suffix_length(text)
