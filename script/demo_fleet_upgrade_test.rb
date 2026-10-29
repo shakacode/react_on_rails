@@ -569,6 +569,15 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     assert_match(/fail \(js-install: pnpm minimumReleaseAge blocks the new release/, out)
   end
 
+  def test_repo_without_a_local_clone_fails_the_run
+    FileUtils.rm_rf(@clone)
+
+    out, code = run_cli
+
+    assert_equal 1, code
+    assert_match(/skipped.*No local clone/, out)
+  end
+
   def test_repo_already_on_target_is_up_to_date
     out, = run_cli(version: "17.2.0")
 

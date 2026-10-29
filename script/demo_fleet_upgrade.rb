@@ -891,8 +891,9 @@ module DemoFleetUpgrade
 
   # Command-line entry point.
   class CLI
-    # A closed, unmerged upgrade PR also needs someone to decide whether to reopen or replace it.
-    FAILING_STATUSES = ["failed", "needs agent", "pr closed"].freeze
+    # Every status a lane must pick up: a closed, unmerged PR needs a reopen-or-replace decision, and a
+    # skipped repo (no local clone) was not upgraded at all.
+    FAILING_STATUSES = ["failed", "needs agent", "pr closed", "skipped"].freeze
     def initialize(argv, runner: CommandRunner.new, out: $stdout, manifest: nil)
       @argv = argv
       @runner = runner
