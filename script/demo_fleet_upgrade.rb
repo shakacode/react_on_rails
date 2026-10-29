@@ -126,9 +126,23 @@ module DemoFleetUpgrade
           [from, to, target]
         end
       end
-      [apply_edits(text, edits), changes, errors]
+      [apply_edits(text, edits), changes, errors + selector_errors(text, pins.keys)]
     rescue JSON::ParserError => e
       [text, [], ["package.json does not parse (#{e.message.lines.first.strip}); update it by hand"]]
+    end
+
+    # Override keys such as "react-on-rails@npm:^17.2.0" select by range, so the script cannot tell
+    # whether the new version should match; it leaves them for an agent.
+    def selector_errors(text, names)
+      string_values(text).filter_map do |path, _value, _from, _to|
+        section = OVERRIDE_SECTIONS.find { |prefix| path.first(prefix.size) == prefix }
+        next unless section
+
+        key = path.drop(section.size).find do |part|
+          names.any? { |name| part.to_s.match?(%r{\A(?:.*/)?#{Regexp.escape(name)}@}) }
+        end
+        "package.json override key #{key} selects by version; update it by hand" if key
+      end.uniq
     end
 
     # Applies [from, to, replacement] edits back to front so earlier offsets stay valid.
@@ -254,7 +268,7 @@ module DemoFleetUpgrade
         end.map(&:first)
       end
       CHILD_ENV.merge("PATH" => entries.join(File::PATH_SEPARATOR), "__MISE_DIFF" => nil, "__MISE_SESSION" => nil,
-                      "__MISE_SHIM" => nil)
+                      "__MISE_SHIM" => nil, "COREPACK_ENABLE_DOWNLOAD_PROMPT" => "0")
     end
 
     def initialize(term_grace: 10)
@@ -356,10 +370,10 @@ module DemoFleetUpgrade
       File.read(File.join(dir, lock)).include?("__metadata:") ? "yarn_berry" : "yarn_classic"
     end
 
-    # Corepack runs the exact pnpm or yarn release a packageManager field pins.
+    # Corepack runs the exact npm, pnpm, or yarn release a packageManager field pins.
     def pm_command(*args)
       tool = package_manager.start_with?("yarn") ? "yarn" : package_manager
-      prefix = !declared_manager.empty? && tool != "npm" ? ["corepack", tool] : [tool]
+      prefix = declared_manager.empty? ? [tool] : ["corepack", tool]
       prefix + args
     end
   end

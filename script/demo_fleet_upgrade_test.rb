@@ -99,6 +99,25 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     assert_equal [%w[react-on-rails ^17.2.0 17.2.1-rc.1]], changes
   end
 
+  def test_package_json_reports_version_selector_override_keys
+    text = %({ "resolutions": { "react-on-rails@npm:^17.2.0": "17.2.0" } }\n)
+    new_text, changes, errors = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, { "react-on-rails" => "17.2.1-rc.1" })
+
+    assert_equal text, new_text
+    assert_empty changes
+    assert_equal ["package.json override key react-on-rails@npm:^17.2.0 selects by version; update it by hand"], errors
+  end
+
+  def test_pinned_npm_runs_through_corepack
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "package.json"), %({ "packageManager": "npm@10.9.2" }\n))
+      File.write(File.join(dir, "package-lock.json"), "{}\n")
+      project = DemoFleetUpgrade::JsProject.new(dir, "npm")
+
+      assert_equal %w[corepack npm ci], project.frozen_install_command.first(3)
+    end
+  end
+
   def test_package_json_rewrites_object_form_override
     text = %({ "overrides": { "react-on-rails": { ".": "17.2.0", "react": "19.3.0" } } }\n)
     new_text, changes, = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, { "react-on-rails" => "17.2.1-rc.1" })
