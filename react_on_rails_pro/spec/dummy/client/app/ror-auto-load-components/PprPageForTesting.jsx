@@ -15,6 +15,8 @@
 
 import React, { Suspense } from 'react';
 
+import PprCounterButton from '../components/PprCounterButton';
+
 /**
  * PPR test fixture with one controlled async Suspense hole.
  *
@@ -59,6 +61,7 @@ const PprPageForTesting = ({
   <div>
     <h1 id="ppr-shell-header">{headerText}</h1>
     <p id="ppr-static-section">Static section rendered in the PPR shell</p>
+    <PprCounterButton />
     {!fullyStatic && (
       <Suspense fallback={<div id="ppr-hole-fallback">Loading PPR hole...</div>}>
         <DelayedPprHole
