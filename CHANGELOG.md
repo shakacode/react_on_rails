@@ -24,6 +24,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Security
+
+- **[Pro]** **The Node Renderer requires `fastify` 5.12.5 or later**: The `react-on-rails-pro-node-renderer` package
+  now depends on `fastify` `^5.12.5` instead of `^5.8.5`, so an app upgrading with an existing lockfile cannot keep a
+  `fastify` release affected by the 5.12.x security fixes, including authentication bypass through malformed URLs
+  ([GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7)) and request-validation bypasses
+  ([GHSA-hwr6-493r-vm6h](https://github.com/advisories/GHSA-hwr6-493r-vm6h)). Fresh installs of 17.2.0 already
+  resolve a fixed `fastify`. **Action required for upgraders** who keep a lockfile: confirm the renderer resolves
+  `fastify` 5.12.5 or later, for example with `pnpm why fastify`.
+  [PR 5274](https://github.com/shakacode/react_on_rails/pull/5274) by [justin808](https://github.com/justin808).
+
 ### [17.2.1.rc.1] - 2026-10-28
 
 #### Fixed
