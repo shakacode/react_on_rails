@@ -56,6 +56,7 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     subscriptions = [
       ReactOnRailsPro::Ppr::CACHE_WRITE_NOTIFICATION,
       ReactOnRailsPro::Ppr::CACHE_WRITE_REFUSED_NOTIFICATION,
+      ReactOnRailsPro::Ppr::CACHE_LOOKUP_NOTIFICATION,
       ReactOnRailsPro::Ppr::EVICT_INVALID_NOTIFICATION,
       ReactOnRailsPro::Ppr::STATIC_SHELL_NOTIFICATION,
       ReactOnRailsPro::Ppr::DEGRADED_PRE_FLUSH_NOTIFICATION,
@@ -147,7 +148,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
       expect(events_named(events, "ppr.cache.write").length).to eq(1)
       static_events = events_named(events, "ppr.static_shell")
       expect(static_events.length).to eq(1)
-      expect(static_events.first[:payload][:cache_hit]).to be(false)
+      lookup_events = events_named(events, "ppr.cache.lookup")
+      expect(lookup_events.length).to eq(1)
+      expect(lookup_events.first[:payload][:outcome]).to eq(:miss)
     end
 
     renderer_stream_js_calls.clear
@@ -162,7 +165,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
       expect(response.body).to include("Static section rendered in the PPR shell")
       static_events = events_named(events, "ppr.static_shell")
       expect(static_events.length).to eq(1)
-      expect(static_events.first[:payload][:cache_hit]).to be(true)
+      lookup_events = events_named(events, "ppr.cache.lookup")
+      expect(lookup_events.length).to eq(1)
+      expect(lookup_events.first[:payload][:outcome]).to eq(:hit)
       expect(events_named(events, "ppr.cache.write")).to be_empty
     end
   end
