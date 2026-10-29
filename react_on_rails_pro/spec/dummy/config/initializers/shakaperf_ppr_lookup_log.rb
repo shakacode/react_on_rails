@@ -56,7 +56,7 @@ if ENV["SHAKAPERF_PPR_CACHE"] == "true"
 
       def record(component_name:, outcome:)
         entry = {
-          component_name: component_name,
+          component_name:,
           outcome: outcome.to_s,
           dynamic_value: current_dynamic_value,
           at: Time.current.iso8601(6)

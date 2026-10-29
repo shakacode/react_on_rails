@@ -81,15 +81,23 @@ only.
 
 ## CI
 
-`.github/workflows/shakaperf-release-gates.yml` carries the `ppr` job: it boots the dummy app
-in PPR mode (`SHAKAPERF_PPR_CACHE=true`, `WEB_CONCURRENCY=0`) on the dedicated self-hosted M1
-benchmark runner (`[self-hosted, macOS, ARM64, rork-bench]`, #4073) and runs this gate with
-`--categories perf`, uploading the report and server logs as artifacts. The job is
-**advisory** (`continue-on-error: true`): per #3169 a new benchmark gate must record three
-consecutive green runs before being promoted to blocking, at which point its result also
-joins the release-evidence JSON (`rakelib/release.rake` validates the evidence key set
-exactly, so the promotion PR must update both together). The workflow is dispatch-only —
-no `pull_request` trigger ever reaches the self-hosted box (#4073 security rule).
+`.github/workflows/shakaperf-ppr-benchmark.yml` is the gate's own **dispatch-only** workflow:
+it boots the dummy app in PPR mode (`SHAKAPERF_PPR_CACHE=true`, `WEB_CONCURRENCY=0`) on the
+dedicated self-hosted M1 benchmark runner (`[self-hosted, macOS, ARM64, rork-bench]`, #4073)
+and runs this gate with `--categories perf`, uploading the report and server logs as
+artifacts. An optional `measurements` dispatch input overrides `SHAKAPERF_PPR_MEASUREMENTS`
+for variance burn runs.
+
+It is deliberately **not** a job in `shakaperf-release-gates.yml`: the release watcher
+(`rakelib/release.rake`) bounds that workflow's whole run at 65 minutes and a contract spec
+pins its job timeouts, so a self-hosted benchmark job there would couple every release
+validation to the M1 box's availability — a queued runner would stall releases even with
+`continue-on-error`. Isolation keeps the gate advisory structurally (#3169: a new benchmark
+gate must record three consecutive green runs before becoming blocking). Promotion later
+means moving the job into `shakaperf-release-gates.yml` and re-budgeting the watcher
+contract (release.rake constants, the contract spec, and the release-evidence JSON key set)
+in one PR. The workflow is dispatch-only — no `pull_request` trigger ever reaches the
+self-hosted box (#4073 security rule).
 
 ## Local Run
 
