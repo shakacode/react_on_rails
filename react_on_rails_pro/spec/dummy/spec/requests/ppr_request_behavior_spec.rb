@@ -115,11 +115,12 @@ describe "PPR request-level behavior", :caching, :server_rendering do
   end
 
   it "cold->warm: the cold request's props are ABSENT from the warm response " \
-     "(stale-props leak; blocked by #5019 — cached shell embeds the cold request's RSC payload)" do
-    pending "https://github.com/shakacode/react_on_rails/issues/5019 — the cached shell embeds " \
-            "the cold request's inline RSC payload (including its props), so stale bytes leak " \
-            "into every warm response. When #5019 is fixed this example starts passing and " \
-            "RSpec will fail it as 'expected pending to fail' — promote it to a real example."
+     "(stale-props leak — the #5019 regression)" do
+    pending "#5019 residual: #5096 cancels in-flight RSC streams for postponed boundaries (jest-proven), " \
+            "but end-to-end the warm response still carries three Flight rows with the COLD request's " \
+            "props (component props row, hole props row, and the resolved hole element row) inside an " \
+            "inline RSC payload script from the cached shell. When the residual leak is fixed this " \
+            "example fails as 'expected pending to fail' — promote it to a real example."
     key = "stale-props-#{SecureRandom.hex(4)}"
 
     get ppr_path(key, dynamic_value: "stale-props-value")
