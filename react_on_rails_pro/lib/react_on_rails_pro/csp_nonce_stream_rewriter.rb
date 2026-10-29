@@ -23,6 +23,7 @@ module ReactOnRailsPro
       @placeholder = placeholder
       @nonce = nonce
       @held_back = +""
+      @held_back_html_safe = false
     end
 
     # Returns the chunk with every complete placeholder replaced, minus any trailing
@@ -34,6 +35,7 @@ module ReactOnRailsPro
       text.gsub!(@placeholder) { @nonce }
       split_at = text.length - partial_placeholder_suffix_length(text)
       @held_back = text[split_at..]
+      @held_back_html_safe = chunk.html_safe?
       emitted = text[0...split_at]
       chunk.html_safe? ? emitted.html_safe : emitted
     end
@@ -42,7 +44,17 @@ module ReactOnRailsPro
     def flush
       held_back = @held_back
       @held_back = +""
-      held_back.html_safe
+      @held_back_html_safe ? held_back.html_safe : held_back
+    end
+
+    # Gives up on rewriting after an error: returns the held-back tail followed by the
+    # chunk unchanged, so no streamed bytes are lost or reordered.
+    def abandon(chunk)
+      tail = flush
+      return chunk if tail.empty? || !chunk.is_a?(String)
+
+      combined = String.new(tail) << chunk.to_str
+      chunk.html_safe? ? combined.html_safe : combined
     end
 
     private

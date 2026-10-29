@@ -758,6 +758,19 @@ describe ReactOnRailsProHelper do
       expect(second_result.scan(/nonce="([^"]+)"/).flatten.uniq).to contain_exactly("victim-BBB=", "session-AAA=")
     end
 
+    it "re-stamps a nested cached render to the enclosing render's placeholder" do
+      allow(self).to receive(:request_csp_nonce).and_return("request-AAAAAAAAAAAAAAAAAAAA=")
+
+      outer_placeholder = nil
+      inner_result = with_csp_nonce_placeholder do |placeholder|
+        outer_placeholder = placeholder
+        cached_react_component("App", cache_key: "csp-nonce-nested", auto_load_bundle: false) { { name: "inner" } }
+      end
+
+      # The enclosing entry can then re-stamp the nested framework scripts on its own hits.
+      expect(inner_result.scan(/nonce="([^"]+)"/).flatten.uniq).to eq([outer_placeholder])
+    end
+
     it "never lets a cached render's placeholder reach a later uncached render" do
       allow(self).to receive(:request_csp_nonce).and_return("request-AAA=")
 

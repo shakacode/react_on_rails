@@ -50,6 +50,21 @@ RSpec.describe ReactOnRailsPro::CspNonceStreamRewriter do
       .to eq(%(<script nonce="request-nonce=">x()</script>))
   end
 
+  it "flushes the held-back tail with the html_safe flag of the chunk it came from" do
+    rewriter.rewrite("plain PLACE")
+    expect(rewriter.flush).not_to be_html_safe
+
+    rewriter.rewrite("safe PLACE".html_safe)
+    expect(rewriter.flush).to be_html_safe
+  end
+
+  it "abandons by returning the held-back tail ahead of the unchanged chunk" do
+    rewriter.rewrite("text PLACE")
+
+    expect(rewriter.abandon("HOLDER and more")).to eq("PLACEHOLDER and more")
+    expect(rewriter.flush).to eq("")
+  end
+
   it "keeps each chunk's html_safe flag and passes non-String chunks through" do
     hash_chunk = { "html" => "PLACEHOLDER" }
 

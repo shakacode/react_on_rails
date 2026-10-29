@@ -53,8 +53,9 @@ module ReactOnRailsProHelper
   # render time receives the placeholder and is re-stamped like the framework's scripts.
   CACHED_CSP_NONCE_MARKER_PREFIX = "<!--rorp-cached-csp-nonce-placeholder:"
   CACHED_CSP_NONCE_MARKER_SUFFIX = "-->"
-  # Placeholders match the request nonce's length, so a cached stream's re-stamp keeps its
-  # chunk boundaries, but never drop below 128 bits of entropy.
+  # Placeholders match the request nonce's length but never drop below 128 bits of
+  # entropy. With nonces of at least that length (Rails' SecureRandom.base64(16) is 24
+  # characters), a cached stream's re-stamp keeps its chunk boundaries.
   CSP_NONCE_PLACEHOLDER_MIN_LENGTH = 22
   # Single source of truth for the accepted CSP nonce shape — base64/base64url characters
   # with `=` only as trailing padding. The cache-write marker capture and the value
@@ -635,10 +636,17 @@ module ReactOnRailsProHelper
   def effective_cached_csp_nonce(cached_csp_nonce)
     return nil unless cached_csp_nonce
 
-    current_nonce = current_csp_nonce_for_cached_html
+    current_nonce = restamp_target_csp_nonce
     return nil if current_nonce.nil? || current_nonce == cached_csp_nonce
 
     cached_csp_nonce
+  end
+
+  # The nonce a re-stamp writes: the request's own, or, while this render is nested inside
+  # another cached render, that render's placeholder, so the outer entry can re-stamp the
+  # nested framework scripts on its own hits.
+  def restamp_target_csp_nonce
+    Fiber[ReactOnRails::Helper::CSP_NONCE_OVERRIDE_FIBER_KEY] || current_csp_nonce_for_cached_html
   end
 
   # Recursive companion to rewrite_cached_csp_nonces for non-componentHtml hash fields,
@@ -768,7 +776,7 @@ module ReactOnRailsProHelper
   def rewrite_cached_csp_nonces(html, cached_csp_nonce)
     return html if cached_csp_nonce.nil?
 
-    current_nonce = current_csp_nonce_for_cached_html
+    current_nonce = restamp_target_csp_nonce
     return html if current_nonce.nil? || current_nonce == cached_csp_nonce
 
     # Allocation-free pre-check: the recursive hash/array field walk calls this for every
@@ -1649,14 +1657,16 @@ module ReactOnRailsProHelper
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
     # The async task streaming this render is started inside the placeholder scope, so it
-    # inherits the placeholder; the live stream swaps it for this request's nonce.
+    # inherits the placeholder; the live stream swaps it for the nonce read here, outside
+    # that scope.
+    live_nonce = restamp_target_csp_nonce
     with_csp_nonce_placeholder do |placeholder|
-      cache_aware_options = stream_cache_miss_options(raw_options, view_cache_key, placeholder)
+      cache_aware_options = stream_cache_miss_options(raw_options, view_cache_key, placeholder, live_nonce)
       render_stream_component_with_props(component_name, cache_aware_options, auto_load_bundle, &block)
     end
   end
 
-  def stream_cache_miss_options(raw_options, view_cache_key, csp_nonce_placeholder)
+  def stream_cache_miss_options(raw_options, view_cache_key, csp_nonce_placeholder, live_nonce)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     raw_cache_options = raw_options[:cache_options] || {}
     # Shared between the per-chunk error callback and the on_complete cache write.
@@ -1664,9 +1674,8 @@ module ReactOnRailsProHelper
     # stream is fully consumed and this flag reflects every chunk.
     stream_has_errors = false
     raw_options.merge(
-      live_chunk_rewriter: csp_nonce_placeholder && ReactOnRailsPro::CspNonceStreamRewriter.new(
-        csp_nonce_placeholder, current_csp_nonce_for_cached_html
-      ),
+      live_chunk_rewriter: csp_nonce_placeholder &&
+        ReactOnRailsPro::CspNonceStreamRewriter.new(csp_nonce_placeholder, live_nonce),
       on_chunk_errors: ->(chunk_has_errors) { stream_has_errors ||= chunk_has_errors == true },
       on_complete: lambda { |chunks|
         # Never persist a render that emitted an error chunk. With production
@@ -1782,15 +1791,19 @@ module ReactOnRailsProHelper
     parent_context = ReactOnRailsPro::OpenTelemetry.capture_context
     task = @react_on_rails_async_barrier.async do
       ReactOnRailsPro::OpenTelemetry.with_context(parent_context) do
-        with_csp_nonce_placeholder do |placeholder|
-          result = react_component(component_name, options)
+        csp_nonce_placeholder = nil
+        result = with_csp_nonce_placeholder do |placeholder|
+          csp_nonce_placeholder = placeholder
+          rendered = react_component(component_name, options)
           unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
             cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-            Rails.cache.write(cache_key, append_cached_csp_nonce_marker(result, placeholder), cache_options)
+            Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
             ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
           end
-          rewrite_cached_csp_nonces_in_value(result, placeholder)
+          rendered
         end
+        # Swapped outside the placeholder scope, so a nested render targets the outer one.
+        rewrite_cached_csp_nonces_in_value(result, csp_nonce_placeholder)
       end
     end
 
@@ -1863,7 +1876,8 @@ module ReactOnRailsProHelper
       end
 
       all_chunks&.push(chunk)
-      emit_stream_chunk(first_chunk_promise, live_chunk_rewriter ? live_chunk_rewriter.rewrite(chunk) : chunk)
+      chunk = rewrite_live_stream_chunk(live_chunk_rewriter, chunk) if live_chunk_rewriter
+      emit_stream_chunk(first_chunk_promise, chunk)
     end
 
     # The rewriter holds back a trailing partial placeholder until the next chunk arrives.
@@ -1873,6 +1887,15 @@ module ReactOnRailsProHelper
     # Handle case where stream has no chunks
     first_chunk_promise.resolve(nil) unless first_chunk_promise.resolved?
     true
+  end
+
+  # Fails open like the rest of the nonce machinery: a chunk the rewriter cannot process
+  # streams with its placeholder for CSP to block instead of failing the stream.
+  def rewrite_live_stream_chunk(rewriter, chunk)
+    rewriter.rewrite(chunk)
+  rescue StandardError => e
+    warn_cached_csp_nonce_degraded("re-stamping CSP nonces in a live cached stream", e)
+    rewriter.abandon(chunk)
   end
 
   # The first chunk resolves the promise for synchronous return; the rest go to the main
