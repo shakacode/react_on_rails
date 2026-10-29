@@ -126,7 +126,8 @@ entry. Do not substitute a generic Renovate preset.
 8. Run Shaka `claim` for every mutable app target before its execution subagent starts, and
    check that target's open PRs and remote branches. A target another owner holds is skipped and
    reported, and an incomplete check is non-passing; neither may produce a competing worktree or
-   branch. Reuse live candidate ownership through an explicit handoff only.
+   branch. Reuse live candidate ownership through an explicit handoff only. These checks do not
+   lock, so run at most one fleet pack per release candidate at a time.
 9. Treat the release tracking issue plus its newest candidate-specific comments as the public
    source of truth. The issue body can describe an earlier candidate in the same release cycle;
    do not mistake that for the current candidate when a newer explicit RC section exists. A hard

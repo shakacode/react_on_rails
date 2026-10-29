@@ -93,7 +93,7 @@ source PR per release backport PR:
    is completed input, not a started release-backport lane: its linked issue,
    assignee, and merged implementation PR do not exclude it. Its backport lane is started by a valid source-atomic
    release-targeted implementation PR or branch; an explicitly
-   maintainer-approved aggregate whose sources are behaviorally inseparable; a
+   maintainer-approved aggregate whose sources are behaviorally inseparable;
    or a backport implementation comment for either valid shape. An unapproved, shape-violating aggregate does not exclude its source
    candidates; keep them eligible so the **Backport Shape** replacement can be
    recommended.
