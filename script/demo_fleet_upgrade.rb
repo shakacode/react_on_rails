@@ -579,17 +579,23 @@ module DemoFleetUpgrade
 
       # A closed or merged PR's branch is left alone; someone decides whether to reopen or replace it.
       pull_request = existing_pr
-      return finish_inactive_pr(pull_request) if pull_request && pull_request["state"] != "OPEN"
+      if pull_request && pull_request["state"] != "OPEN"
+        return finish_inactive_pr(pull_request,
+                                  unpublished: head != pushed)
+      end
 
       @pushed_now = head != pushed
       push if @pushed_now
       ensure_pr(pull_request)
     end
 
-    def finish_inactive_pr(pull_request)
+    # Commits this run made but could not publish need a person, whatever the PR's state.
+    def finish_inactive_pr(pull_request, unpublished:)
       result.pr_url = pull_request["url"]
       state = pull_request["state"].downcase
-      finish("pr #{state}", "Existing PR is #{state}; branch not pushed and PR not reopened")
+      return finish("pr #{state}", "Existing PR is #{state}; branch not pushed and PR not reopened") unless unpublished
+
+      finish("needs agent", "Existing PR is #{state}; new commits on #{@branch} stay local in #{@worktree}")
     end
 
     def prepare_worktree

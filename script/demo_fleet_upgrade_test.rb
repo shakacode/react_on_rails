@@ -498,6 +498,28 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     assert_match(/react_on_rails 17\.2\.0 -> 17\.2\.1\.rc\.1/, out)
   end
 
+  def test_merged_pr_with_new_local_commits_needs_an_agent
+    run_cli("--execute")
+    pushed = remote_branch_sha
+    @runner.prs.each { |pr| pr["state"] = "MERGED" }
+
+    out, code = run_cli("--execute", "--bump", "npm:react-on-rails-rsc=19.3.1")
+
+    assert_equal 1, code
+    assert_match(/needs agent.*Existing PR is merged; new commits/, out)
+    assert_equal pushed, remote_branch_sha
+  end
+
+  def test_merged_pr_without_new_commits_is_done
+    run_cli("--execute")
+    @runner.prs.each { |pr| pr["state"] = "MERGED" }
+
+    out, code = run_cli("--execute")
+
+    assert_equal 0, code, out
+    assert_match(/pr merged/, out)
+  end
+
   def test_closed_upgrade_pr_fails_the_run_without_pushing
     run_cli("--execute")
     pushed = remote_branch_sha
@@ -506,7 +528,7 @@ class DemoFleetUpgradeFlowTest < Minitest::Test
     out, code = run_cli("--execute", "--bump", "npm:react-on-rails-rsc=19.3.1")
 
     assert_equal 1, code
-    assert_match(/pr closed/, out)
+    assert_match(/needs agent.*Existing PR is closed; new commits/, out)
     assert_equal pushed, remote_branch_sha, "a closed PR's branch must not move"
   end
 
