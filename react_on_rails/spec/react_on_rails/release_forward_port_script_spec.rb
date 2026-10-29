@@ -576,10 +576,14 @@ RSpec.describe "script/release-forward-port" do
 
   describe "documented release-line variables" do
     it "rejects a non-stable canonical version before any release command" do
-      _stdout, stderr, status = run_documented_release_line_variables("exit 72", release_version: "17.0.0.rc.1")
+      _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+        "git fetch --prune origin main",
+        { "RELEASE_VERSION_INPUT" => "17.0.0.rc.1" }
+      )
 
       expect(status).not_to be_success
       expect(stderr).to include("release version must be X.Y.Z; stop")
+      expect(calls).to be_empty
     end
 
     it "keeps the canonical release version and branch immutable for the shell lifecycle" do

@@ -127,7 +127,7 @@ entry. Do not substitute a generic Renovate preset.
    check that target's open PRs and remote branches. A target another owner holds is skipped and
    reported, and an incomplete check is non-passing; neither may produce a competing worktree or
    branch. Reuse live candidate ownership through an explicit handoff only. These checks do not
-   lock, so run at most one fleet pack per release candidate at a time.
+   lock, so run at most one fleet pack at a time across all release candidates.
 9. Treat the release tracking issue plus its newest candidate-specific comments as the public
    source of truth. The issue body can describe an earlier candidate in the same release cycle;
    do not mistake that for the current candidate when a newer explicit RC section exists. A hard

@@ -3187,6 +3187,8 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "Do not select a candidate independently"
     assert_includes pack, "independently released `react-on-rails-rsc`"
     assert_includes pack, "run Shaka `claim` for that target"
+    assert_includes pack, "If another owner already holds the target, skip it and report the"
+    assert_match(%r{report UNKNOWN and do not create a branch/worktree}, pack)
     refute_includes pack, "agent-coord"
     refute_includes pack, "fallback_claim"
     assert_includes pack, "Search the open `Release gate: react_on_rails X.Y.Z`"
