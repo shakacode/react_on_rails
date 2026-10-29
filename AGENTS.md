@@ -10,8 +10,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - Installed [Shaka](https://github.com/shakacode/shaka) owns issue and PR
   delivery: claim, plan, implement, validate, local review, publication, and
   the merge decision. Start it with `/shaka` in Claude Code or `$shaka` in
-  Codex. React on Rails no longer uses `shakacode/agent-workflows` skills; the last
-  vendored helper copies are being moved or removed.
+  Codex. React on Rails no longer uses `shakacode/agent-workflows` skills or
+  vendored copies.
 - When updating reusable agent workflows, first consider whether the change
   belongs in Shaka rather than this repo; keep local edits focused on React on
   Rails-specific policy, seams, or overrides.
