@@ -36,6 +36,9 @@ describe "react_on_rails_pro:ppr:warm rake task" do
 
   around do |example|
     original_env = ENV.to_hash.slice("PPR_WARM_STRICT", "PPR_WARM_PATHS", "PPR_WARM_HOST", "PPR_WARM_HTTPS")
+    # Restore the prior process-wide Rake singleton afterwards: nil-ing it would hand any
+    # later Rake-using example a fresh application with every previously loaded task gone.
+    original_application = Rake.application
     Rake.application = Rake::Application.new
     Rake.load_rakefile(ppr_rake_file)
     ENV["PPR_WARM_PATHS"] = "/some-path"
@@ -43,7 +46,7 @@ describe "react_on_rails_pro:ppr:warm rake task" do
   ensure
     %w[PPR_WARM_STRICT PPR_WARM_PATHS PPR_WARM_HOST PPR_WARM_HTTPS].each { |key| ENV.delete(key) }
     original_env.each { |key, value| ENV[key] = value }
-    Rake.application = nil
+    Rake.application = original_application
   end
 
   def invoke_task
