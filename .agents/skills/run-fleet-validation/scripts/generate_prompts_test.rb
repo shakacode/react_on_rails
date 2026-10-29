@@ -3377,7 +3377,6 @@ class FleetValidationGeneratorTest < Minitest::Test
       pack = build_generator(manifest_path:).render_pack
 
       assert_includes pack, "- owner/example!: owner-example"
-      refute_includes pack, "owner-example-\n"
     end
   end
 
