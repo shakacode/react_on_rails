@@ -10,6 +10,8 @@ module ReactOnRails
       def self.log_ignored: (Exception error) -> void
 
       module PnpmLockfile
+        PLAIN_VERSION: Regexp
+
         def self.version: (String path, String package_name) -> String?
         def self.all_versions: (String path, String package_name) -> Array[String]
         def self.copy_version: (String key, untyped entry, Regexp key_pattern, String package_name) -> String?

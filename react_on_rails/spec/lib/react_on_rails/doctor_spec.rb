@@ -11607,7 +11607,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       expect(messages_of(:success)).to be_empty
       expect(messages_of(:warning)).to contain_exactly(
-        a_string_including("Could not tell whether react-server-dom-webpack https://example.com/rsdw-19.3.0.tgz")
+        a_string_including("Could not tell whether react-server-dom-webpack react-server-dom-webpack@https://example.com/rsdw-19.3.0.tgz")
       )
     end
 

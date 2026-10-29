@@ -104,9 +104,9 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
 
       expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
         "19.3.1",
-        "https://example.com/react-server-dom-webpack-19.3.0.tgz",
-        "https://codeload.github.com/react/react/tar.gz/abc123",
-        "file:vendor/react-server-dom-webpack.tgz"
+        "react-server-dom-webpack@https://example.com/react-server-dom-webpack-19.3.0.tgz",
+        "react-server-dom-webpack@https://codeload.github.com/react/react/tar.gz/abc123",
+        "react-server-dom-webpack@file:vendor/react-server-dom-webpack.tgz"
       )
     end
 
@@ -122,7 +122,7 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
             dependencies: {}
       YAML
 
-      expect(versions_in("pnpm-lock.yaml" => lockfile)).to eq(["https://example.com/rsdw.tgz"])
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to eq(["react-server-dom-webpack@https://example.com/rsdw.tgz"])
     end
 
     it "reads pnpm 5 package keys that start with a registry host" do
@@ -134,14 +134,18 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
             resolution: {integrity: sha512-abc}
           localhost+4873/react-server-dom-webpack/19.2.8:
             resolution: {integrity: sha512-ghi}
-          pkgs.example.com/react-server-dom-webpack/19.3.1.tgz:
+          pkgs.example.com/react-server-dom-webpack/19.3.1.tgz_react@19.3.1:
             resolution: {tarball: https://pkgs.example.com/react-server-dom-webpack/19.3.1.tgz}
+          registry.example.com/react-server-dom-webpack/-/react-server-dom-webpack-19.3.0.tgz_react@19.3.0:
+            resolution: {tarball: https://registry.example.com/react-server-dom-webpack/-/react-server-dom-webpack-19.3.0.tgz}
           registry.example.com/react-server-dom-webpack-extra/1.0.0:
             resolution: {integrity: sha512-def}
       YAML
 
       expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
-        "19.3.0", "19.2.8", "pkgs.example.com/react-server-dom-webpack/19.3.1.tgz"
+        "19.3.0", "19.2.8",
+        "pkgs.example.com/react-server-dom-webpack/19.3.1.tgz_react@19.3.1",
+        "registry.example.com/react-server-dom-webpack/-/react-server-dom-webpack-19.3.0.tgz_react@19.3.0"
       )
     end
 
