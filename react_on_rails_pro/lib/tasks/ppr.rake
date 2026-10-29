@@ -19,7 +19,7 @@ namespace :react_on_rails_pro do
     # CGI servers, and Docker images, and would silently change warm-up behavior.
     desc "Warm the PPR shell cache by requesting config.ppr_warm_up_paths in-process. " \
          "PPR_WARM_PATHS=/a,/b overrides the configured list; PPR_WARM_HOST sets the Host header; " \
-         "PPR_WARM_HTTPS=false issues plain-HTTP requests; PPR_WARM_STRICT=true exits non-zero on any failed path. " \
+         "PPR_WARM_HTTPS=false uses plain HTTP; PPR_WARM_STRICT=true exits non-zero on failed or no-ppr paths. " \
          "Run AFTER the new bundle digest is live (release phase / post-deploy hook), never as a build step."
     task warm: :environment do
       # An explicitly empty override behaves like no override at all, so "no paths anywhere"
@@ -42,8 +42,8 @@ namespace :react_on_rails_pro do
       puts summary.to_log
 
       if ENV["PPR_WARM_STRICT"] == "true" && !summary.success?
-        abort "[ReactOnRailsPro] PPR warm-up finished with #{summary.failed.size} failed path(s) " \
-              "and PPR_WARM_STRICT=true."
+        abort "[ReactOnRailsPro] PPR warm-up: #{summary.failed.size} failed, #{summary.no_ppr.size} " \
+              "no-ppr (2xx but no ppr_react_component) path(s); PPR_WARM_STRICT=true."
       end
     end
   end

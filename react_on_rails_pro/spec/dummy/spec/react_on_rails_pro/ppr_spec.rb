@@ -114,20 +114,71 @@ describe ReactOnRailsPro::Ppr do
   end
 
   describe ".instrument_static_shell" do
-    it "emits the ppr.static_shell counter notification with its payload" do
+    it "emits the ppr.static_shell counter notification with only the component name" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::STATIC_SHELL_NOTIFICATION
       ) { |event| events << event }
 
       begin
-        described_class.instrument_static_shell(component_name: "PprPageForTesting", cache_hit: true)
+        described_class.instrument_static_shell(component_name: "PprPageForTesting")
       ensure
         ActiveSupport::Notifications.unsubscribe(subscription)
       end
 
       expect(events.length).to eq(1)
-      expect(events.first.payload).to include(component_name: "PprPageForTesting", cache_hit: true)
+      # The cache axis moved to ppr.cache.lookup (issue #5102): this event reports only the
+      # "render had no holes" axis, so the two never overlap.
+      expect(events.first.payload).to eq(component_name: "PprPageForTesting")
+    end
+  end
+
+  describe "event name constants" do
+    it "pins the published event-name strings (the docs/pro/ppr-events.md contract)" do
+      expect(
+        {
+          static_shell: described_class::STATIC_SHELL_NOTIFICATION,
+          cache_lookup: described_class::CACHE_LOOKUP_NOTIFICATION,
+          cache_write: described_class::CACHE_WRITE_NOTIFICATION,
+          cache_write_refused: described_class::CACHE_WRITE_REFUSED_NOTIFICATION,
+          cache_read_error: described_class::CACHE_READ_ERROR_NOTIFICATION,
+          evict_invalid: described_class::EVICT_INVALID_NOTIFICATION,
+          degraded_pre_flush: described_class::DEGRADED_PRE_FLUSH_NOTIFICATION,
+          degraded_post_flush: described_class::DEGRADED_POST_FLUSH_NOTIFICATION,
+          render_abort: described_class::RENDER_ABORT_NOTIFICATION
+        }
+      ).to eq(
+        static_shell: "ppr.static_shell.react_on_rails_pro",
+        cache_lookup: "ppr.cache.lookup.react_on_rails_pro",
+        cache_write: "ppr.cache.write.react_on_rails_pro",
+        cache_write_refused: "ppr.cache.write_refused.react_on_rails_pro",
+        cache_read_error: "ppr.cache.read_error.react_on_rails_pro",
+        evict_invalid: "ppr.cache.evict_invalid.react_on_rails_pro",
+        degraded_pre_flush: "ppr.resume.degraded_pre_flush.react_on_rails_pro",
+        degraded_post_flush: "ppr.resume.degraded_post_flush.react_on_rails_pro",
+        render_abort: "ppr.render.abort.react_on_rails_pro"
+      )
+    end
+  end
+
+  describe ".instrument_cache_lookup" do
+    it "emits the ppr.cache.lookup notification with component_name and outcome only" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_LOOKUP_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_lookup(component_name: "PprPageForTesting", outcome: :hit)
+        described_class.instrument_cache_lookup(component_name: "PprPageForTesting", outcome: :miss)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.map { |event| event.payload[:outcome] }).to eq(%i[hit miss])
+      # Deliberately no cache key: keys are user-supplied and can carry identifiers
+      # (issue #5102 redaction note).
+      expect(events.map { |event| event.payload.keys.sort }).to all(eq(%i[component_name outcome]))
     end
   end
 
@@ -196,7 +247,7 @@ describe ReactOnRailsPro::Ppr do
   # --- Issue #4896: cache write path instrumentation ---
 
   describe ".instrument_cache_write" do
-    it "emits the ppr.cache.write notification with component_name and cache_key" do
+    it "emits the ppr.cache.write notification with component_name, cache_key, and tags_registered" do
       events = []
       subscription = ActiveSupport::Notifications.subscribe(
         described_class::CACHE_WRITE_NOTIFICATION
@@ -214,8 +265,52 @@ describe ReactOnRailsPro::Ppr do
       expect(events.length).to eq(1)
       expect(events.first.payload).to include(
         component_name: "PprPageForTesting",
-        cache_key: "ppr:test-key"
+        cache_key: "ppr:test-key",
+        tags_registered: true
       )
+    end
+
+    it "reports a persisted write whose tag registration failed on the write event itself" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::CACHE_WRITE_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_cache_write(
+          component_name: "PprPageForTesting",
+          cache_key: "ppr:test-key",
+          tags_registered: false
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      # One axis per event: a persisted-but-untagged write is still a write, never a
+      # write_refused (#5106 review) - the flag is how subscribers see the orphaned entry.
+      expect(events.first.payload).to include(tags_registered: false)
+    end
+  end
+
+  describe ".instrument_render_abort" do
+    it "emits the ppr.render.abort notification with redacted error (class name only)" do
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe(
+        described_class::RENDER_ABORT_NOTIFICATION
+      ) { |event| events << event }
+
+      begin
+        described_class.instrument_render_abort(
+          component_name: "TestComponent",
+          error: RuntimeError.new("cache_key proc exploded for user@email.com")
+        )
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      expect(events.length).to eq(1)
+      expect(events.first.payload).to include(component_name: "TestComponent", error: "RuntimeError")
+      expect(events.first.payload[:error]).not_to include("user@email.com")
     end
   end
 

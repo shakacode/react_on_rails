@@ -17,14 +17,25 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
     Warm request: cached shell served instantly + resume streamed with fresh dynamicValue
     (rendered fresh each request below, so warm holes visibly change while the shell stays cached).
     ?fullyStatic=true renders no hole (shell-only cache record, no resume request).
-    ?throwAsyncError=true rejects inside the hole (render must not be cached). %>
+    ?throwAsyncError=true rejects inside the hole (render must not be cached).
+    ?raiseInCacheKey=true raises inside the cache_key proc (the invocation dies before the
+      cache read — ppr.render.abort attribution, #5106 review).
+    ?rescuePprErrors=true rescues the ppr_react_component raise in the template, simulating an
+      app-level rescue_from that turns a PPR failure into a 2xx page. %>
 <%
   fully_static = params[:fullyStatic] == "true"
   throw_async_error = params[:throwAsyncError] == "true"
+  page_cache_key =
+    if params[:raiseInCacheKey] == "true"
+      -> { raise "deliberate cache_key proc failure for PPR abort testing" }
+    else
+      ["PprPageForTesting", params[:cacheKey], fully_static, throw_async_error]
+    end
 %>
+<% begin %>
 <%= ppr_react_component(
   "PprPageForTesting",
-  cache_key: ["PprPageForTesting", params[:cacheKey], fully_static, throw_async_error],
+  cache_key: page_cache_key,
   cache_tags: ["ppr-page:#{params[:cacheKey].presence || 'default'}"],
   cache_options: { expires_in: 5.minutes },
   trace: true,
@@ -38,6 +49,10 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
     throwAsyncError: throw_async_error,
   }
 end %>
+<% rescue StandardError %>
+  <% raise unless params[:rescuePprErrors] == "true" %>
+  <h2>PPR invocation rescued for testing — the page still renders with a 2xx</h2>
+<% end %>
 <hr/>
 
 <h1>React on Rails Pro PPR (Partial Prerendering) Test Page</h1>

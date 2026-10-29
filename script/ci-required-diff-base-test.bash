@@ -214,6 +214,8 @@ run_case() {
     CI=1 \
       GITHUB_EVENT_NAME="$event_name" \
       GITHUB_OUTPUT="$WORKDIR/github-output.txt" \
+      GITHUB_BASE_REF="" \
+      GITHUB_HEAD_REF="" \
       PULL_REQUEST_BASE_SHA="$dispatch_base_sha" \
       PULL_REQUEST_HEAD_SHA="$pr_head_sha" \
       EVENT_BASE_REF="$event_base_ref" \
@@ -374,6 +376,8 @@ run_push_case() {
       GITHUB_OUTPUT="$WORKDIR/github-output.txt" \
       GIT_DIFF_BASE_FETCH_DEPTH=1 \
       GIT_DIFF_BASE_MAX_ATTEMPTS=1 \
+      GITHUB_BASE_REF="" \
+      GITHUB_HEAD_REF="" \
       PULL_REQUEST_BASE_SHA="" \
       PULL_REQUEST_HEAD_SHA="" \
       EVENT_BASE_REF="$event_base_ref" \
