@@ -36,7 +36,7 @@ import { useRSC } from './RSCProvider.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from './RSCRouteSuccessfulVersion.ts';
 import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import { isServerComponentFetchError, ServerComponentFetchError } from './ServerComponentFetchError.ts';
-import { createRSCPayloadKey } from './utils.ts';
+import { createRSCPayloadKey, createEmbeddedPayloadKey } from './utils.ts';
 
 /**
  * Error boundary component for RSCRoute that adds server component name and props to the error
@@ -415,6 +415,19 @@ function RSCRoute({
     throw new RSCRouteSSRFalseBailoutError(componentName);
   }
 
+  // PPR boundary-committed marker key (#5019-A). Uses the embedded payload key
+  // (componentName + props hash) so two RSCRoute instances with the same name but
+  // different props are distinguished. Falls back to componentName alone when
+  // props are not serializable (e.g., circular references) — this is safe because
+  // non-serializable props will also fail createRSCPayloadKey downstream, so the
+  // RSCRoute will error before the marker matters for cancellation.
+  let committedMarkerKey: string;
+  try {
+    committedMarkerKey = createEmbeddedPayloadKey(componentName, componentProps);
+  } catch {
+    committedMarkerKey = componentName;
+  }
+
   return (
     <>
       <RSCRouteContentWithErrorBoundary
@@ -423,14 +436,14 @@ function RSCRoute({
         componentProps={componentProps}
         onRefetchError={onRefetchError}
       />
-      {/* PPR boundary-committed marker (#5019-A). Fizz includes this in the prelude only when
-          the owning Suspense boundary resolves (content committed to the shell). When the
-          boundary is postponed, Fizz discards the content — including this marker — and
-          emits only the fallback. The PPR prerender path scans the prelude for these markers
-          to determine which RSC streams belong to committed boundaries and must be kept in
-          the cached shell. Streams whose marker is absent are cancelled.
+      {/* Fizz includes this in the prelude only when the owning Suspense boundary
+          resolves (content committed to the shell). When the boundary is postponed,
+          Fizz discards the content — including this marker — and emits only the
+          fallback. The PPR prerender path scans the prelude for these markers to
+          determine which RSC streams belong to committed boundaries and must be kept
+          in the cached shell. Streams whose marker is absent are cancelled.
           Rendered on both server and client for hydration parity (inert on the client). */}
-      <span data-rsc-committed={componentName} style={{ display: 'none' }} />
+      <span data-rsc-committed={committedMarkerKey} style={{ display: 'none' }} />
     </>
   );
 }

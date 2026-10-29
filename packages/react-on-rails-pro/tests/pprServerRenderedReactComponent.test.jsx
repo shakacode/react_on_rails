@@ -32,6 +32,7 @@ import {
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
+import { createEmbeddedPayloadKey } from '../src/utils.ts';
 // Registers the PPR APIs from react-dom, exactly like an app's server bundle entry does — the
 // registry is the only source the renderers load from.
 import '../src/pprSupport.ts';
@@ -104,7 +105,12 @@ const PprShellWithRSCHole = (props, railsContext) => {
       <h1>{SHELL_HEADER_TEXT}</h1>
       <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
         {/* Boundary-committed marker inside the Suspense — discarded when postponed (#5019-A) */}
-        <span data-rsc-committed="PostponedRSCComponent" style={{ display: 'none' }} />
+        <span
+          data-rsc-committed={createEmbeddedPayloadKey('PostponedRSCComponent', {
+            marker: RSC_PAYLOAD_MARKER,
+          })}
+          style={{ display: 'none' }}
+        />
         <DelayedHole {...props} />
       </React.Suspense>
     </div>
@@ -141,10 +147,16 @@ const PprShellWithMixedRSC = (props, railsContext) => {
     <div>
       <h1>{SHELL_HEADER_TEXT}</h1>
       {/* FastRSCComponent marker OUTSIDE the Suspense — always committed to shell */}
-      <span data-rsc-committed="FastRSCComponent" style={{ display: 'none' }} />
+      <span
+        data-rsc-committed={createEmbeddedPayloadKey('FastRSCComponent', { type: 'fast' })}
+        style={{ display: 'none' }}
+      />
       <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
         {/* SlowRSCComponent marker INSIDE the Suspense — discarded when postponed */}
-        <span data-rsc-committed="SlowRSCComponent" style={{ display: 'none' }} />
+        <span
+          data-rsc-committed={createEmbeddedPayloadKey('SlowRSCComponent', { type: 'slow' })}
+          style={{ display: 'none' }}
+        />
         <DelayedHole {...props} />
       </React.Suspense>
     </div>

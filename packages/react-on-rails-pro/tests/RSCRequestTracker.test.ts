@@ -26,6 +26,7 @@ import type {
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 import transformRSCStream from '../src/transformRSCNodeStream.ts';
+import { createEmbeddedPayloadKey } from '../src/utils.ts';
 import { flushMacrotasks } from './testUtils.ts';
 
 const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 16KB
@@ -729,8 +730,8 @@ describe('RSCRequestTracker', () => {
       expect(() => tracker.clear()).not.toThrow();
     });
 
-    it('cancels a completed stream when committedComponentNames excludes it', async () => {
-      // A stream whose source completed (readableEnded=true) but whose component name
+    it('cancels a completed stream when committedKeys excludes it', async () => {
+      // A stream whose source completed (readableEnded=true) but whose payload key
       // is NOT in the committed set — the boundary was postponed despite the RSC fetch
       // completing. The stream must be cancelled to prevent per-user data leaking into
       // the shared cache (#5019-A readableEnded heuristic gap).
@@ -745,8 +746,9 @@ describe('RSCRequestTracker', () => {
       source.push(null);
       await new Promise<void>((resolve) => source.once('end', resolve));
 
-      // Cancel with a committed set that does NOT include this component
-      tracker.cancelInFlightStreams(new Set(['OtherComponent']));
+      // Cancel with a committed set that does NOT include this component's payload key
+      const otherKey = createEmbeddedPayloadKey('OtherComponent', {});
+      tracker.cancelInFlightStreams(new Set([otherKey]));
 
       // The source should be destroyed despite readableEnded=true
       expect(source.destroyed).toBe(true);
@@ -759,7 +761,7 @@ describe('RSCRequestTracker', () => {
       }
     });
 
-    it('keeps a completed stream when committedComponentNames includes it', async () => {
+    it('keeps a completed stream when committedKeys includes it', async () => {
       const source = setupSourceStream();
       const tracker = createTracker();
 
@@ -770,8 +772,9 @@ describe('RSCRequestTracker', () => {
       source.push(null);
       await new Promise<void>((resolve) => source.once('end', resolve));
 
-      // Cancel with a committed set that INCLUDES this component
-      tracker.cancelInFlightStreams(new Set(['CommittedRoute']));
+      // Cancel with a committed set that INCLUDES this component's payload key
+      const committedKey = createEmbeddedPayloadKey('CommittedRoute', {});
+      tracker.cancelInFlightStreams(new Set([committedKey]));
 
       // Source should NOT be destroyed — its data belongs in the shell
       expect(source.destroyed).toBe(false);
@@ -779,7 +782,7 @@ describe('RSCRequestTracker', () => {
       expect(data.toString()).toContain('STATIC_DATA');
     });
 
-    it('cancels ALL streams when committedComponentNames is empty (all boundaries postponed)', async () => {
+    it('cancels ALL streams when committedKeys is empty (all boundaries postponed)', async () => {
       // When all RSCRoute boundaries are postponed, all markers land inside hidden divs,
       // the committed set is empty, and ALL streams must be cancelled — even completed ones.
       const source = setupSourceStream();
@@ -804,6 +807,98 @@ describe('RSCRequestTracker', () => {
       expect(trackedStream).toBeDefined();
       const trackedData = await collectStreamData(trackedStream!);
       expect(trackedData.toString()).not.toContain('SHOULD_BE_CANCELLED');
+    });
+
+    it('distinguishes two instances of the same component with different props (#5019-A)', async () => {
+      // Two RSCRoute instances share the same componentName but differ in props. One
+      // boundary commits (its marker is in the committed set), the other is postponed.
+      // Only the committed instance's stream should be kept.
+      const committedSource = new PassThrough();
+      const postponedSource = new PassThrough();
+
+      (globalThis as any).generateRSCPayload = jest
+        .fn()
+        .mockResolvedValueOnce(committedSource)
+        .mockResolvedValueOnce(postponedSource);
+
+      const tracker = createTracker();
+
+      const committedProps = { userId: 'public' };
+      const postponedProps = { userId: 'secret-user-123' };
+
+      const stream1Committed = await tracker.getRSCPayloadStream('SharedName', committedProps);
+      const stream1Postponed = await tracker.getRSCPayloadStream('SharedName', postponedProps);
+
+      // Attach 'end' listeners BEFORE pushing null — once in flowing mode (on('data')
+      // attached by getRSCPayloadStream), 'end' can fire synchronously with push(null).
+      const committedEnded = new Promise<void>((resolve) => committedSource.once('end', resolve));
+      const postponedEnded = new Promise<void>((resolve) => postponedSource.once('end', resolve));
+
+      // Both sources complete before cancellation
+      committedSource.push(toLengthPrefixedPayload('PUBLIC_DATA'));
+      committedSource.push(null);
+      postponedSource.push(toLengthPrefixedPayload('SECRET_DATA'));
+      postponedSource.push(null);
+      await committedEnded;
+      await postponedEnded;
+
+      // Only the committed instance's payload key is in the set
+      const committedKey = createEmbeddedPayloadKey('SharedName', committedProps);
+      tracker.cancelInFlightStreams(new Set([committedKey]));
+
+      // Committed stream preserved
+      const committedData = await collectStreamData(stream1Committed);
+      expect(committedData.toString()).toContain('PUBLIC_DATA');
+
+      // Postponed stream cancelled — different props produce a different key
+      const postponedTrackedStream = tracker.getRSCPayloadStreams()[1]?.stream;
+      if (postponedTrackedStream) {
+        const postponedData = await collectStreamData(postponedTrackedStream);
+        expect(postponedData.toString()).not.toContain('SECRET_DATA');
+      }
+    });
+
+    it('drains tee for auto-destroyed source whose boundary was postponed (#5019-A)', async () => {
+      // In production, RSC sources (HTTP response streams) auto-destroy after EOF.
+      // Node's Readable has autoDestroy: true by default, so a source that completes
+      // naturally ends up with source.destroyed = true. If that boundary was postponed
+      // (RSC data arrived but the boundary was suspended for another reason), the old
+      // guard `!source.destroyed` would skip the tee drain, leaking buffered data into
+      // the shell.
+      //
+      // PassThrough (Transform) does NOT auto-destroy after push(null) alone — it
+      // needs both sides to finish. We simulate real auto-destroy by explicitly
+      // destroying the source after it ends, matching HTTP response stream behavior.
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('AutoDestroyedPostponed', {});
+
+      // Attach 'end' listener BEFORE pushing
+      const ended = new Promise<void>((resolve) => source.once('end', resolve));
+
+      // Push data and end the source
+      const payload = toLengthPrefixedPayload('LEAKED_DATA');
+      source.push(payload);
+      source.push(null);
+      await ended;
+
+      // Simulate auto-destroy (as real Readable streams do after EOF)
+      source.destroy();
+      // Let the 'close' event propagate (which calls tee.end() via the close handler)
+      await new Promise<void>((resolve) => source.once('close', resolve));
+
+      expect(source.readableEnded).toBe(true);
+      expect(source.destroyed).toBe(true);
+
+      // Cancel with empty committed set — this boundary was postponed
+      tracker.cancelInFlightStreams(new Set());
+
+      // The tee must have been drained despite the source being already destroyed
+      const trackedStream = tracker.getRSCPayloadStreams()[0]?.stream;
+      expect(trackedStream).toBeDefined();
+      const trackedData = await collectStreamData(trackedStream!);
+      expect(trackedData.toString()).not.toContain('LEAKED_DATA');
     });
 
     it('does not crash when source had pre-buffered data before on("data") was attached', async () => {

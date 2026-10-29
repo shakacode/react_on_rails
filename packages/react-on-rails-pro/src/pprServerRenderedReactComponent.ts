@@ -377,9 +377,11 @@ const pprPrerenderRenderReactComponent = (
         // PPR #5019-A: when the prerender has postponed boundaries, cancel RSC streams that
         // should NOT be in the cached shell. To determine which streams belong to committed
         // (non-postponed) boundaries, we buffer the prelude HTML and scan for boundary-committed
-        // markers emitted by RSCRoute (<span data-rsc-committed="ComponentName">). Fizz includes
+        // markers emitted by RSCRoute (<span data-rsc-committed="PayloadKey">). Fizz includes
         // these markers only when the RSCRoute's Suspense boundary resolves — when postponed,
-        // the marker is discarded with the boundary's content.
+        // the marker is discarded with the boundary's content. Each marker value is a payload
+        // key (componentName + props hash), not just the componentName, so two instances of the
+        // same component with different props are correctly distinguished.
         //
         // This replaces the readableEnded-only heuristic, which missed the edge case where an
         // RSC stream completes but the boundary is postponed for another reason (e.g., a sibling
@@ -397,10 +399,13 @@ const pprPrerenderRenderReactComponent = (
           });
           const preludeHtml = Buffer.concat(preludeChunks).toString('utf-8');
 
-          // Extract component names from RSCRoute boundary-committed markers, excluding
-          // markers inside React PPR's hidden divs (<div hidden id="...S:N">) which hold
-          // the rendered-but-discarded content of postponed boundaries.
-          const committedNames = new Set<string>();
+          // Extract committed payload keys from RSCRoute boundary-committed markers,
+          // excluding markers inside React PPR's hidden divs (<div hidden id="...S:N">)
+          // which hold the rendered-but-discarded content of postponed boundaries.
+          // Each marker value is an embedded payload key (componentName + props hash),
+          // so two RSCRoute instances with the same name but different props are
+          // distinguished (#5019-A).
+          const committedKeys = new Set<string>();
 
           // First, find the byte ranges of hidden postponed-content divs.
           const hiddenRanges: Array<[number, number]> = [];
@@ -434,11 +439,11 @@ const pprPrerenderRenderReactComponent = (
             const markerPos = markerMatch.index;
             const isInsideHiddenDiv = hiddenRanges.some(([s, e]) => markerPos >= s && markerPos < e);
             if (!isInsideHiddenDiv) {
-              committedNames.add(markerMatch[1]);
+              committedKeys.add(markerMatch[1]);
             }
           }
 
-          streamingTrackers.rscRequestTracker.cancelInFlightStreams(committedNames);
+          streamingTrackers.rscRequestTracker.cancelInFlightStreams(committedKeys);
 
           // Re-create a Readable from the buffered HTML for injectRSCPayload.
           preludeForInjection = Readable.from(Buffer.from(preludeHtml, 'utf-8'));
