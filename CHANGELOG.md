@@ -121,6 +121,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `react-server-dom-webpack` together, so a retained lockfile cannot keep the vulnerable copy.
   [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Doctor's `react-server-dom-webpack` check no longer skips pnpm tarball, git, or `file:` copies**:
+  `pnpm-lock.yaml` copies installed from a tarball URL, a git repository, or a local file, and pnpm 5 copies from a
+  non-default registry, are now read too. Doctor warns that it cannot tell whether a non-registry copy includes the
+  fixes, instead of reporting the lockfile as not affected.
+  [PR 5275](https://github.com/shakacode/react_on_rails/pull/5275) by [justin808](https://github.com/justin808).
+
 ### [17.2.0] - 2026-10-13
 
 #### Changed

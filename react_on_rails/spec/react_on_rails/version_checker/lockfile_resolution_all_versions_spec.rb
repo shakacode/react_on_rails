@@ -82,6 +82,48 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       expect(versions_in("pnpm-lock.yaml" => pnpm5)).to eq(["19.0.1"])
     end
 
+    it "keeps pnpm tarball, git, and file copies so they are not skipped" do
+      lockfile = <<~YAML
+        lockfileVersion: '9.0'
+        importers:
+          .: {}
+        packages:
+          react-server-dom-webpack@19.3.1:
+            resolution: {integrity: sha512-abc}
+          react-server-dom-webpack@https://example.com/react-server-dom-webpack-19.3.0.tgz:
+            resolution: {tarball: https://example.com/react-server-dom-webpack-19.3.0.tgz}
+          react-server-dom-webpack@https://codeload.github.com/react/react/tar.gz/abc123:
+            resolution: {tarball: https://codeload.github.com/react/react/tar.gz/abc123}
+          react-server-dom-webpack@file:vendor/react-server-dom-webpack.tgz:
+            resolution: {integrity: sha512-def, tarball: file:vendor/react-server-dom-webpack.tgz}
+        snapshots:
+          react-server-dom-webpack@https://example.com/react-server-dom-webpack-19.3.0.tgz(react@19.3.0):
+            dependencies:
+              react: 19.3.0
+      YAML
+
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
+        "19.3.1",
+        "https://example.com/react-server-dom-webpack-19.3.0.tgz",
+        "https://codeload.github.com/react/react/tar.gz/abc123",
+        "file:vendor/react-server-dom-webpack.tgz"
+      )
+    end
+
+    it "reads pnpm 5 package keys that start with a registry host" do
+      lockfile = <<~YAML
+        lockfileVersion: 5.4
+        dependencies: {}
+        packages:
+          registry.example.com/react-server-dom-webpack/19.3.0_react@19.3.0:
+            resolution: {integrity: sha512-abc}
+          registry.example.com/react-server-dom-webpack-extra/1.0.0:
+            resolution: {integrity: sha512-def}
+      YAML
+
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to eq(["19.3.0"])
+    end
+
     it "collects every Yarn classic block, including merged selectors" do
       lockfile = <<~LOCK
         # yarn lockfile v1

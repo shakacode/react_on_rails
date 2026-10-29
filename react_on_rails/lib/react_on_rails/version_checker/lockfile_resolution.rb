@@ -93,18 +93,21 @@ module ReactOnRails
 
         # Keys under packages/snapshots name every installed copy:
         #   9.0: "name@1.2.3" or "name@1.2.3(peer@4.5.6)"; 6.0: "/name@1.2.3(...)"; 5.x: "/name/1.2.3_peer@4.5.6"
+        #   5.x from a non-default registry: "registry.example.com/name/1.2.3"
+        # Tarball, git, and file: copies ("name@https://...tgz(peer@4.5.6)") keep their resolution, so callers
+        # report them as unknown instead of skipping them.
         def self.all_versions(path, package_name)
           doc = project_document(path)
           return [] unless doc
 
           keys = %w[packages snapshots].flat_map { |section| doc[section].is_a?(Hash) ? doc[section].keys : [] }
+          key_pattern = %r{\A/?(?:[^/@]+\.[^/@]+/)?#{Regexp.escape(package_name)}[@/](.+)\z}
           keys.filter_map do |key|
-            key = key.to_s.delete_prefix("/")
-            rest = [key.delete_prefix("#{package_name}@"), key.delete_prefix("#{package_name}/")].find do |candidate|
-              candidate != key
-            end
-            strip_peer_suffix(rest) if rest&.match?(/\A\d/)
-          end
+            rest = key.to_s[key_pattern, 1]
+            next unless rest
+
+            rest.match?(/\A\d/) ? strip_peer_suffix(rest) : rest.sub(/\(.*\z/, "")
+          end.uniq
         end
 
         def self.dependencies(doc)
