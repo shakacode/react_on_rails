@@ -94,40 +94,63 @@ module DemoFleetUpgrade
     end
   end
 
-  # Rewrites version strings for named packages anywhere in a package.json
-  # (dependencies, devDependencies, overrides, resolutions, pnpm.overrides).
+  # Rewrites version strings for named packages in a package.json's dependency sections
+  # (dependencies, devDependencies, optionalDependencies, overrides, resolutions, pnpm.overrides).
+  # Edits stay textual so formatting survives; the parsed JSON decides which entries are pins.
   module PackageJsonEditor
     module_function
 
     PROTOCOL_PREFIX = /\A(?:workspace|file|link|portal|npm|git|github|https?):/
-    # A dependency spec: a version (optionally with a range operator) or a protocol pin. Other
-    # values under the same key, such as a "scripts" command, are not pins and are left alone.
-    SPEC = /\A(?:[~^=<>]*\s*v?\d[\w.+-]*|(?:workspace|file|link|portal|npm|git|github|https?):.*)\z/
+    # A pin the script can replace: an exact version, optionally with ^, ~ or =.
+    PINNABLE = /\A[~^=]?\s*v?\d+\.\d+\.\d+[\w.+-]*\z/
+    DEPENDENCY_SECTIONS = %w[dependencies devDependencies optionalDependencies].freeze
+    OVERRIDE_SECTIONS = [%w[overrides], %w[resolutions], %w[pnpm overrides]].freeze
 
-    def declares?(text, names)
-      names.any? { |name| text.scan(entry_pattern(name)).any? { |_prefix, value, _suffix| value.match?(SPEC) } }
-    end
+    def declares?(text, names) = names.any? { |name| dependency_values(text).key?(name) }
 
     def entry_pattern(name) = /("#{Regexp.escape(name)}"\s*:\s*")([^"]*)(")/
 
     def rewrite(text, pins)
       changes = []
       errors = []
+      values = dependency_values(text)
       new_text = pins.reduce(text) do |current, (name, target)|
         current.gsub(entry_pattern(name)) do
           prefix, value, suffix = Regexp.last_match.captures
-          if !value.match?(SPEC)
-            "#{prefix}#{value}#{suffix}"
-          elsif value.match?(PROTOCOL_PREFIX)
+          next "#{prefix}#{value}#{suffix}" unless values.fetch(name, []).include?(value)
+
+          unless value.match?(PINNABLE)
             errors << "package.json sets #{name} to #{value}; update it by hand"
-            "#{prefix}#{value}#{suffix}"
-          else
-            changes << [name, value, target] unless value == target
-            "#{prefix}#{target}#{suffix}"
+            next "#{prefix}#{value}#{suffix}"
           end
+          changes << [name, value, target] unless value == target
+          "#{prefix}#{target}#{suffix}"
         end
       end
       [new_text, changes, errors]
+    rescue JSON::ParserError => e
+      [text, [], ["package.json does not parse (#{e.message.lines.first.strip}); update it by hand"]]
+    end
+
+    # Every string value per package name found in a dependency or override section.
+    def dependency_values(text)
+      json = JSON.parse(text)
+      values = Hash.new { |hash, key| hash[key] = [] }
+      DEPENDENCY_SECTIONS.each { |section| collect(json[section], values, nested: false) }
+      OVERRIDE_SECTIONS.each { |path| collect(json.dig(*path), values, nested: true) }
+      values
+    end
+
+    def collect(section, values, nested:)
+      return unless section.is_a?(Hash)
+
+      section.each do |name, value|
+        if value.is_a?(String)
+          values[name] << value
+        elsif nested && value.is_a?(Hash)
+          collect(value, values, nested: true)
+        end
+      end
     end
   end
 

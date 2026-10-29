@@ -120,6 +120,26 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     refute DemoFleetUpgrade::PackageJsonEditor.declares?(text, npm.keys)
   end
 
+  def test_package_json_reports_ranges_and_tags_it_cannot_pin
+    npm = %w[react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer].to_h { |n| [n, "17.2.1-rc.1"] }
+    [">=17.0.0 <18.0.0", "latest", "*"].each do |spec|
+      text = %({ "dependencies": { "react-on-rails": "#{spec}" } }\n)
+      new_text, changes, errors = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, npm)
+
+      assert_equal text, new_text, spec
+      assert_empty changes, spec
+      assert_match(/sets react-on-rails to #{Regexp.escape(spec)}; update it by hand/, errors.first, spec)
+    end
+  end
+
+  def test_package_json_rewrites_nested_npm_overrides
+    text = %({ "overrides": { "react-on-rails-pro": { "react-on-rails": "^17.2.0" } } }\n)
+    new_text, changes, = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, { "react-on-rails" => "17.2.1-rc.1" })
+
+    assert_includes new_text, %("react-on-rails": "17.2.1-rc.1")
+    assert_equal [%w[react-on-rails ^17.2.0 17.2.1-rc.1]], changes
+  end
+
   def test_unfiltered_selection_lists_each_repo_once
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" },
                                                           { "name" => "shakacode/demo-a" }])
