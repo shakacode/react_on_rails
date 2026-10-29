@@ -6181,6 +6181,9 @@ describe InstallGenerator, type: :generator do
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("React 19.3.0 is below the recommended minimum")
       expect(warning_text).to include("react@19.3.1 react-dom@19.3.1 react-server-dom-webpack@19.3.1")
+      expect(warning_text.tr("\n", " ")).to include("react-server-dom-webpack below 19.3.1 on the 19.3.x line")
+      expect(warning_text).to include("nested under react-on-rails-rsc stays behind")
+      expect(warning_text).to include("npm `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`")
       expect(warning_text).to include("commit the refreshed lockfile")
     end
   end
@@ -6197,6 +6200,8 @@ describe InstallGenerator, type: :generator do
       expect(warning_text).to include("detected: 19.2.7")
       expect(warning_text).to include("This generator installs react-on-rails-rsc@19.3.1")
       expect(warning_text).to include("react@~19.3.1 react-dom@~19.3.1 react-server-dom-webpack@~19.3.1")
+      expect(warning_text.tr("\n", " ")).to include("react-server-dom-webpack below 19.3.1 on the 19.3.x line")
+      expect(warning_text).to include("npm `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`")
       expect(warning_text).not_to include("patch >=")
     end
   end
@@ -6237,7 +6242,17 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("below the recommended minimum")
+      expect(warning_text).to include("Upgrade all three together to 19.3.2")
       expect(warning_text).to include("react@19.3.2 react-dom@19.3.2 react-server-dom-webpack@19.3.2")
+      # A raised floor must not move the dated advisory claim.
+      expect(warning_text.tr("\n", " ")).to include("react-server-dom-webpack below 19.3.1 on the 19.3.x line")
+      expect(warning_text).not_to include("below 19.3.2")
+    end
+
+    specify "the dated advisory sentence still describes the supported React line" do
+      # When the supported line leaves 19.3, drop the advisory sentence from both RSC warnings.
+      expect(ReactOnRails::Generators::RscSetup::RSC_ADVISORY_REACT_LINE)
+        .to eq(ReactOnRails::Generators::RscSetup::RSC_SUPPORTED_REACT_LINE)
     end
   end
 
