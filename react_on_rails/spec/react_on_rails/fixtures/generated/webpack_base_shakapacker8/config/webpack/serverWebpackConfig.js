@@ -83,9 +83,18 @@ const configureServer = () => {
 
 
   // Don't hash the server bundle b/c would conflict with the client manifest
-  // And no need for the MiniCssExtractPlugin
+  // And no need for the CSS extraction plugin (MiniCssExtractPlugin or CssExtractRspackPlugin)
+  // Rspack's plugins are matched by class because rspack-manifest-plugin names its
+  // class WebpackManifestPlugin (exported as RspackManifestPlugin).
+  const { RspackManifestPlugin } = config.assets_bundler === 'rspack'
+    ? require('rspack-manifest-plugin')
+    : {};
+  const isRspackClientOnlyPlugin = (plugin) =>
+    (RspackManifestPlugin && plugin instanceof RspackManifestPlugin) ||
+    (bundler.CssExtractRspackPlugin && plugin instanceof bundler.CssExtractRspackPlugin);
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
+      !isRspackClientOnlyPlugin(plugin) &&
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',
