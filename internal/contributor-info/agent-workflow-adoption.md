@@ -23,15 +23,30 @@ Do not copy Shaka's schema, key lists, or defaults into this repository.
 
 ## Retired Agent Workflows Content
 
-React on Rails no longer syncs files from `shakacode/agent-workflows`. The
-drift manifest and its pinned-pack CI check are gone. Vendored pack copies still
-in `.agents/` are no longer verified against upstream; follow-up PRs remove
-them together with their remaining callers.
+React on Rails no longer uses `shakacode/agent-workflows`. The drift manifest,
+its pinned-pack CI check, and the vendored workflow, doc, and helper copies are
+gone, and so is the `agent-coord` coordination backend those copies relied on. The one
+helper React on Rails still needs is repo-owned:
+`.agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs`.
 
-Until then, treat `.agents/docs/*.md` and `.agents/workflows/*.md` as historical.
-Their instructions to run `.agents/bin/agent-workflow-drift-manifest-test.rb`,
-`check-agent-workflow-drift`, or `.agents/agent-workflow-drift.yml` describe the
-retired drift check and no longer apply.
+## What Retires And What Replaces It
+
+| Retired agent-workflows item                                                      | Replacement                                                                                                | Not replaced                                                                                                    |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `pr-processing` workflow                                                          | Shaka delivery (`/shaka`): claim, validation, local review, publication, merge decision                    | Nothing                                                                                                         |
+| `address-review` skill and workflow                                               | Shaka review phase: trusted `comments`, `reply`, `resolve`                                                 | Nothing                                                                                                         |
+| `adversarial-pr-review` skill and workflow                                        | Shaka local adversarial review (`shaka review run`)                                                        | Nothing                                                                                                         |
+| `tdd` workflow, `verify-pr-fix` skill                                             | Shaka implement rule: reproduce first, smallest fix, rerun the same check                                  | Separate evidence-posting flow for manual fix verification                                                      |
+| `evaluate-issue` skill and workflow                                               | Shaka value checkpoint plus `internal/contributor-info/issue-evaluation.md`                                | Nothing                                                                                                         |
+| `update-changelog` skill                                                          | Repo-local `$react-on-rails-update-changelog`; a follow-up PR extends it from release branches to mainline | Nothing                                                                                                         |
+| `pr-batch`, `plan-pr-batch` skills and their helpers                              | Shaka control towers (`$rct`, `$mct`) select work and start one Shaka delivery per task                    | Batch goal prompts, Sol/Terra model routing, batch cancellation protocol, file-touch maps, dispatcher preflight |
+| `plan-issue-triage`, `triage` skills                                              | None                                                                                                       | Review-only all-issue audits and generated dependency graphs                                                    |
+| `post-merge-audit` skill, `closeout-evidence-replay`                              | Shaka reviews-after-merge for each merged PR                                                               | Cross-PR batch audits and `qa-evidence` marker replay                                                           |
+| `continuous-evaluation-loop` workflow                                             | None                                                                                                       | Recurring evaluation loop                                                                                       |
+| `pr-security-preflight --strict-trust`                                            | Shaka trusted-actor filtering of public comments, plus the `AGENTS.md` trust rules                         | Pre-launch trust check of assigned issue and PR targets                                                         |
+| Drift manifest and pinned-pack CI check                                           | Shaka seam validation in required CI                                                                       | Nothing; the copies are gone                                                                                    |
+| `codex-claim` public comment fallback                                             | Shaka `claim`, as advisory evidence                                                                        | Nothing                                                                                                         |
+| `agent-coord` backend, `agent-coord-bounded`, release-line lease, published phase | Shaka `claim`; phase from the target branch and tracker mode; one active release lane at a time            | Cross-machine claims, heartbeats, and batch cancellation state                                                  |
 
 ## Validation
 
