@@ -69,6 +69,13 @@ module ReactOnRailsProHelper
     "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_PREFIX)}(#{CSP_NONCE_VALUE_SHAPE})" \
     "#{Regexp.escape(CACHED_CSP_NONCE_MARKER_SUFFIX)}\\z"
   )
+
+  # Suffix appended to a component cache key to form the sidecar key that stores
+  # httpResponse metadata. The sidecar is written alongside the main cache entry
+  # and read back on cache hits so SsrStatusHandler can set the HTTP status. The
+  # main cache entry is never modified — this avoids breaking raw: true caches,
+  # async paths, and existing tests that inspect the cached value. See #5125.
+  SSR_HTTP_RESPONSE_CACHE_SUFFIX = ":ssr_hr"
   # Mirrors the accepted shape in packages/react-on-rails/src/sanitizeNonce.ts —
   # base64/base64url characters with optional trailing `=` padding — but validates the
   # original value as-is. Never strip-then-validate: a stripped derivative can pass the
@@ -619,7 +626,9 @@ module ReactOnRailsProHelper
     end
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+      write_http_response_sidecar(cache_key, cache_write_options)
     end
+    read_http_response_sidecar(cache_key, cache_write_options) if cache_hit
     load_pack_for_cached_react_component(component_name, options) if cache_hit
     result = restamp_fetched_cache_entry(result, cache_hit, csp_nonce_placeholder)
 
@@ -648,6 +657,13 @@ module ReactOnRailsProHelper
         rendered_result = with_csp_nonce_placeholder do |placeholder|
           csp_nonce_placeholder = placeholder
           append_cached_csp_nonce_marker(yield, placeholder)
+        end
+
+        # Never cache 5xx error responses — the next request should retry rendering
+        # and may succeed (e.g. a transient downstream failure).
+        if current_http_response_server_error?
+          cache_write_skipped = true
+          throw(skip_cache_write, rendered_result)
         end
         next rendered_result unless cache_write_if && !cache_write_if.call
 
@@ -841,6 +857,56 @@ module ReactOnRailsProHelper
     return [hash, nil] unless nonce
 
     [hash.merge(ReactOnRails::Helper::COMPONENT_HTML_KEY => html), nonce]
+  end
+
+  # Writes the per-component httpResponse metadata to a sidecar cache key alongside
+  # the main component cache entry. The sidecar is read on cache hits so
+  # SsrStatusHandler can set the HTTP status. The main cache value is never modified.
+  # Does not write for 5xx (those are not cached). See issue #5125.
+  #
+  # Accepts an explicit +http_response+ hash to avoid reading the shared
+  # request.env[CURRENT_ENV_KEY] slot, which is unsafe under Async::Barrier
+  # concurrency (multiple tasks overwrite the same slot). When +http_response+
+  # is nil, falls back to the request.env slot for callers that have not been
+  # migrated yet.
+  def write_http_response_sidecar(cache_key, cache_write_options, http_response: nil)
+    hr = http_response
+    if hr.nil? && defined?(request) && request.respond_to?(:env)
+      hr = request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
+    end
+    return unless hr.is_a?(Hash)
+
+    sidecar_key = "#{cache_key}#{SSR_HTTP_RESPONSE_CACHE_SUFFIX}"
+    # Strip :raw from the sidecar options — the sidecar value is a Hash that
+    # must be Marshal-serialized, not written as a raw string. The main cache
+    # entry may use raw: true, but the sidecar never should.
+    sidecar_options = (cache_write_options || {}).except(:raw)
+    Rails.cache.write(sidecar_key, hr, sidecar_options)
+  end
+
+  # Reads httpResponse metadata from the sidecar cache key and replays it into
+  # request.env so SsrStatusHandler can set the HTTP status on cache hits.
+  def read_http_response_sidecar(cache_key, cache_write_options)
+    sidecar_key = "#{cache_key}#{SSR_HTTP_RESPONSE_CACHE_SUFFIX}"
+    # Strip :raw for the same reason as in write_http_response_sidecar.
+    sidecar_options = (cache_write_options || {}).except(:raw)
+    hr = Rails.cache.read(sidecar_key, sidecar_options)
+    store_ssr_http_response({ "httpResponse" => hr }) if hr.is_a?(Hash)
+  end
+
+  # Returns true when the given httpResponse (or the current component's
+  # httpResponse from request.env) has a 5xx status. Checked inside
+  # fetch_cache_entry to skip caching server errors.
+  #
+  # Prefers the explicit +http_response+ parameter to avoid reading the shared
+  # request.env[CURRENT_ENV_KEY] slot, which is unsafe under Async::Barrier
+  # concurrency.
+  def current_http_response_server_error?(http_response: nil)
+    hr = http_response
+    if hr.nil? && defined?(request) && request.respond_to?(:env)
+      hr = request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
+    end
+    hr.is_a?(Hash) && hr["status"].is_a?(Integer) && hr["status"] >= 500
   end
 
   def extract_cached_csp_nonce_marker_from_html(html)
@@ -1276,7 +1342,9 @@ module ReactOnRailsProHelper
 
     unless cache_hit || cache_write_skipped
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+      write_http_response_sidecar(cache_key, cache_write_options)
     end
+    read_http_response_sidecar(cache_key, cache_write_options) if cache_hit
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
     cache_diagnostics[:hit] = cache_hit
@@ -2360,14 +2428,19 @@ module ReactOnRailsProHelper
     cached_result = Rails.cache.read(cache_key, cache_write_options)
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
-      load_pack_for_cached_react_component(component_name, cache_options)
-      cached_result, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_result)
-      normalized_result = normalize_cached_pro_attribution(cached_result, cached_csp_nonce)
-      return ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
+      return replay_async_cache_hit(component_name, cache_options, cache_key, cache_write_options, cached_result)
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
     render_async_react_component_with_cache(component_name, cache_options, cache_key, raw_cache_options, &)
+  end
+
+  def replay_async_cache_hit(component_name, cache_options, cache_key, cache_write_options, cached_result)
+    load_pack_for_cached_react_component(component_name, cache_options)
+    read_http_response_sidecar(cache_key, cache_write_options)
+    cached_result, cached_csp_nonce = extract_cached_csp_nonce_marker(cached_result)
+    normalized_result = normalize_cached_pro_attribution(cached_result, cached_csp_nonce)
+    ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
@@ -2404,8 +2477,18 @@ module ReactOnRailsProHelper
           rendered = react_component(component_name, options)
           unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
             cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-            Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
-            ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+            # Capture httpResponse from the task-local request.env slot immediately
+            # after react_component returns — before another concurrent async task
+            # can overwrite the shared CURRENT_ENV_KEY.
+            hr = defined?(request) && request.respond_to?(:env) &&
+                 request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
+            hr = nil unless hr.is_a?(Hash)
+            # Never cache 5xx error responses — the next request retries rendering.
+            unless current_http_response_server_error?(http_response: hr)
+              Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
+              ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+              write_http_response_sidecar(cache_key, cache_options, http_response: hr)
+            end
           end
           rendered
         end
