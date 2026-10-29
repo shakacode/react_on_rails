@@ -140,6 +140,23 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     assert_equal [%w[react-on-rails ^17.2.0 17.2.1-rc.1]], changes
   end
 
+  def test_package_json_rewrites_object_form_override
+    text = %({ "overrides": { "react-on-rails": { ".": "17.2.0", "react": "19.3.0" } } }\n)
+    new_text, changes, = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, { "react-on-rails" => "17.2.1-rc.1" })
+
+    assert_includes new_text, %(".": "17.2.1-rc.1")
+    assert_includes new_text, %("react": "19.3.0")
+    assert_equal [%w[react-on-rails 17.2.0 17.2.1-rc.1]], changes
+  end
+
+  def test_package_json_leaves_matching_values_outside_dependency_sections
+    text = %({ "dependencies": { "react-on-rails": "17.2.0" }, "config": { "react-on-rails": "17.2.0" } }\n)
+    new_text, = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, { "react-on-rails" => "17.2.1-rc.1" })
+
+    assert_equal %({ "dependencies": { "react-on-rails": "17.2.1-rc.1" }, "config": { "react-on-rails": "17.2.0" } }\n),
+                 new_text
+  end
+
   def test_unfiltered_selection_lists_each_repo_once
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" },
                                                           { "name" => "shakacode/demo-a" }])

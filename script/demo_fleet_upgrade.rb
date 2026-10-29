@@ -96,61 +96,109 @@ module DemoFleetUpgrade
 
   # Rewrites version strings for named packages in a package.json's dependency sections
   # (dependencies, devDependencies, optionalDependencies, overrides, resolutions, pnpm.overrides).
-  # Edits stay textual so formatting survives; the parsed JSON decides which entries are pins.
+  # A small scanner records each string value's JSON path and position, so edits touch only
+  # those entries and the rest of the file keeps its formatting.
   module PackageJsonEditor
     module_function
 
-    PROTOCOL_PREFIX = /\A(?:workspace|file|link|portal|npm|git|github|https?):/
     # A pin the script can replace: an exact version, optionally with ^, ~ or =.
     PINNABLE = /\A[~^=]?\s*v?\d+\.\d+\.\d+[\w.+-]*\z/
     DEPENDENCY_SECTIONS = %w[dependencies devDependencies optionalDependencies].freeze
     OVERRIDE_SECTIONS = [%w[overrides], %w[resolutions], %w[pnpm overrides]].freeze
 
-    def declares?(text, names) = names.any? { |name| dependency_values(text).key?(name) }
-
-    def entry_pattern(name) = /("#{Regexp.escape(name)}"\s*:\s*")([^"]*)(")/
+    def declares?(text, names) = names.any? { |name| entries(text, name).any? }
 
     def rewrite(text, pins)
       changes = []
       errors = []
-      values = dependency_values(text)
-      new_text = pins.reduce(text) do |current, (name, target)|
-        current.gsub(entry_pattern(name)) do
-          prefix, value, suffix = Regexp.last_match.captures
-          next "#{prefix}#{value}#{suffix}" unless values.fetch(name, []).include?(value)
-
+      edits = pins.flat_map do |name, target|
+        entries(text, name).filter_map do |value, from, to|
           unless value.match?(PINNABLE)
             errors << "package.json sets #{name} to #{value}; update it by hand"
-            next "#{prefix}#{value}#{suffix}"
+            next
           end
           changes << [name, value, target] unless value == target
-          "#{prefix}#{target}#{suffix}"
+          [from, to, target]
         end
       end
-      [new_text, changes, errors]
+      [apply_edits(text, edits), changes, errors]
     rescue JSON::ParserError => e
       [text, [], ["package.json does not parse (#{e.message.lines.first.strip}); update it by hand"]]
     end
 
-    # Every string value per package name found in a dependency or override section.
-    def dependency_values(text)
-      json = JSON.parse(text)
-      values = Hash.new { |hash, key| hash[key] = [] }
-      DEPENDENCY_SECTIONS.each { |section| collect(json[section], values, nested: false) }
-      OVERRIDE_SECTIONS.each { |path| collect(json.dig(*path), values, nested: true) }
+    # Applies [from, to, replacement] edits back to front so earlier offsets stay valid.
+    def apply_edits(text, edits)
+      edits.sort_by { |from, _to, _replacement| -from }.each_with_object(text.dup) do |(from, to, replacement), out|
+        out[from...to] = replacement
+      end
+    end
+
+    # [value, from, to] for each pin of the named package, where from...to spans the value's characters.
+    def entries(text, name)
+      JSON.parse(text)
+      string_values(text).filter_map do |path, value, from, to|
+        [value, from, to] if pin_path?(path, name)
+      end
+    end
+
+    def pin_path?(path, name)
+      return path.size == 2 && path.last == name if DEPENDENCY_SECTIONS.include?(path.first)
+
+      override_path?(path, name)
+    end
+
+    def override_path?(path, name)
+      section = OVERRIDE_SECTIONS.find { |prefix| path.first(prefix.size) == prefix }
+      return false unless section && path.size > section.size
+
+      # npm's object form keeps a package's own version under ".".
+      key = path.last == "." ? path[-2] : path.last
+      key == name || (path.first == "resolutions" && key.to_s.end_with?("/#{name}"))
+    end
+
+    # Yields [path, value, from, to] for every string value; path holds object keys and array indexes.
+    def string_values(text)
+      values = []
+      stack = []
+      index = 0
+      while index < text.length
+        if text[index] == '"'
+          index = read_string(text, index, stack, values)
+        else
+          track_structure(text[index], stack)
+        end
+        index += 1
+      end
       values
     end
 
-    def collect(section, values, nested:)
-      return unless section.is_a?(Hash)
-
-      section.each do |name, value|
-        if value.is_a?(String)
-          values[name] << value
-        elsif nested && value.is_a?(Hash)
-          collect(value, values, nested: true)
-        end
+    # Pushes, pops, and advances the stack of [kind, key-or-index] frames.
+    def track_structure(char, stack)
+      case char
+      when "{" then stack << [:object, nil]
+      when "[" then stack << [:array, 0]
+      when "}", "]" then stack.pop
+      when "," then stack.last[1] = stack.last[0] == :array ? stack.last[1] + 1 : nil
       end
+    end
+
+    # Records a string as the open object's key, or as a value at the current path; returns its closing offset.
+    def read_string(text, opening, stack, values)
+      closing = string_end(text, opening)
+      value = JSON.parse(text[opening..closing])
+      frame = stack.last
+      if frame && frame[0] == :object && frame[1].nil?
+        frame[1] = value
+      else
+        values << [stack.map(&:last), value, opening + 1, closing]
+      end
+      closing
+    end
+
+    def string_end(text, opening)
+      index = opening + 1
+      index += text[index] == "\\" ? 2 : 1 until text[index] == '"'
+      index
     end
   end
 
