@@ -100,16 +100,25 @@ module DemoFleetUpgrade
     module_function
 
     PROTOCOL_PREFIX = /\A(?:workspace|file|link|portal|npm|git|github|https?):/
+    # A dependency spec: a version (optionally with a range operator) or a protocol pin. Other
+    # values under the same key, such as a "scripts" command, are not pins and are left alone.
+    SPEC = /\A(?:[~^=<>]*\s*v?\d[\w.+-]*|(?:workspace|file|link|portal|npm|git|github|https?):.*)\z/
 
-    def declares?(text, names) = names.any? { |name| text.match?(/"#{Regexp.escape(name)}"\s*:/) }
+    def declares?(text, names)
+      names.any? { |name| text.scan(entry_pattern(name)).any? { |_prefix, value, _suffix| value.match?(SPEC) } }
+    end
+
+    def entry_pattern(name) = /("#{Regexp.escape(name)}"\s*:\s*")([^"]*)(")/
 
     def rewrite(text, pins)
       changes = []
       errors = []
       new_text = pins.reduce(text) do |current, (name, target)|
-        current.gsub(/("#{Regexp.escape(name)}"\s*:\s*")([^"]*)(")/) do
+        current.gsub(entry_pattern(name)) do
           prefix, value, suffix = Regexp.last_match.captures
-          if value.match?(PROTOCOL_PREFIX)
+          if !value.match?(SPEC)
+            "#{prefix}#{value}#{suffix}"
+          elsif value.match?(PROTOCOL_PREFIX)
             errors << "package.json sets #{name} to #{value}; update it by hand"
             "#{prefix}#{value}#{suffix}"
           else
@@ -143,7 +152,7 @@ module DemoFleetUpgrade
     end
 
     def select(filters)
-      return repos if filters.empty?
+      return repos.uniq { |repo| repo["name"] } if filters.empty?
 
       selected = filters.map do |filter|
         repos.find { |repo| [repo["name"], repo["name"].split("/").last].include?(filter) } ||

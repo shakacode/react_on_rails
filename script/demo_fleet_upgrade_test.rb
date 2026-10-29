@@ -108,6 +108,24 @@ class DemoFleetUpgradeEditorsTest < Minitest::Test
     end
   end
 
+  def test_package_json_ignores_non_dependency_values_under_a_package_name
+    text = %({ "scripts": { "react-on-rails": "node bin/setup.js" }, "dependencies": { "react": "19.3.0" } }\n)
+    npm = { "react-on-rails" => "17.2.1-rc.1" }
+
+    new_text, changes, errors = DemoFleetUpgrade::PackageJsonEditor.rewrite(text, npm)
+
+    assert_equal text, new_text
+    assert_empty changes
+    assert_empty errors
+    refute DemoFleetUpgrade::PackageJsonEditor.declares?(text, npm.keys)
+  end
+
+  def test_unfiltered_selection_lists_each_repo_once
+    manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" },
+                                                          { "name" => "shakacode/demo-a" }])
+    assert_equal 1, manifest.select([]).size
+  end
+
   def test_manifest_selects_by_short_or_full_name
     manifest = DemoFleetUpgrade::Manifest.new("repos" => [{ "name" => "shakacode/demo-a" }])
     assert_equal(["shakacode/demo-a"], manifest.select(["demo-a"]).map { |r| r["name"] })
