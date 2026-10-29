@@ -1560,6 +1560,43 @@ describe ReactOnRailsHelper do
       end
     end
 
+    context "when React on Rails Pro renders a component for its cache" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(_directive = nil)
+          "request-nonce"
+        end
+      end
+
+      around do |example|
+        key = ReactOnRails::Helper::CSP_NONCE_OVERRIDE_FIBER_KEY
+        previous = Fiber[key]
+        example.run
+      ensure
+        Fiber[key] = previous
+      end
+
+      it "returns the fiber-scoped placeholder while keeping the request nonce available" do
+        # The dummy app's rendering extension needs a controller this plain helper lacks.
+        allow(ReactOnRails.configuration).to receive(:rendering_extension).and_return(nil)
+        Fiber[ReactOnRails::Helper::CSP_NONCE_OVERRIDE_FIBER_KEY] = "placeholder"
+
+        expect(helper.send(:csp_nonce)).to eq("placeholder")
+        expect(helper.send(:request_csp_nonce)).to eq("request-nonce")
+        expect(helper.send(:rails_context, server_side: true)[:cspNonce]).to eq("placeholder")
+
+        Fiber[ReactOnRails::Helper::CSP_NONCE_OVERRIDE_FIBER_KEY] = nil
+
+        # The memoized context does not keep the placeholder for later renders.
+        expect(helper.send(:rails_context, server_side: true)[:cspNonce]).to eq("request-nonce")
+      end
+    end
+
     context "with Rails 5.2-6.0 compatibility (ArgumentError fallback)" do
       before do
         # Simulate an older Rails where content_security_policy_nonce raises ArgumentError
