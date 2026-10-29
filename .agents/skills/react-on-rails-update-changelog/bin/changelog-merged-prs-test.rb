@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 # Unit tests for changelog-merged-prs.
-# Run with: ruby .agents/skills/update-changelog/bin/changelog-merged-prs-test.rb
+# Run with: ruby .agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs-test.rb
 
 require "minitest/autorun"
 require "open3"

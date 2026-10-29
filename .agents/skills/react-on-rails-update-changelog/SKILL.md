@@ -26,19 +26,12 @@ Before editing, read:
 3. `.agents/agent-workflow.yml` for `base_branch`, and the Changelog section of
    `AGENTS.md` for changelog policy.
 
-Resolve the shared helper directory explicitly; do not assume this checkout has
-a repo-local shared skill copy:
-
-```bash
-UPDATE_CHANGELOG_SKILL_DIR="${UPDATE_CHANGELOG_SKILL_DIR:-$(.agents/bin/shared-skill-dir update-changelog)}"
-```
-
-Use that helper for mechanical classification sweeps:
+Use the repo-owned helper for mechanical classification sweeps:
 
 ```bash
 BASE_REF="${BASE_REF:?set BASE_REF, e.g. v17.0.0.rc.2}"
 TARGET_REF="${TARGET_REF:?set TARGET_REF, e.g. origin/main or origin/release/17.0.0}"
-"${UPDATE_CHANGELOG_SKILL_DIR}/bin/changelog-merged-prs" "${BASE_REF}..${TARGET_REF}"
+.agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs "${BASE_REF}..${TARGET_REF}"
 ```
 
 ## Target Resolution

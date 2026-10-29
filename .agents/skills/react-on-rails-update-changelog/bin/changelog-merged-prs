@@ -3,8 +3,8 @@
 
 # List merged PRs for a BASE..TARGET git range without writing to git or GitHub.
 #
-# Replaces the inline classification-sweep PR-listing loop in update-changelog's
-# SKILL.md. For each first-parent commit in the range it extracts the PR number
+# Lists PRs for the react-on-rails-update-changelog skill's classification
+# sweep. For each first-parent commit in the range it extracts the PR number
 # from the squash title `(#NNNN)` suffix or the `Merge pull request #NNNN` form,
 # falls back to GitHub's commit-to-PR API for commits whose subject lacks a PR
 # number, dedups by PR number, and emits an explicit UNKNOWN marker for any

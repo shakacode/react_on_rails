@@ -123,11 +123,11 @@ entry. Do not substitute a generic Renovate preset.
    lanes.
 7. Let lane coordinators create or update bump PRs and post idempotent evidence comments. Merge
    remains a generated closeout task and requires explicit authority plus a fresh mode/freeze read.
-8. Require an authoritative coordination claim for every mutable app target before its execution
-   subagent starts. A status read is not a lock. A refused claim or unknown claim outcome is
-   non-passing and must not produce a competing worktree or branch. Reuse live candidate ownership
-   first; generated fallback claim targets are only for genuinely fresh lanes and are stable by
-   resolved candidate plus repository so separately generated packs cannot race.
+8. Run Shaka `claim` for every mutable app target before its execution subagent starts, and
+   check that target's open PRs and remote branches. A target another owner holds is skipped and
+   reported, and an incomplete check is non-passing; neither may produce a competing worktree or
+   branch. Reuse live candidate ownership through an explicit handoff only. These checks do not
+   lock, so run at most one fleet pack at a time across all release candidates.
 9. Treat the release tracking issue plus its newest candidate-specific comments as the public
    source of truth. The issue body can describe an earlier candidate in the same release cycle;
    do not mistake that for the current candidate when a newer explicit RC section exists. A hard
