@@ -489,6 +489,63 @@ export function isDeclaredCurrentGenerationReady() {
   return declaredCurrentGenerationIsReady();
 }
 
+// Bundles already warned about for lacking the revalidation hook, so a pre-tags
+// bundle logs once per worker instead of once per invalidation. Never cleaned
+// on eviction: a Set of bundle paths is tiny, and re-warning after a pool
+// eviction/reload of the same stale bundle would add noise, not signal.
+const revalidateHookMissingWarnedBundles = new Set<string>();
+
+/**
+ * Delivers a tag invalidation into every loaded bundle sandbox — every
+ * generation, not just the current one: during rolling deploys old-generation
+ * bundles still serve requests from their own caches.
+ *
+ * The hook is installed on the sandbox's global object by the
+ * `react-on-rails-pro` package's cache module when the bundle loads
+ * (`__REACT_ON_RAILS_REVALIDATE_TAGS__`). The sandbox global IS the context
+ * object the worker holds, so the function reference is read directly off it —
+ * no code-string evaluation. A bundle built with a pre-tags package version has
+ * no hook: warn once per bundle (silence would be indistinguishable from a
+ * broken broadcast) and skip it.
+ *
+ * Best-effort by contract: one bundle's failure never stops delivery to the
+ * others, and callers only need to know (via logs) that something failed.
+ */
+export async function revalidateTagsInAllVMContexts(tags: string[], invalidatedAt: number): Promise<void> {
+  const deliveries: Promise<void>[] = [];
+  for (const [bundlePath, vmContext] of vmContexts.entries()) {
+    // eslint-disable-next-line no-underscore-dangle -- dunder name matches the sandbox-global convention
+    const hook = (vmContext.context as Record<string, unknown>).__REACT_ON_RAILS_REVALIDATE_TAGS__;
+    if (typeof hook !== 'function') {
+      if (!revalidateHookMissingWarnedBundles.has(bundlePath)) {
+        revalidateHookMissingWarnedBundles.add(bundlePath);
+        log.warn(
+          {
+            bundlePath,
+          },
+          'Tag revalidation skipped for a bundle with no __REACT_ON_RAILS_REVALIDATE_TAGS__ hook. ' +
+            'The bundle was likely built with a react-on-rails-pro version without cache tag support; ' +
+            'its unstable_cache entries expire by TTL only.',
+        );
+      }
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    deliveries.push(
+      // Promise.resolve().then(...) converts a synchronous throw inside the
+      // sandbox into a rejection handled below, so one bundle cannot abort
+      // delivery to the rest.
+      Promise.resolve()
+        .then(() => (hook as (tags: string[], invalidatedAt: number) => Promise<void>)(tags, invalidatedAt))
+        .catch((err: unknown) => {
+          log.warn({ msg: 'Tag revalidation failed inside bundle sandbox', bundlePath, err });
+        }),
+    );
+  }
+  await Promise.all(deliveries);
+}
+
 /**
  * The type of the result returned by executing the code payload sent in the rendering request.
  */
