@@ -2457,6 +2457,27 @@ module ReactOnRailsProHelper
     ReactOnRailsPro::AsyncValue.new(task:)
   end
 
+  # Extracted from render_async_react_component_with_cache (Metrics/AbcSize):
+  # persists a successfully rendered async component plus its cache tags and
+  # HTTP-response sidecar, skipping expired cache windows and 5xx results.
+  def write_async_component_cache(rendered, cache_key, raw_cache_options, normalized_cache_tags, placeholder)
+    return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    # Capture httpResponse from the task-local request.env slot immediately
+    # after react_component returns — before another concurrent async task
+    # can overwrite the shared CURRENT_ENV_KEY.
+    hr = defined?(request) && request.respond_to?(:env) &&
+         request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
+    hr = nil unless hr.is_a?(Hash)
+    # Never cache 5xx error responses — the next request retries rendering.
+    return if current_http_response_server_error?(http_response: hr)
+
+    Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
+    write_http_response_sidecar(cache_key, cache_options, http_response: hr)
+  end
+
   # Renders async and writes to cache on completion
   def render_async_react_component_with_cache(
     component_name,
@@ -2475,21 +2496,8 @@ module ReactOnRailsProHelper
         result = with_csp_nonce_placeholder do |placeholder|
           csp_nonce_placeholder = placeholder
           rendered = react_component(component_name, options)
-          unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-            cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-            # Capture httpResponse from the task-local request.env slot immediately
-            # after react_component returns — before another concurrent async task
-            # can overwrite the shared CURRENT_ENV_KEY.
-            hr = defined?(request) && request.respond_to?(:env) &&
-                 request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY]
-            hr = nil unless hr.is_a?(Hash)
-            # Never cache 5xx error responses — the next request retries rendering.
-            unless current_http_response_server_error?(http_response: hr)
-              Rails.cache.write(cache_key, append_cached_csp_nonce_marker(rendered, placeholder), cache_options)
-              ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
-              write_http_response_sidecar(cache_key, cache_options, http_response: hr)
-            end
-          end
+          write_async_component_cache(rendered, cache_key, raw_cache_options,
+                                      normalized_cache_tags, placeholder)
           rendered
         end
         # Swapped outside the placeholder scope, so a nested render targets the outer one.
