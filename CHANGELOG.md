@@ -58,6 +58,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   as an experimental build, falls outside the advisories' version rules.
   [PR 5247](https://github.com/shakacode/react_on_rails/pull/5247) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **The RSC generator declares React 19.3.1 as the floor**: New RSC apps now install `react` and `react-dom`
+  from `~19.3.1` instead of `~19.3.0`, so they cannot resolve React 19.3.0. React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect
+  `react-server-dom-webpack` 19.3.0, and the patched `react-server-dom-webpack` 19.3.1 peers on React 19.3.1.
+  `react-on-rails-rsc` 19.3.1 still accepts React 19.3.0, so this floor is stricter than the package requires. When an
+  existing app has React 19.3.0, the generator now warns and gives one command that upgrades `react`, `react-dom`, and
+  `react-server-dom-webpack` together, so a retained lockfile cannot keep the vulnerable copy.
+  [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **The Node Renderer requires `fastify` 5.12.6 or later**: The `react-on-rails-pro-node-renderer` package
   now depends on `fastify` `^5.12.6` instead of `^5.8.5`, so an app upgrading with an existing lockfile cannot keep a
   `fastify` release affected by the 5.12.x security fixes, including authentication bypass through malformed URLs
