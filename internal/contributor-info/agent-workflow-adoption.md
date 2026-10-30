@@ -2,19 +2,19 @@
 
 React on Rails uses [Shaka](https://github.com/shakacode/shaka)'s versioned
 repository contract, which lives in
-[`.agents/agent-workflow.yml`](../../.agents/agent-workflow.yml).
+[`.agents/shaka/config.yml`](../../.agents/shaka/config.yml).
 
 ## Current Boundary
 
 - Install Shaka from a trusted source outside the consumer checkout.
-- Initialize or migrate the fixed command wrappers under `.agents/bin/` with
+- Initialize or migrate the fixed command wrappers under `.agents/shaka/bin/` with
   `shaka seam init`.
 - Validate candidate bytes with `shaka seam check --root . --local`. This mode
   grants neither policy nor merge authority.
 - Load workflow policy only from an immutable default-branch commit with
   `shaka seam check --root . --ref <sha>`.
 - Keep human-only repository policy in `AGENTS.md` and actor trust in
-  `.agents/trusted-github-actors.yml`.
+  `.agents/shaka/trusted-github-actors.yml`.
 
 React on Rails required CI checks out `shakacode/shaka` at an immutable reviewed
 commit, runs the candidate validator, and exercises

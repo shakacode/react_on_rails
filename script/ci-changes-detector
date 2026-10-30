@@ -506,20 +506,20 @@ while IFS= read -r file; do
   case "$file" in
     # Markdown under the binstub directory is still documentation. Keep this
     # before the executable binstub arm so README-only edits do not force CI.
-    .agents/bin/*.md|.agents/bin/**/*.md)
+    .agents/bin/*.md|.agents/bin/**/*.md|.agents/shaka/*.md|.agents/shaka/**/*.md)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
-    # Executable agent workflow binstubs and the workflow seam config are
+    # Executable agent tools, the Shaka command wrappers, and the Shaka config are
     # CI/workflow plumbing, not docs. Keep this before the broader .agents/**
     # metadata arm so future seam changes run validation instead of being
     # skipped as docs-only.
-    .agents/agent-workflow.yml|.agents/agent-workflow.yaml)
+    .agents/shaka/config.yml)
       DOCS_ONLY=false
       CI_INFRA_CHANGED=true
       ;;
 
-    .agents/bin/*|.agents/bin/**/*)
+    .agents/bin/*|.agents/bin/**/*|.agents/shaka/bin/*|.agents/shaka/bin/**/*)
       DOCS_ONLY=false
       CI_INFRA_CHANGED=true
       ;;

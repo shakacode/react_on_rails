@@ -5,10 +5,10 @@
 This repository uses Shaka 0.1.0.pre.1 (pilot stage 0.0.x)
 with contract `version: 1`. The files below hold its configuration.
 
-| Path                 | Purpose                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `agent-workflow.yml` | Review, merge, and branch policy, read from the trusted default branch. Live GitHub settings still govern checks and approvals. |
-| `bin/`               | Executable setup, test, and validation wrappers. Shaka runs the candidate checkout's copies; inspect changes before execution.  |
+| Path               | Purpose                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `shaka/config.yml` | Review, merge, and branch policy, read from the trusted default branch. Live GitHub settings still govern checks and approvals. |
+| `shaka/bin/`       | Executable setup, test, and validation wrappers. Shaka runs the candidate checkout's copies; inspect changes before execution.  |
 
 ## Check configuration edits
 
