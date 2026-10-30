@@ -44,6 +44,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **[Pro]** **Fix CSP nonce handling in fragment-cached components**: The `cached_*` helpers now refresh executable inline script nonces on cache hits, preventing CSP from blocking hydration, console replay, and streaming scripts.
+  **Upgrade notes:** Do not embed request nonces in cached props or text; only matching double-quoted `nonce="…"` attributes are refreshed. Overrides of `normalize_cached_pro_attribution` or `normalize_cached_pro_attribution_html` must accept and forward the new `cached_csp_nonce` parameter. See [CSP caching caveats](docs/pro/strict-csp.md#caching-caveats) for details.
+  Fixes [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021). [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Security
 
 - **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
