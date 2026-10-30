@@ -47,6 +47,16 @@ export function isWorkerStartupFailureMessage(value: unknown): value is WorkerSt
 
 export const REVALIDATE_TAGS = 'NODE_RENDERER_REVALIDATE_TAGS' as const;
 
+// Mirrors MAX_TAG_LENGTH / MAX_TAGS_PER_CALL in the react-on-rails-pro
+// package's src/cache/tagValidation.ts (the renderer cannot import that
+// package). Enforced BOTH at the HTTP endpoint and in the message guard below:
+// with supportModules enabled the sandbox sees the real `process`, so bundle
+// code could forge this message — the guard keeps the master from amplifying
+// oversized payloads to every worker (the sandbox-side validator would refuse
+// them anyway; this bounds the IPC traffic, not a privilege boundary).
+export const REVALIDATE_MAX_TAG_LENGTH = 256;
+export const REVALIDATE_MAX_TAGS_PER_MESSAGE = 64;
+
 /**
  * Carries a tag invalidation from the worker that received POST /revalidate-tags
  * up to the master and back down to every worker. `invalidatedAt` is stamped at
@@ -72,7 +82,10 @@ export function isRevalidateTagsMessage(value: unknown): value is RevalidateTags
     message.type === REVALIDATE_TAGS &&
     Array.isArray(message.tags) &&
     message.tags.length > 0 &&
-    message.tags.every((tag) => typeof tag === 'string' && tag.length > 0) &&
+    message.tags.length <= REVALIDATE_MAX_TAGS_PER_MESSAGE &&
+    message.tags.every(
+      (tag) => typeof tag === 'string' && tag.length > 0 && tag.length <= REVALIDATE_MAX_TAG_LENGTH,
+    ) &&
     typeof message.invalidatedAt === 'number' &&
     Number.isFinite(message.invalidatedAt)
   );

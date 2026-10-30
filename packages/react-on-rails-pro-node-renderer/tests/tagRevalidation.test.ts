@@ -49,8 +49,25 @@ describe('isRevalidateTagsMessage', () => {
     ['empty-string tag', buildMessage({ tags: [''] })],
     ['missing invalidatedAt', { type: REVALIDATE_TAGS, tags: ['t'] }],
     ['non-finite invalidatedAt', buildMessage({ invalidatedAt: Number.NaN })],
+    // The guard gates the master fanout: with supportModules the sandbox sees
+    // the real `process`, so forged oversized messages must not be amplified.
+    [
+      'more tags than the per-message cap',
+      buildMessage({ tags: Array.from({ length: 65 }, (_, i) => `t-${i}`) }),
+    ],
+    ['a tag over the length cap', buildMessage({ tags: ['x'.repeat(257)] })],
   ])('rejects %s', (_label, value) => {
     expect(isRevalidateTagsMessage(value)).toBe(false);
+  });
+
+  test('accepts a message exactly at the caps', () => {
+    expect(
+      isRevalidateTagsMessage(
+        buildMessage({
+          tags: Array.from({ length: 64 }, (_, i) => `t-${i}-${'x'.repeat(250)}`.slice(0, 256)),
+        }),
+      ),
+    ).toBe(true);
   });
 });
 

@@ -29,18 +29,19 @@
 import {
   isRevalidateTagsMessage,
   REVALIDATE_TAGS,
+  REVALIDATE_MAX_TAG_LENGTH,
+  REVALIDATE_MAX_TAGS_PER_MESSAGE,
   type RevalidateTagsMessage,
 } from '../shared/workerMessages.js';
 import log from '../shared/log.js';
 import { revalidateTagsInAllVMContexts } from './vm.js';
 
-// Mirrors MAX_TAG_LENGTH / MAX_TAGS_PER_CALL in the react-on-rails-pro
-// package's src/cache/tagValidation.ts. The renderer cannot import that package
-// (the registry and validators live inside the user's compiled bundle), so the
-// caps are restated here; the bundle-side validator re-checks on apply, making
-// a drift between the two visible as rejected deliveries rather than silence.
-export const MAX_TAG_LENGTH = 256;
-export const MAX_TAGS_PER_REQUEST = 64;
+// Single source for the caps is shared/workerMessages.ts, so the HTTP
+// endpoint and the IPC message guard can never drift apart; the bundle-side
+// validator re-checks on apply, making a drift against the Pro package
+// visible as rejected deliveries rather than silence.
+export const MAX_TAG_LENGTH = REVALIDATE_MAX_TAG_LENGTH;
+export const MAX_TAGS_PER_REQUEST = REVALIDATE_MAX_TAGS_PER_MESSAGE;
 
 export type TagValidationResult = { tags: string[] } | { error: string };
 

@@ -43,6 +43,16 @@ describe('POST /revalidate-tags', () => {
     await resetForTest(testName);
   });
 
+  test('rejects a body-less POST with 401, not a 500 from dereferencing undefined', async () => {
+    const broadcastSpy = jest.spyOn(tagRevalidation, 'broadcastOrApplyTagRevalidation').mockResolvedValue();
+    const app = createWorker({ password: 'my_password' });
+
+    const res = await app.inject().post('/revalidate-tags').end();
+
+    expect(res.statusCode).toBe(401);
+    expect(broadcastSpy).not.toHaveBeenCalled();
+  });
+
   test('rejects a wrong password without broadcasting', async () => {
     const broadcastSpy = jest.spyOn(tagRevalidation, 'broadcastOrApplyTagRevalidation').mockResolvedValue();
     const app = createWorker({ password: 'my_password' });

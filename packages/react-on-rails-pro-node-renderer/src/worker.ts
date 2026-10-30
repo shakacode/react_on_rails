@@ -1494,13 +1494,16 @@ export default function run(config: Partial<Config>) {
   app.post<{
     Body: WithBodyArrayField<Record<string, unknown>, 'tags'>;
   }>('/revalidate-tags', async (req, res) => {
-    const authResult = authenticate(req.body as AuthBody);
+    // A POST with no parseable body leaves req.body undefined; it must fail
+    // authentication as a 401, not crash into the generic 500 handler.
+    const body: WithBodyArrayField<Record<string, unknown>, 'tags'> = req.body ?? {};
+    const authResult = authenticate(body as AuthBody);
     if (authResult) {
       await setResponse(authResult, res);
       return;
     }
 
-    const validation = validateRevalidationTags(extractBodyArrayField(req.body, 'tags'));
+    const validation = validateRevalidationTags(extractBodyArrayField(body, 'tags'));
     if ('error' in validation) {
       log.info('POST /revalidate-tags rejected: %s', validation.error);
       await setResponse(badRequestResponseResult(validation.error), res);
