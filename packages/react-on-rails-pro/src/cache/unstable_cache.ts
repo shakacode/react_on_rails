@@ -15,20 +15,55 @@
 
 import { PassThrough } from 'stream';
 import type { ReactNode } from 'react';
-import type { CacheEntry } from './CacheHandler.ts';
+import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
 import { getCacheHandler } from './cacheHandlerRegistry.ts';
 import { buildCacheKey } from './buildCacheKey.ts';
 import { getBuildId } from './buildIdProvider.ts';
 import { getClientRenderer } from './manifestLoader.ts';
 import { getServerRenderer } from './manifestLoaderServer.ts';
+import { validateTags } from './tagValidation.ts';
 
-export interface UnstableCacheOptions {
+export interface UnstableCacheOptions<TArgs extends unknown[] = unknown[]> {
   /** Stable identifier for this cached function. Required. */
   id: string;
   /** Time in seconds before the cache entry is considered stale. 0 = indefinite. */
   revalidate?: number;
   /** Cache handler kind to use. Defaults to 'default' (in-memory LRU). */
   kind?: string;
+  /**
+   * Invalidation labels stored on each entry, static or derived from the
+   * call's arguments. Strings must be non-empty, at most MAX_TAG_LENGTH
+   * characters, and must match the tags the invalidator sends byte-for-byte.
+   */
+  tags?: string[] | ((...args: TArgs) => string[]);
+}
+
+function resolveTags<TArgs extends unknown[]>(
+  tags: UnstableCacheOptions<TArgs>['tags'],
+  args: TArgs,
+): string[] {
+  // Only an OMITTED option (undefined) means "no tags". Any other supplied
+  // value — including falsy junk like null, false, 0, or '' from an untyped
+  // caller or JSON config (where null is expressible and undefined is not) —
+  // must reach validateTags and throw, not silently cache the render untagged
+  // (which would make later unstable_revalidateTag calls ineffective for it).
+  if (tags === undefined) return [];
+  return validateTags(typeof tags === 'function' ? tags(...args) : tags);
+}
+
+// Suppression is keyed by handler INSTANCE (a WeakSet), not by kind:
+// registerCacheHandler(kind, replacement) must not inherit a suppression
+// earned by a different handler. The kind still appears in the message for
+// operator context.
+const warnedHandlers = new WeakSet<CacheHandler>();
+function warnIfHandlerLacksRevalidation(kind: string, handler: CacheHandler): void {
+  if (typeof handler.revalidateTag === 'function' || warnedHandlers.has(handler)) return;
+  warnedHandlers.add(handler);
+  console.warn(
+    `unstable_cache: entries use "tags", but the "${kind}" cache handler has no revalidateTag ` +
+      'method — tag invalidation will silently do nothing for these entries. ' +
+      'Implement revalidateTag on the handler, or remove the tags option.',
+  );
 }
 
 function chunksToNodeStream(chunks: Buffer[]): PassThrough {
@@ -56,9 +91,9 @@ const inFlightRenders = new Map<string, Promise<void>>();
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
 export function unstable_cache<TArgs extends unknown[]>(
   originalFn: (...args: TArgs) => Promise<ReactNode> | ReactNode,
-  options: UnstableCacheOptions,
+  options: UnstableCacheOptions<TArgs>,
 ): (...args: TArgs) => Promise<ReactNode> {
-  const { id, revalidate = 0, kind = 'default' } = options;
+  const { id, revalidate = 0, kind = 'default', tags } = options;
 
   return async function cachedFn(...args: TArgs): Promise<ReactNode> {
     const handler = getCacheHandler(kind);
@@ -89,11 +124,24 @@ export function unstable_cache<TArgs extends unknown[]>(
     }
 
     // --- MISS path: render and populate cache ---
+
+    // Resolve tags per call (the function form sees the arguments) and fail
+    // fast on invalid values BEFORE the in-flight marker exists and BEFORE
+    // paying for the render. A throw here propagates to the caller with no
+    // cleanup needed.
+    const entryTags = resolveTags(tags, args);
+    if (entryTags.length > 0) warnIfHandlerLacksRevalidation(kind, handler);
+
     let resolveInflight!: () => void;
     const inflightPromise = new Promise<void>((resolve) => {
       resolveInflight = resolve;
     });
     inFlightRenders.set(cacheKey, inflightPromise);
+
+    // Stamp at render start: the earliest instant originalFn could have read
+    // its data. Closes the in-flight repopulation race — a tag invalidated
+    // DURING the render refuses the entry stored AFTER it.
+    const renderStartedAt = Date.now();
 
     let renderHadError = false;
     let rscPipeable: ReturnType<Awaited<ReturnType<typeof getServerRenderer>>['renderToPipeableStream']>;
@@ -137,7 +185,8 @@ export function unstable_cache<TArgs extends unknown[]>(
         const newEntry: CacheEntry = {
           value: chunks,
           revalidate,
-          timestamp: Date.now(),
+          timestamp: renderStartedAt,
+          ...(entryTags.length > 0 ? { tags: entryTags } : {}),
         };
         return handler.set(cacheKey, newEntry);
       })

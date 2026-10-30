@@ -105,5 +105,12 @@ export function buildCacheKey(buildId: string, id: string, args: unknown[]): str
   hash.update(id);
   hash.update(':');
   hash.update(stableStringify(args));
-  return `rorp:rsc-cache:${hash.digest('hex')}`;
+  // The ':2:' segment namespaces keys per storage-format generation. Entries
+  // written by pre-tags package versions (the un-versioned v1 blob format)
+  // live under the old 'rorp:rsc-cache:' prefix and are never read by this
+  // code — so a package upgrade can never serve an old untagged blob that tag
+  // invalidation cannot reach, even when the RSC artifact hash (and therefore
+  // the buildId hashed above) happens to survive the upgrade. Old-prefix keys
+  // expire via their own TTLs; the docs cover deleting revalidate: 0 leftovers.
+  return `rorp:rsc-cache:2:${hash.digest('hex')}`;
 }
