@@ -37,8 +37,19 @@ Rails.application.configure do
   config.consider_all_requests_local       = true
   config.action_controller.perform_caching = false
 
-  # disable caching for tests
-  config.cache_store = :null_store
+  # Disable caching for tests. Browser (:js) specs are the exception: Capybara
+  # drives an external `rails server` process (Capybara.run_server = false), so
+  # an in-process cache swap can never reach the server answering the browser.
+  # When E2E_SHARED_CACHE_DIR is set, that server uses a file store instead:
+  # files are visible across processes, so the RSpec process can assert real
+  # cache-write and cache-hit evidence, and PPR's cold->warm flow genuinely
+  # runs (see spec/system/ppr_system_spec.rb). A relative path resolves against
+  # the server's working directory (spec/dummy in CI and in local runs).
+  config.cache_store = if ENV["E2E_SHARED_CACHE_DIR"]
+                         [:file_store, File.expand_path(ENV["E2E_SHARED_CACHE_DIR"])]
+                       else
+                         :null_store
+                       end
 
   # ShakaPerf PPR benchmark gate (issue #5103): the gate boots this app with
   # RAILS_ENV=test (mirroring the rsc-fouc gate) but measures *warm-hit* PPR
