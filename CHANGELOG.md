@@ -58,6 +58,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   see the migration note in the
   [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache). Part of
   [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+- **[Pro]** **`ReactOnRailsPro.revalidate_tag` now invalidates the RSC `unstable_cache` too**: with
+  `config.server_renderer = "NodeRenderer"`, every `revalidate_tag`/`revalidate_tags` call — including
+  the `Cache::Revalidates` `after_commit` concern, with zero app changes — fans out to the Node
+  Renderer's `/revalidate-tags` endpoint after clearing the Rails fragment-cache entries, so one
+  committed write busts both caches under the same normalized tag vocabulary (a model becomes its
+  version-less `cache_key`, e.g. `posts/42`). The fanout is best-effort and non-blocking: a single
+  attempt with no transport retries that never raises into the write path; failures are logged and
+  covered entries fall back to their `revalidate` TTL. Closes the read-your-writes gap of
+  [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
 - **[Pro]** **Node Renderer `POST /revalidate-tags` endpoint with cluster-wide fanout**: one
   authenticated POST invalidates `unstable_cache` tags in **every** renderer worker — the receiving
   worker stamps the invalidation at arrival, the master rebroadcasts it over IPC, and each worker

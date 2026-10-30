@@ -78,7 +78,35 @@ involved (see [Tag Invalidation Through Redis](#tag-invalidation-through-redis))
 entries on a handler without `revalidateTag` logs a warning once per handler; the entries keep their
 tags, so a handler upgrade honors them later.
 
-## Invalidating from outside the renderer
+## Invalidate from Rails
+
+`ReactOnRailsPro.revalidate_tag` (and the splat form `revalidate_tags`) invalidates **both**
+caches in one call: the Rails fragment-cache entries registered under the tag, and the renderer's
+`unstable_cache` entries carrying the same tag, by POSTing to the Node Renderer's
+`/revalidate-tags` endpoint described below. Tags accept the same forms as the `cache_tags:`
+helper option, and the string form that reaches the renderer is the same normalized form the
+fragment cache uses (an ActiveRecord model becomes its version-less `cache_key`, e.g. `posts/42`) —
+declare your `unstable_cache` `tags` in that vocabulary.
+
+```ruby
+ReactOnRailsPro.revalidate_tag(post)              # "posts/42" in both caches
+ReactOnRailsPro.revalidate_tags("products", post) # any mix of forms
+```
+
+Apps using the `ReactOnRailsPro::Cache::Revalidates` concern get this with **zero new code**: its
+`after_commit` callback already funnels into `revalidate_tags`, so a committed model write now
+reaches the renderer too. `after_commit` timing is what makes read-your-writes hold — the
+invalidation instant is strictly later than data visibility, so any render it refuses would have
+read the old data, and any render that starts afterward sees the committed row.
+
+The renderer fanout is **best-effort and non-blocking by contract**: it is a single attempt with no
+transport retries, it never raises into the write path, and every failure (renderer down, non-200,
+oversize tag) is logged and falls back to the entry's `revalidate` TTL. It fires only when
+`config.server_renderer == "NodeRenderer"`. Callback-skipping writes (`update_column`,
+`update_all`, raw SQL, other services writing to the same database) still need an explicit
+`revalidate_tags` call — the concern documents this caveat.
+
+## The renderer endpoint
 
 The Node Renderer exposes `POST /revalidate-tags`, authenticated with the same renderer password as
 every other endpoint. The receiving worker stamps the invalidation instant on arrival and forwards
@@ -108,9 +136,9 @@ With `RedisCacheHandler` the broadcast is belt-and-suspenders for the same machi
 invalidation record already covers every machine sharing the Redis. For **in-memory** handlers the
 endpoint is the only cross-worker path, and it reaches only the renderer instance you POST to.
 
-The Ruby-side bridge (`ReactOnRailsPro.revalidate_tag` fanning out to this endpoint from
-`after_commit`) ships separately; until then, call the endpoint from your own Rails code where you
-need read-your-writes.
+Rails apps rarely call the endpoint directly — `ReactOnRailsPro.revalidate_tag` does it for them
+(see [Invalidate from Rails](#invalidate-from-rails)). The endpoint remains the integration point
+for writes Rails never sees: other services sharing the database, ETL jobs, or operational tooling.
 
 ## Use Shared Storage
 
@@ -241,16 +269,17 @@ support tag invalidation. The contract:
 
 ## Invalidation Limits
 
-Tag-based invalidation works from JavaScript (`unstable_revalidateTag` reaches the cache handlers
-registered in the worker that calls it) and through the Node Renderer's authenticated
-`POST /revalidate-tags` endpoint, which fans the invalidation out to **every** worker of that
-renderer over IPC (see [Invalidating from outside the renderer](#invalidating-from-outside-the-renderer)).
-There is no Ruby bridge yet, so a Rails-side write does not invalidate JavaScript `unstable_cache`
-entries automatically — a Rails caller must POST to the endpoint itself. Entries in a shared
-`RedisCacheHandler` are invalidated for every worker on every machine sharing the Redis (see
+Tag-based invalidation works from Rails (`ReactOnRailsPro.revalidate_tag`, including the
+`Revalidates` `after_commit` concern — see [Invalidate from Rails](#invalidate-from-rails)), from
+JavaScript (`unstable_revalidateTag` reaches the cache handlers registered in the worker that calls
+it), and through the Node Renderer's authenticated `POST /revalidate-tags` endpoint, which fans the
+invalidation out to **every** worker of that renderer over IPC (see
+[The renderer endpoint](#the-renderer-endpoint)). Entries in a shared `RedisCacheHandler` are
+invalidated for every worker on every machine sharing the Redis (see
 [Tag Invalidation Through Redis](#tag-invalidation-through-redis)); per-machine **in-memory** caches
-on OTHER renderer instances are only reached by POSTing to each instance. The `CacheHandler`
-interface has no delete method.
+on OTHER renderer instances are only reached by POSTing to each instance — Rails posts to the one
+`renderer_url` it is configured with. The `CacheHandler` interface has no delete method, and every
+Rails-to-renderer hop is best-effort with the entry TTL as the correctness floor.
 
 Use a finite `revalidate` interval when data can change. Include all data that distinguishes the
 rendered result in the cached function arguments. The build ID comes from the RSC artifact ID
@@ -290,6 +319,7 @@ under the previous build ID are never read again but are **not automatically del
 - **Tiered handler** (`TieredCacheHandler`): the L1 handler follows its own eviction rules (see
   above); the L2 handler (typically Redis) follows the Redis rules.
 
-React on Rails Pro's Ruby fragment-caching helpers have a separate `cache_tags:` and
-`ReactOnRailsPro.revalidate_tag` API. That API invalidates Rails fragment-cache entries; it does not
-invalidate entries created by JavaScript `unstable_cache`.
+React on Rails Pro's Ruby fragment-caching helpers register tags with the same
+`ReactOnRailsPro.revalidate_tag` API via the `cache_tags:` option. One `revalidate_tag` call
+invalidates both the Rails fragment-cache entries and the JavaScript `unstable_cache` entries
+carrying that tag (see [Invalidate from Rails](#invalidate-from-rails)).

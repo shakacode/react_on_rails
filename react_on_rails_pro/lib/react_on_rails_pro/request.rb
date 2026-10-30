@@ -25,6 +25,12 @@ module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     RAW_RENDER_CONTENT_TYPE = "application/vnd.react-on-rails.render-request+javascript"
     RAW_RENDER_HEADER_PREFIX = "x-react-on-rails-pro-"
+    # Mirror of the Node Renderer's /revalidate-tags request caps
+    # (packages/react-on-rails-pro-node-renderer/src/worker/tagRevalidation.ts).
+    # Exceeding either would 400 the whole request, so larger invalidations are
+    # sent in slices and oversize tags are dropped individually with a warning.
+    RENDERER_REVALIDATE_TAGS_BATCH_SIZE = 64
+    RENDERER_REVALIDATE_TAG_MAX_LENGTH = 256
 
     class UploadAssetsWaiter
       def initialize
@@ -242,7 +248,65 @@ module ReactOnRailsPro
         JSON.parse(response.body)["exists"] == true
       end
 
+      # Best-effort fanout of a tag invalidation to the Node Renderer's
+      # /revalidate-tags endpoint, which rebroadcasts it to every renderer
+      # worker (issue #5077). Called from the model write path (after_commit
+      # via ReactOnRailsPro.revalidate_tags), so it must never raise: every
+      # failure is logged and the renderer's unstable_cache entries fall back
+      # to expiring by their revalidate TTL. Single attempt, no transport
+      # retries — a renderer outage must not stall application writes.
+      #
+      # Expects normalized String tags (Cache::TagIndex.normalize_tags), so
+      # Ruby and JavaScript invalidate the same tag vocabulary.
+      # Returns the number of tags accepted by the renderer.
+      def revalidate_renderer_tags(tags)
+        return 0 unless ReactOnRailsPro.configuration.server_renderer == "NodeRenderer"
+
+        valid_tags = renderer_revalidation_tags(Array(tags))
+        return 0 if valid_tags.empty?
+
+        accepted = 0
+        valid_tags.each_slice(RENDERER_REVALIDATE_TAGS_BATCH_SIZE) do |batch|
+          response = connection.post("/revalidate-tags",
+                                     json: {
+                                       password: ReactOnRailsPro.configuration.renderer_password,
+                                       tags: batch
+                                     })
+          if response.status == 200
+            accepted += batch.size
+          else
+            Rails.logger.warn do
+              "[ReactOnRailsPro] Node Renderer rejected tag revalidation (HTTP #{response.status}); " \
+                "#{batch.size} tag(s) fall back to expiring by their revalidate TTL"
+            end
+          end
+        end
+        accepted
+      rescue StandardError => e
+        Rails.logger.warn do
+          "[ReactOnRailsPro] Could not reach the Node Renderer for tag revalidation (#{e.class}); " \
+            "affected unstable_cache entries expire by their revalidate TTL instead"
+        end
+        accepted || 0
+      end
+
       private
+
+      # Drops tags the renderer would reject (over the per-tag length cap) so
+      # one oversize tag cannot 400 a whole batch, and dedupes the remainder.
+      def renderer_revalidation_tags(tags)
+        valid_tags, oversize_tags = tags.partition do |tag|
+          tag.length <= RENDERER_REVALIDATE_TAG_MAX_LENGTH
+        end
+        if oversize_tags.any?
+          Rails.logger.warn do
+            "[ReactOnRailsPro] Skipping #{oversize_tags.size} cache tag(s) longer than " \
+              "#{RENDERER_REVALIDATE_TAG_MAX_LENGTH} characters for renderer tag revalidation; " \
+              "their unstable_cache entries expire by their revalidate TTL instead"
+          end
+        end
+        valid_tags.uniq
+      end
 
       def connection
         # Fast path: return existing connection without locking (lock-free for 99.99% of calls)
