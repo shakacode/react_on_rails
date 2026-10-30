@@ -18,9 +18,13 @@ import { validateTags } from './tagValidation.ts';
 import cacheErrorLabel from './cacheErrorLabel.ts';
 
 declare global {
+  // null = this bundle's cache entry point is the stub (no handlers can exist
+  // here; cross-process delivery skips it silently). undefined = pre-tags
+  // bundle (delivery warns once per bundle).
   // eslint-disable-next-line vars-on-top, no-underscore-dangle -- global augmentation needs var; dunder name matches the sandbox-global convention
   var __REACT_ON_RAILS_REVALIDATE_TAGS__:
     | ((tags: string[], invalidatedAt?: number) => Promise<void>)
+    | null
     | undefined;
 }
 

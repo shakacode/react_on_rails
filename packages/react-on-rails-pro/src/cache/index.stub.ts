@@ -44,6 +44,15 @@ const STUB_ERROR_REVALIDATE =
   'unstable_revalidateTag is only available in the react-server bundle. ' +
   'It should not be called from the SSR server bundle or client bundle.';
 
+declare global {
+  // Must match the augmentation in revalidation.ts (the react-server entry).
+  // eslint-disable-next-line vars-on-top, no-underscore-dangle -- global augmentation needs var; dunder name matches the sandbox-global convention
+  var __REACT_ON_RAILS_REVALIDATE_TAGS__:
+    | ((tags: string[], invalidatedAt?: number) => Promise<void>)
+    | null
+    | undefined;
+}
+
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
 export function unstable_cache<TArgs extends unknown[]>(
   originalFn: (...args: TArgs) => Promise<ReactNode> | ReactNode,
@@ -58,8 +67,14 @@ export function registerCacheHandler(kind: string, handler: CacheHandler): void 
   throw new Error(STUB_ERROR);
 }
 
-// The stub installs NO global revalidation hook — the hook exists only where
-// handlers exist (the react-server entry point).
+// The stub installs an explicit NULL revalidation hook: this bundle can never
+// hold unstable_cache entries (handlers exist only in the react-server entry
+// point), and the renderer's cross-process delivery uses the null to skip this
+// sandbox silently. `undefined` stays reserved for bundles built before tag
+// support, which the renderer warns about once per bundle.
+// eslint-disable-next-line no-underscore-dangle -- dunder name matches the sandbox-global convention
+globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__ = null;
+
 // eslint-disable-next-line camelcase, @typescript-eslint/require-await -- Next.js naming; async so the stub REJECTS like its siblings
 export async function unstable_revalidateTag(_tags: string | string[]): Promise<void> {
   throw new Error(STUB_ERROR_REVALIDATE);

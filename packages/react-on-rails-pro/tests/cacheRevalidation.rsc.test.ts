@@ -229,7 +229,7 @@ describe('the sandbox global hook', () => {
 });
 
 describe('the stub entry point', () => {
-  test('unstable_revalidateTag rejects with the stub error and no global hook is installed', async () => {
+  test('unstable_revalidateTag rejects with the stub error and the hook is an explicit null marker', async () => {
     // jest.isolateModules resets the module registry but NOT globalThis, so
     // the hook installed by the real entry point must be managed explicitly.
     const saved = globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__;
@@ -243,8 +243,11 @@ describe('the stub entry point', () => {
         // synchronously — matching the real entry point, whose failures
         // surface as rejections.
         rejection = stub.unstable_revalidateTag('t');
-        // The stub installs no hook — it exists only where handlers exist.
-        expect(globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__).toBeUndefined();
+        // The stub installs an explicit NULL hook: handlers can never exist in
+        // this bundle, and the renderer's cross-process delivery uses the null
+        // to skip the sandbox silently (undefined would mean a pre-tags bundle
+        // and draw a once-per-bundle warning for every normal SSR bundle).
+        expect(globalThis.__REACT_ON_RAILS_REVALIDATE_TAGS__).toBeNull();
 
         // Type-level pin: function-form tags see typed arguments through the
         // stub too. With a non-generic stub signature this fails to compile,
