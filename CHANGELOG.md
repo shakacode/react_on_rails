@@ -68,6 +68,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `react-server-dom-webpack` together, so a retained lockfile cannot keep the vulnerable copy.
   [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **The Node Renderer requires `fastify` 5.12.6 or later**: The `react-on-rails-pro-node-renderer` package
+  now depends on `fastify` `^5.12.6` instead of `^5.8.5`, so an app upgrading with an existing lockfile cannot keep a
+  `fastify` release affected by the 5.12.x security fixes, including authentication bypass through malformed URLs
+  ([GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7)), request-validation bypasses
+  ([GHSA-hwr6-493r-vm6h](https://github.com/advisories/GHSA-hwr6-493r-vm6h)), and a header-validation bypass fixed
+  in 5.12.6 ([GHSA-389g-gv7q-r4x8](https://github.com/advisories/GHSA-389g-gv7q-r4x8)). Fresh 17.2.0 installs
+  already pick up a fixed `fastify`. If your app pins a `fastify` 5 release below 5.12.6 through pnpm `overrides`,
+  npm `overrides`, or Yarn `resolutions`, raise or remove that pin. Node 18.19 apps that use the documented Fastify 4
+  override keep it, but no Fastify 4 release fixes the authentication and request-validation bypasses, so
+  move to Node 20 or later to get the fixed Fastify 5.
+  [PR 5274](https://github.com/shakacode/react_on_rails/pull/5274) by [justin808](https://github.com/justin808).
+
 ### [17.2.1.rc.1] - 2026-10-28
 
 #### Fixed
