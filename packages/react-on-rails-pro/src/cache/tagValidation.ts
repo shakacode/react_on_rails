@@ -26,6 +26,21 @@ export const MAX_TAG_LENGTH = 256; // chars; matches the renderer-endpoint cap p
 // cardinality valve. Generous for real use: tags name entities, not rows.
 export const MAX_TAGS_PER_CALL = 64;
 
+// A lone high surrogate is one not followed by a low surrogate; a lone low
+// surrogate is one not preceded by a high surrogate.
+const LONE_SURROGATE = /(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/;
+
+// Host-global-free well-formedness check: this module runs inside the
+// renderer's bundle sandbox, which has `Buffer` only when the renderer runs
+// with supportModules, and the delivered-invalidation path must not fail on a
+// missing host global. Prefers the native check where the runtime has it
+// (Node >= 20 / ES2024), with the regex as the portable fallback.
+function isWellFormedString(value: string): boolean {
+  const native = (value as { isWellFormed?: () => boolean }).isWellFormed;
+  if (typeof native === 'function') return native.call(value);
+  return !LONE_SURROGATE.test(value);
+}
+
 /** Validates, caps the count, and dedupes; throws TypeError on anything else. */
 export function validateTags(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -37,7 +52,7 @@ export function validateTags(value: unknown): string[] {
     }
     // Redis encodes tag names as UTF-8. Reject lone UTF-16 surrogates rather
     // than letting replacement characters collapse distinct tag identities.
-    if (Buffer.from(tag, 'utf8').toString('utf8') !== tag) {
+    if (!isWellFormedString(tag)) {
       throw new TypeError('tags must contain well-formed Unicode strings');
     }
   }
