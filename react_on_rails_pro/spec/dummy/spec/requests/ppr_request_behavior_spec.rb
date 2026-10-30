@@ -121,7 +121,10 @@ describe "PPR request-level behavior", :caching, :server_rendering do
             "but end-to-end the warm response still carries three Flight rows with the COLD request's " \
             "props (component props row, hole props row, and the resolved hole element row) inside an " \
             "inline RSC payload script from the cached shell. When the residual leak is fixed this " \
-            "example fails as 'expected pending to fail' — promote it to a real example."
+            "example fails as 'expected pending to fail' — promote it by deleting this pending call, " \
+            "nothing else: the not_to include assertion below already scans the ENTIRE warm response " \
+            "body, inline Flight payload scripts included. This is issue #5002's 'stale props are " \
+            "absent' acceptance criterion, unresolved until #5278 is fixed."
     key = "stale-props-#{SecureRandom.hex(4)}"
 
     get ppr_path(key, dynamic_value: "stale-props-value")
