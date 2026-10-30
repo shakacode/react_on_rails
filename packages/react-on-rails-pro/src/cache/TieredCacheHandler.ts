@@ -91,7 +91,7 @@ export class TieredCacheHandler implements CacheHandler {
     try {
       l2Entry = await this.l2.get(key);
     } catch (err) {
-      console.error('TieredCacheHandler: L2 get failed, treating as miss', err);
+      console.error('TieredCacheHandler: L2 get failed, treating as miss:', cacheErrorLabel(err));
       return null;
     }
 
@@ -108,7 +108,7 @@ export class TieredCacheHandler implements CacheHandler {
       const promoted = l2Entry.tags?.length ? null : this.applyL1TtlForPromotion(l2Entry);
       if (promoted) {
         void this.l1.set(key, promoted).catch((err: unknown) => {
-          console.error('TieredCacheHandler: L1 promotion failed', err);
+          console.error('TieredCacheHandler: L1 promotion failed:', cacheErrorLabel(err));
         });
       }
       return l2Entry; // Return original entry (full TTL); only L1 gets the capped TTL
@@ -130,13 +130,24 @@ export class TieredCacheHandler implements CacheHandler {
     const l1Sees = typeof this.l1.revalidateTag === 'function';
     const l2Sees = typeof this.l2.revalidateTag === 'function';
     const skipBlindLayers = tagged && l1Sees !== l2Sees;
+
+    // Degenerate composition: the only invalidation-capable layer is a
+    // DISABLED L1 (l1MaxTtlSeconds <= 0) over a blind L2. The blind-layer rule
+    // forbids L2 and the disabled L1 cannot store, so a tagged entry is cached
+    // nowhere — safe (never stale) but every call re-renders. Say exactly
+    // that, once, instead of the misleading "cached only in the layer that
+    // supports invalidation" message.
+    if (skipBlindLayers && !l2Sees && this.l1Disabled()) {
+      this.warnTaggedUncachedOnce();
+      return;
+    }
     if (skipBlindLayers) this.warnTaggedBlindLayerOnce(l1Sees ? 'L2' : 'L1');
 
     const skipL2 = skipBlindLayers && !l2Sees;
     const l2Write = skipL2
       ? Promise.resolve()
       : this.l2.set(key, entry).catch((err: unknown) => {
-          console.error('TieredCacheHandler: L2 set failed', err);
+          console.error('TieredCacheHandler: L2 set failed:', cacheErrorLabel(err));
         });
 
     const skipL1 = this.l1Disabled() || (skipBlindLayers && !l1Sees);
@@ -147,9 +158,21 @@ export class TieredCacheHandler implements CacheHandler {
 
     const l1Entry = this.applyL1TtlForFreshEntry(entry);
     const l1Write = this.l1.set(key, l1Entry).catch((err: unknown) => {
-      console.error('TieredCacheHandler: L1 set failed', err);
+      console.error('TieredCacheHandler: L1 set failed:', cacheErrorLabel(err));
     });
     await Promise.all([l2Write, l1Write]);
+  }
+
+  private warnedTaggedUncached = false;
+
+  private warnTaggedUncachedOnce(): void {
+    if (this.warnedTaggedUncached) return;
+    this.warnedTaggedUncached = true;
+    console.warn(
+      'TieredCacheHandler: tagged entries are not cached AT ALL in this composition — L2 has no ' +
+        'revalidateTag (so it must never hold a tagged entry) and L1 is disabled by l1MaxTtlSeconds. ' +
+        'Every tagged call re-renders. Implement revalidateTag on L2 or enable L1 to cache them.',
+    );
   }
 
   private warnedTaggedBlindLayer = false;

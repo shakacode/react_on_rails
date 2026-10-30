@@ -310,6 +310,39 @@ describe('TieredCacheHandler', () => {
       }
     });
 
+    test('blind L2 under a DISABLED L1: tagged entries are stored nowhere, with an accurate warning', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const blindStore = new Map<string, CacheEntry>();
+        const bareL2 = {
+          get: jest.fn((k: string) => Promise.resolve(blindStore.get(k) ?? null)),
+          set: jest.fn((k: string, e: CacheEntry) => {
+            blindStore.set(k, e);
+            return Promise.resolve();
+          }),
+        };
+        const composed = new TieredCacheHandler(l1, bareL2, { l1MaxTtlSeconds: 0 });
+
+        await composed.set('key', makeEntry({ revalidate: 60, tags: ['t'] }));
+        await composed.set('key2', makeEntry({ revalidate: 60, tags: ['t'] }));
+
+        // Neither layer may hold the tagged entry: L2 cannot refuse it, L1 is disabled.
+        expect(bareL2.set).not.toHaveBeenCalled();
+        expect(await l1.get('key')).toBeNull();
+        // Exactly one warning, and it must say "not cached at all", not the
+        // misleading only-in-the-capable-layer message.
+        const uncachedWarnings = warnSpy.mock.calls.filter(([msg]) =>
+          String(msg).includes('not cached AT ALL'),
+        );
+        expect(uncachedWarnings).toHaveLength(1);
+        // Untagged entries still reach L2 as before.
+        await composed.set('untagged', makeEntry({ revalidate: 60 }));
+        expect(bareL2.set).toHaveBeenCalledTimes(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     test('set() writes tagged entries to BOTH layers with the original timestamp', async () => {
       const renderStart = Date.now() - 1_234;
       await tiered.set('key', makeEntry({ timestamp: renderStart, revalidate: 60, tags: ['t'] }));

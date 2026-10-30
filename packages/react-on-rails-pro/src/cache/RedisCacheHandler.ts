@@ -339,7 +339,9 @@ export class RedisCacheHandler implements CacheHandler {
         await this.redis.set(key, blob);
       }
     } catch (err) {
-      console.warn('[RedisCacheHandler] set failed, skipping cache write:', (err as Error).message);
+      // Label only — these handlers run during RSC renders whose console is
+      // replayed to the browser, and ioredis puts host:port in error messages.
+      console.warn('[RedisCacheHandler] set failed, skipping cache write:', cacheErrorLabel(err));
     }
   }
 }
