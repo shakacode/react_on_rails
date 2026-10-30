@@ -809,6 +809,29 @@ describe ReactOnRailsPro::Request do
       allow(ReactOnRailsPro.configuration).to receive_messages(
         server_renderer: "NodeRenderer", renderer_password:
       )
+      # The fanout uses its own short-read-timeout client, not the shared SSR
+      # connection.
+      described_class.instance_variable_set(:@revalidation_connection, mock_connection)
+    end
+
+    after do
+      described_class.instance_variable_set(:@revalidation_connection, nil)
+    end
+
+    it "builds the dedicated client with the short read timeout and a single-slot pool" do
+      described_class.instance_variable_set(:@revalidation_connection, nil)
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(mock_connection)
+      allow(mock_connection).to receive(:post)
+        .and_return(ReactOnRailsPro::RendererHttpClient::Response.new(status: 200))
+
+      expect(described_class.revalidate_renderer_tags(["posts/42"])).to eq(1)
+
+      expect(ReactOnRailsPro::RendererHttpClient).to have_received(:new)
+        .with(hash_including(
+                connect_timeout: ReactOnRailsPro::Request::RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS,
+                read_timeout: ReactOnRailsPro::Request::RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS,
+                pool_size: 1
+              ))
     end
 
     def stub_revalidation_post(status: 200)
@@ -855,6 +878,28 @@ describe ReactOnRailsPro::Request do
       oversize = "x" * (ReactOnRailsPro::Request::RENDERER_REVALIDATE_TAG_MAX_LENGTH + 1)
 
       expect(described_class.revalidate_renderer_tags(["ok-tag", oversize])).to eq(1)
+
+      expect(recorded).to eq([["/revalidate-tags", { password: renderer_password, tags: ["ok-tag"] }]])
+      expect(logger_mock).to have_received(:warn)
+    end
+
+    it "measures the length cap in UTF-16 code units, matching the renderer's JS semantics" do
+      recorded = stub_revalidation_post
+      # 129 astral-plane chars: 129 Ruby code points but 258 UTF-16 units — the
+      # renderer would 400 the whole batch if this tag were sent.
+      astral_oversize = "\u{1F600}" * 129
+      astral_at_cap = "\u{1F600}" * 128 # exactly 256 UTF-16 units
+
+      expect(described_class.revalidate_renderer_tags([astral_oversize, astral_at_cap])).to eq(1)
+
+      expect(recorded).to eq([["/revalidate-tags", { password: renderer_password, tags: [astral_at_cap] }]])
+      expect(logger_mock).to have_received(:warn)
+    end
+
+    it "drops blank and non-String tags from direct callers instead of letting them 400 the batch" do
+      recorded = stub_revalidation_post
+
+      expect(described_class.revalidate_renderer_tags(["", :symbol_tag, "ok-tag"])).to eq(1)
 
       expect(recorded).to eq([["/revalidate-tags", { password: renderer_password, tags: ["ok-tag"] }]])
       expect(logger_mock).to have_received(:warn)

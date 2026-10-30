@@ -99,9 +99,10 @@ reaches the renderer too. `after_commit` timing is what makes read-your-writes h
 invalidation instant is strictly later than data visibility, so any render it refuses would have
 read the old data, and any render that starts afterward sees the committed row.
 
-The renderer fanout is **best-effort and non-blocking by contract**: it is a single attempt with no
-transport retries, it never raises into the write path, and every failure (renderer down, non-200,
-oversize tag) is logged and falls back to the entry's `revalidate` TTL. It fires only when
+The renderer fanout is **best-effort and time-bounded**: a single attempt on a dedicated
+connection with a 1-second connect/read timeout and no transport retries. It never raises into the
+write path, and every failure (renderer down, timed out, non-200, oversize tag) is logged and falls
+back to the entry's `revalidate` TTL. It fires only when
 `config.server_renderer == "NodeRenderer"`. Callback-skipping writes (`update_column`,
 `update_all`, raw SQL, other services writing to the same database) still need an explicit
 `revalidate_tags` call — the concern documents this caveat.

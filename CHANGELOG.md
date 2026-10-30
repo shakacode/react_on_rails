@@ -63,9 +63,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   the `Cache::Revalidates` `after_commit` concern, with zero app changes — fans out to the Node
   Renderer's `/revalidate-tags` endpoint after clearing the Rails fragment-cache entries, so one
   committed write busts both caches under the same normalized tag vocabulary (a model becomes its
-  version-less `cache_key`, e.g. `posts/42`). The fanout is best-effort and non-blocking: a single
-  attempt with no transport retries that never raises into the write path; failures are logged and
-  covered entries fall back to their `revalidate` TTL. Closes the read-your-writes gap of
+  version-less `cache_key`, e.g. `posts/42`). The fanout is best-effort and time-bounded: a single
+  attempt on a dedicated connection with a 1-second connect/read timeout, no transport retries, never raising
+  into the write path, and it runs even when the Rails cache store itself raised during revalidation
+  (the two backends are independent); failures are logged and covered entries fall back to their
+  `revalidate` TTL. Tag lengths are measured in UTF-16 code units to match the renderer's cap, so one
+  astral-plane tag can never 400 a whole batch. Closes the read-your-writes gap of
   [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
 - **[Pro]** **Node Renderer `POST /revalidate-tags` endpoint with cluster-wide fanout**: one
   authenticated POST invalidates `unstable_cache` tags in **every** renderer worker — the receiving
