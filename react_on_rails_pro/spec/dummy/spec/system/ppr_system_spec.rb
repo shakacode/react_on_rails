@@ -106,13 +106,22 @@ describe "PPR in the browser", :js do
     console_entries.select do |entry|
       entry.level.match?(/SEVERE|WARNING/) &&
         (entry.message.include?("Switched to client rendering") || entry.message.match?(/hydrat/i)) &&
-        # Known base defect #5295: RSCRoute's data-rsc-committed marker embeds
-        # the request props hash, so the cached (cold) shell's marker can never
-        # match the client's fresh-props marker on a warm visit. Filter ONLY
-        # that signature so every other hydration error still fails the test.
-        # Remove this filter when #5295 is fixed.
-        !entry.message.include?("data-rsc-committed")
+        !known_marker_attribute_warning?(entry)
     end
+  end
+
+  # Known base defect #5295: RSCRoute's data-rsc-committed marker embeds the
+  # request props hash, so the cached (cold) shell's marker can never match the
+  # client's fresh-props marker on a warm visit, and React logs an
+  # attribute-mismatch warning. Except ONLY that exact signature: the
+  # attribute-mismatch wording AND the marker name, and never anything that
+  # says "Switched to client rendering" — a client-render recovery must fail
+  # this test even when its diagnostic happens to mention the marker.
+  # Remove this exception when #5295 is fixed.
+  def known_marker_attribute_warning?(entry)
+    entry.message.include?("some attributes of the server rendered HTML didn't match") &&
+      entry.message.include?("data-rsc-committed") &&
+      !entry.message.include?("Switched to client rendering")
   end
 
   it "serves the cached shell, resumes the hole with this request's props, and hydrates interactively" do
