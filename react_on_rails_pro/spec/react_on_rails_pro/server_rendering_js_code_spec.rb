@@ -458,6 +458,28 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
 
         expect(render_js).to include('railsContext.pprPostponedState = "{\"step\":1}";')
       end
+
+      # Wire-key pin: `railsContext.pprShellAssets` carries the cached shell's asset
+      # manifest (stylesheet hrefs + init-script keys) to the resume render so it can
+      # suppress duplicates (#4897). Renaming either side silently disables the dedup
+      # (#5002 break-it M10: the suite stayed green with this emission removed).
+      it "injects the shell asset manifest under the pinned railsContext.pprShellAssets wire key" do
+        allow(render_options).to receive(:ppr_resume?).and_return(true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+        allow(render_options).to receive(:internal_option)
+          .with(:ppr_shell_assets).and_return('{"stylesheetHrefs":[],"initScriptKeys":["K1"]}')
+
+        expect(render_js)
+          .to include('railsContext.pprShellAssets = "{\"stylesheetHrefs\":[],\"initScriptKeys\":[\"K1\"]}";')
+      end
+
+      it "omits pprShellAssets from the resume context when the cached entry carried no manifest" do
+        allow(render_options).to receive(:ppr_resume?).and_return(true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+        allow(render_options).to receive(:internal_option).with(:ppr_shell_assets).and_return(nil)
+
+        expect(render_js).not_to include("pprShellAssets")
+      end
     end
   end
 end
