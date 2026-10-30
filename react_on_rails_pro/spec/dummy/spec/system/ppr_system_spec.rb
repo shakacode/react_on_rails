@@ -34,14 +34,54 @@ require "rails_helper"
 # never run during SSR), so it is the readiness gate before reading the
 # settled DOM — by hydration time the full streamed document has arrived.
 describe "PPR in the browser", :js do
+  # The browser's requests go to an EXTERNAL `rails server` process
+  # (Capybara.run_server = false), so this process cannot observe that
+  # server's Rails.cache or its notifications. The server is therefore booted
+  # with E2E_SHARED_CACHE_DIR (see config/environments/test.rb and the CI
+  # workflow), pointing its cache at a file store this process can read:
+  # - an entry file appearing after the cold visit proves the cache write
+  #   really happened in the server process;
+  # - that file staying untouched across the warm visit proves the warm
+  #   request served the cached shell instead of re-prerendering (a second
+  #   cold render would rewrite the entry).
+  # Without this, both visits silently hit :null_store and every "warm"
+  # assertion would pass on two independent cold renders (PR #5280 review).
+  def e2e_shared_cache_dir
+    File.expand_path(ENV.fetch("E2E_SHARED_CACHE_DIR", "tmp/e2e_shared_cache"), Rails.root)
+  end
+
+  # The PPR envelope entry for one example: its key contains both the fixed
+  # "ppr_react_component" term and the example's random cache-key marker.
+  # FileStore may split a long encoded key across directory levels, so match
+  # on the path with separators removed (neither substring contains one).
+  def ppr_cache_entry_files(marker)
+    Dir.glob(File.join(e2e_shared_cache_dir, "**", "*")).select do |path|
+      flat = path.delete("/")
+      File.file?(path) && flat.include?("ppr_react_component") && flat.include?(marker)
+    end
+  end
+
+  def expect_single_cold_cache_write(marker)
+    entries = ppr_cache_entry_files(marker)
+    expect(entries.length).to eq(1),
+                              "Expected the cold visit to write exactly one PPR cache entry under " \
+                              "#{e2e_shared_cache_dir} (got #{entries.length}). Is the Rails server " \
+                              "running with E2E_SHARED_CACHE_DIR? Without it the server uses " \
+                              ":null_store and every visit is a cold render."
+    entries.first
+  end
+
   it "serves the cached shell, resumes the hole with this request's props, and hydrates interactively" do
     cache_key = "ppr-system-#{SecureRandom.hex(4)}"
     base = "/ppr_page_for_testing?cacheKey=#{cache_key}&holeDelayMs=1500"
 
-    # Cold visit warms the shared Rails cache through the full stack.
+    # Cold visit warms the shared cache through the full stack; the entry file
+    # proves the write happened in the server process.
     visit "#{base}&dynamicValue=cold-browser-value"
     expect(page).to have_css("#ppr-shell-header", text: "PPR header for testing", wait: 15)
     expect(page).to have_css("#ppr-dynamic-value", text: "cold-browser-value", wait: 15)
+    entry = expect_single_cold_cache_write(cache_key)
+    cold_entry_mtime = File.mtime(entry)
 
     # Warm visit: the shell comes from the cache; the hole must carry THIS
     # request's value (not the cold one) once the resume stream's reveal runs.
@@ -50,6 +90,13 @@ describe "PPR in the browser", :js do
     expect(page).to have_css("#ppr-dynamic-value", text: "warm-browser-value", wait: 15)
     expect(page).to have_no_css("#ppr-hole-fallback")
     expect(page).to have_css("#ppr-shell-footer")
+
+    # Warm evidence: a hit never rewrites the envelope — a changed mtime means
+    # the "warm" visit actually re-prerendered and re-wrote the cache.
+    expect(ppr_cache_entry_files(cache_key)).to eq([entry])
+    expect(File.mtime(entry)).to eq(cold_entry_mtime),
+                                 "The warm visit rewrote the PPR cache entry: it re-prerendered " \
+                                 "instead of serving the cached shell."
 
     # Hydrated AND interactive: the gate attribute only appears after the
     # hydration commit, and the click must update React state.
@@ -68,10 +115,17 @@ describe "PPR in the browser", :js do
     # record is cached and no resume phase runs even on this first request.
     visit "#{base}&dynamicValue=static-cold-value"
     assert_fully_static_dom
+    entry = expect_single_cold_cache_write(cache_key)
+    cold_entry_mtime = File.mtime(entry)
 
-    # Warm visit: the shell comes entirely from the cache — still no resume.
+    # Warm visit: the shell comes entirely from the cache — still no resume,
+    # and the untouched entry file proves no re-prerender happened.
     visit "#{base}&dynamicValue=static-warm-value"
     assert_fully_static_dom
+    expect(ppr_cache_entry_files(cache_key)).to eq([entry])
+    expect(File.mtime(entry)).to eq(cold_entry_mtime),
+                                 "The warm visit rewrote the shell-only PPR cache entry: it " \
+                                 "re-prerendered instead of serving the cached shell."
   end
 
   # The fully static DOM contract (issue #5002 scope §1, scenario 2): shell

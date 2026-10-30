@@ -338,7 +338,12 @@ jobs:
       - name: Run Rails server in background
         run: |
           cd spec/dummy
-          RAILS_ENV="test" bundle exec rails server &
+          # E2E_SHARED_CACHE_DIR switches this server's Rails.cache from
+          # :null_store to a file store (config/environments/test.rb) so the
+          # PPR browser spec can observe cache writes and hits across
+          # processes (spec/system/ppr_system_spec.rb). Only the server gets
+          # the var: the rspec step below keeps :null_store.
+          RAILS_ENV="test" E2E_SHARED_CACHE_DIR="tmp/e2e_shared_cache" bundle exec rails server &
 
       - name: Wait for Rails server to start
         run: |
