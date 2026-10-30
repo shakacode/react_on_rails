@@ -509,7 +509,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(instance.add_npm_dependencies_calls).to include(
         a_hash_including(
-          packages: ["react@~19.3.0", "react-dom@~19.3.0", "prop-types@^15.0.0"],
+          packages: ["react@~19.3.1", "react-dom@~19.3.1", "prop-types@^15.0.0"],
           dev: false
         )
       )
@@ -535,7 +535,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s)
-        .to include("npm install react@~19.3.0 react-dom@~19.3.0 prop-types@^15.0.0")
+        .to include("npm install react@~19.3.1 react-dom@~19.3.1 prop-types@^15.0.0")
     end
   end
 
@@ -808,22 +808,24 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
   describe "#rsc_packages_with_version" do
     it "defines an explicit RSC package version pin independent from the React semver range prefix" do
-      expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.3.0")
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.3.1")
       expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.3.1")
     end
 
-    it "keeps the generated RSC React policy on the 19.3.x patch track" do
+    it "keeps the generated RSC React policy on the patched 19.3.x track" do
       range = ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE
       requirement = Gem::Requirement.new(range.sub(/\A~/, "~> "))
 
-      expect(requirement.satisfied_by?(Gem::Version.new("19.3.0"))).to be(true)
+      # 19.3.0 is excluded: GHSA-xqc2-xf4c-x3h3 affects react-server-dom-webpack 19.3.0.
+      expect(requirement.satisfied_by?(Gem::Version.new("19.3.0"))).to be(false)
+      expect(requirement.satisfied_by?(Gem::Version.new("19.3.1"))).to be(true)
       expect(requirement.satisfied_by?(Gem::Version.new("19.3.2"))).to be(true)
       expect(requirement.satisfied_by?(Gem::Version.new("19.2.8"))).to be(false)
       expect(requirement.satisfied_by?(Gem::Version.new("19.2.7"))).to be(false)
       expect(requirement.satisfied_by?(Gem::Version.new("19.4.0"))).to be(false)
     end
 
-    it "pairs the generated React range with the React line the pinned RSC package requires" do
+    it "keeps the generated React range inside the React line the pinned RSC package requires" do
       require "react_on_rails/doctor"
 
       doctor_range = ReactOnRails::Doctor::RSC_REACT_SUPPORT_RANGES.find do |range|
@@ -834,8 +836,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       end
 
       expect(doctor_range).not_to be_nil
-      expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE)
-        .to eq("~19.#{doctor_range[:minor]}.#{doctor_range[:min_patch]}")
+      # The generated floor may sit above the doctor's compatibility floor (it does, for the
+      # 2026-10-14 react-server-dom-webpack advisories), but never on another minor or below it.
+      _major, minor, patch = ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE
+                             .delete_prefix("~").split(".").map(&:to_i)
+      expect(minor).to eq(doctor_range[:minor])
+      expect(patch).to be >= doctor_range[:min_patch]
     end
 
     it "pins react-on-rails-rsc to the exact RSC package compatibility track" do
