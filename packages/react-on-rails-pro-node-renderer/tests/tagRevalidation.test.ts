@@ -114,8 +114,31 @@ describe('broadcastOrApplyTagRevalidation', () => {
 
     await broadcastOrApplyTagRevalidation(['t1'], 123);
 
-    expect(sendMock).toHaveBeenCalledWith({ type: REVALIDATE_TAGS, tags: ['t1'], invalidatedAt: 123 });
+    // The callback is load-bearing: send failures on a closing channel arrive
+    // there instead of as an unhandled 'error' event on process.
+    expect(sendMock).toHaveBeenCalledWith(
+      { type: REVALIDATE_TAGS, tags: ['t1'], invalidatedAt: 123 },
+      expect.any(Function),
+    );
     expect(applySpy).not.toHaveBeenCalled();
+  });
+
+  test('applies locally when the send callback reports an asynchronous channel failure', async () => {
+    const sendMock = jest.fn((_message: unknown, callback: (err: Error | null) => void) => {
+      // Node's real behavior on a closing channel: no throw, false return,
+      // error delivered through the callback.
+      callback(Object.assign(new Error('channel closed'), { code: 'ERR_IPC_CHANNEL_CLOSED' }));
+      return false;
+    });
+    process.send = sendMock as unknown as typeof process.send;
+    const applySpy = jest.spyOn(vm, 'revalidateTagsInAllVMContexts').mockResolvedValue();
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => log);
+
+    await broadcastOrApplyTagRevalidation(['t1'], 123);
+    await Promise.resolve();
+
+    expect(applySpy).toHaveBeenCalledWith(['t1'], 123);
+    expect(warnSpy).toHaveBeenCalled();
   });
 
   test('applies locally when there is no IPC channel (standalone mode)', async () => {

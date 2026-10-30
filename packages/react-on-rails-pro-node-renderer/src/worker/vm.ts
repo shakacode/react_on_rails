@@ -516,6 +516,14 @@ export async function revalidateTagsInAllVMContexts(tags: string[], invalidatedA
   for (const [bundlePath, vmContext] of vmContexts.entries()) {
     // eslint-disable-next-line no-underscore-dangle -- dunder name matches the sandbox-global convention
     const hook = (vmContext.context as Record<string, unknown>).__REACT_ON_RAILS_REVALIDATE_TAGS__;
+    // An explicit null is the cache stub's marker: this bundle (the SSR server
+    // bundle in every normal deployment) can never hold unstable_cache
+    // entries, so it is skipped silently. Only `undefined` — a bundle built
+    // before tag support — earns the once-per-bundle warning below.
+    if (hook === null) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
     if (typeof hook !== 'function') {
       if (!revalidateHookMissingWarnedBundles.has(bundlePath)) {
         revalidateHookMissingWarnedBundles.add(bundlePath);
@@ -524,8 +532,10 @@ export async function revalidateTagsInAllVMContexts(tags: string[], invalidatedA
             bundlePath,
           },
           'Tag revalidation skipped for a bundle with no __REACT_ON_RAILS_REVALIDATE_TAGS__ hook. ' +
-            'The bundle was likely built with a react-on-rails-pro version without cache tag support; ' +
-            'its unstable_cache entries expire by TTL only.',
+            "Either the bundle never imports 'react-on-rails-pro/cache' (it then holds no " +
+            'unstable_cache entries and this warning is harmless), or it was built with a ' +
+            'react-on-rails-pro version without cache tag support, in which case its ' +
+            'unstable_cache entries expire by TTL only.',
         );
       }
       // eslint-disable-next-line no-continue

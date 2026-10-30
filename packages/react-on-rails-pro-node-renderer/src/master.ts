@@ -276,7 +276,22 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     if (isRevalidateTagsMessage(message)) {
       currentWorkers().forEach((targetWorker) => {
         try {
-          targetWorker.send(message);
+          // The send callback is load-bearing: a send on a dead or
+          // disconnecting worker does NOT throw — it returns false and reports
+          // ERR_IPC_CHANNEL_CLOSED asynchronously (verified empirically on
+          // Node 22) — and when no callback is supplied that failure is
+          // emitted as an unhandled 'error' event on the Worker object, which
+          // would crash the master. With the callback, the failure lands here
+          // as the documented best-effort log; that worker's entries expire by
+          // TTL instead.
+          targetWorker.send(message, (err: Error | null) => {
+            if (!err) return;
+            log.warn({
+              msg: 'Error sending tag revalidation to worker; its cached entries expire by TTL instead',
+              workerId: targetWorker.id,
+              err,
+            });
+          });
         } catch (err: unknown) {
           log.warn({
             msg: 'Error sending tag revalidation to worker; its cached entries expire by TTL instead',

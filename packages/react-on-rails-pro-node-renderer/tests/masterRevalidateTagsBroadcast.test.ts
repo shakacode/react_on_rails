@@ -122,8 +122,23 @@ describe('master tag-revalidation rebroadcast', () => {
 
     messageHandler({ id: workers.first.id }, message);
 
-    expect(workers.first.send).toHaveBeenCalledWith(message);
-    expect(workers.second.send).toHaveBeenCalledWith(message);
+    // The callback is load-bearing: a dead worker's send does not throw — it
+    // reports ERR_IPC_CHANNEL_CLOSED through the callback, and without one the
+    // failure becomes an unhandled 'error' event on the Worker object.
+    expect(workers.first.send).toHaveBeenCalledWith(message, expect.any(Function));
+    expect(workers.second.send).toHaveBeenCalledWith(message, expect.any(Function));
+  });
+
+  test('a send whose callback reports an async channel failure is logged with the worker id', () => {
+    const { workers, messageHandler, mockLog } = setupMasterHarness();
+    workers.first.send.mockImplementation((_message: unknown, callback?: (err: Error | null) => void) => {
+      callback?.(Object.assign(new Error('channel closed'), { code: 'ERR_IPC_CHANNEL_CLOSED' }));
+      return false;
+    });
+
+    expect(() => messageHandler({ id: workers.second.id }, buildMessage())).not.toThrow();
+
+    expect(mockLog.warn).toHaveBeenCalledWith(expect.objectContaining({ workerId: workers.first.id }));
   });
 
   test('a worker whose send throws is logged and does not block the others', () => {
@@ -135,7 +150,7 @@ describe('master tag-revalidation rebroadcast', () => {
 
     expect(() => messageHandler({ id: workers.second.id }, message)).not.toThrow();
 
-    expect(workers.second.send).toHaveBeenCalledWith(message);
+    expect(workers.second.send).toHaveBeenCalledWith(message, expect.any(Function));
     expect(mockLog.warn).toHaveBeenCalledWith(expect.objectContaining({ workerId: workers.first.id }));
   });
 

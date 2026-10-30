@@ -64,6 +64,21 @@ describe('revalidateTagsInAllVMContexts', () => {
     expect(secondHook).toHaveBeenCalledWith(['product-42-reviews', 'other'], 1758870000000);
   });
 
+  test('skips a null hook silently — the cache stub marks SSR bundles that can never hold entries', async () => {
+    await createVmBundle(testName);
+    await createSecondaryVmBundle(testName);
+
+    const hooked = jest.fn().mockResolvedValue(undefined);
+    contextGlobal(vmBundlePath(testName)).__REACT_ON_RAILS_REVALIDATE_TAGS__ = null;
+    contextGlobal(vmSecondaryBundlePath(testName)).__REACT_ON_RAILS_REVALIDATE_TAGS__ = hooked;
+    const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => log);
+
+    await revalidateTagsInAllVMContexts(['t'], 7);
+
+    expect(hooked).toHaveBeenCalledWith(['t'], 7);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   test('warns once per bundle lacking the hook and still delivers to the rest', async () => {
     await createVmBundle(testName);
     await createSecondaryVmBundle(testName);

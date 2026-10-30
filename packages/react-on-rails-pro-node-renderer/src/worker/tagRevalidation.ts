@@ -98,7 +98,24 @@ export async function broadcastOrApplyTagRevalidation(tags: string[], invalidate
   const message: RevalidateTagsMessage = { type: REVALIDATE_TAGS, tags, invalidatedAt };
   if (typeof process.send === 'function') {
     try {
-      process.send(message);
+      // The send callback is load-bearing twice over: a send on a closing IPC
+      // channel does NOT throw — it returns false and reports
+      // ERR_IPC_CHANNEL_CLOSED asynchronously (verified empirically on Node
+      // 22) — and when no callback is supplied, that asynchronous failure is
+      // emitted as an 'error' event on `process`, which has no listener and
+      // would crash the worker. With the callback, the failure is delivered
+      // here instead, and this worker at least applies the invalidation
+      // locally (late local apply is idempotent under mark-stale).
+      process.send(message, (err: Error | null) => {
+        if (!err) return;
+        log.warn({
+          msg: 'IPC forward of tag revalidation failed after queueing; applying in this worker only',
+          err,
+        });
+        applyTagRevalidationLocally(tags, invalidatedAt).catch((applyErr: unknown) => {
+          log.warn({ msg: 'Tag revalidation delivery failed', err: applyErr });
+        });
+      });
       return;
     } catch (err: unknown) {
       log.warn({
