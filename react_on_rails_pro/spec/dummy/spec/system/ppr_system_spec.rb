@@ -71,6 +71,50 @@ describe "PPR in the browser", :js do
     entries.first
   end
 
+  before do
+    # Flush the Selenium log buffer accumulated by preceding examples so the
+    # hydration-error check only sees this example's entries. Reading the
+    # buffer clears it.
+    page.driver.browser.logs.get(:browser)
+  rescue Selenium::WebDriver::Error::NoSuchDriverError
+    # Driver session gone; nothing to flush.
+    # Other WebDriver errors stay unrescued so a misconfigured driver fails visibly.
+  end
+
+  # A recovered hydration mismatch would pass every DOM assertion in this
+  # file: React throws the server HTML away, re-renders client-side, the
+  # fallback is gone, data-hydrated gets set on the fresh mount, and the click
+  # works. The only trace is a console error ("Switched to client rendering"
+  # or a hydration message), so assert its absence — after first proving the
+  # log channel captures at all (same convention as tanstack_starter_spec.rb;
+  # without the probe a broken channel returns [] and the check is vacuous).
+  def expect_no_hydration_errors
+    probe = "ppr-system-console-log-probe-#{SecureRandom.hex(4)}"
+    page.execute_script("console.error(arguments[0])", probe)
+    console_entries = page.driver.browser.logs.get(:browser)
+    expect(console_entries.map(&:message)).to include(a_string_including(probe)),
+                                              "Browser console log channel is unavailable; cannot assert " \
+                                              "absence of hydration errors. Check the goog:loggingPrefs " \
+                                              "setup in rails_helper.rb."
+
+    hydration_errors = hydration_error_entries(console_entries)
+    expect(hydration_errors).to be_empty,
+                                "Expected no hydration errors, got:\n#{hydration_errors.map(&:message).join("\n")}"
+  end
+
+  def hydration_error_entries(console_entries)
+    console_entries.select do |entry|
+      entry.level.match?(/SEVERE|WARNING/) &&
+        (entry.message.include?("Switched to client rendering") || entry.message.match?(/hydrat/i)) &&
+        # Known base defect #5295: RSCRoute's data-rsc-committed marker embeds
+        # the request props hash, so the cached (cold) shell's marker can never
+        # match the client's fresh-props marker on a warm visit. Filter ONLY
+        # that signature so every other hydration error still fails the test.
+        # Remove this filter when #5295 is fixed.
+        !entry.message.include?("data-rsc-committed")
+    end
+  end
+
   it "serves the cached shell, resumes the hole with this request's props, and hydrates interactively" do
     cache_key = "ppr-system-#{SecureRandom.hex(4)}"
     base = "/ppr_page_for_testing?cacheKey=#{cache_key}&holeDelayMs=1500"
@@ -104,6 +148,10 @@ describe "PPR in the browser", :js do
     expect(page).to have_css("#ppr-counter", text: "clicked 0")
     find_by_id("ppr-counter").click
     expect(page).to have_css("#ppr-counter", text: "clicked 1")
+
+    # The DOM checks above also pass when React recovers from a hydration
+    # mismatch by re-rendering client-side; the console is the only witness.
+    expect_no_hydration_errors
   end
 
   it "fullyStatic=true: cold and warm visits render the complete shell DOM with no hole " \
@@ -126,6 +174,11 @@ describe "PPR in the browser", :js do
     expect(File.mtime(entry)).to eq(cold_entry_mtime),
                                  "The warm visit rewrote the shell-only PPR cache entry: it " \
                                  "re-prerendered instead of serving the cached shell."
+
+    # A hydration mismatch here would mean the client rendered a different
+    # tree than the cached static shell (e.g. it rendered the hole the server
+    # omitted) — invisible to the DOM checks after React's recovery.
+    expect_no_hydration_errors
   end
 
   # The fully static DOM contract (issue #5002 scope §1, scenario 2): shell
