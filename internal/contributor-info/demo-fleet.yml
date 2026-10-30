@@ -158,18 +158,23 @@ repos:
       - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      # No cpflow package until a CPFlow review-app pipeline exists for this repo.
+      # cpflow is consumed as SHA-pinned control-plane-flow reusable workflows, not as a package.
     needs_pro: true
     package_manager: npm # packageManager npm@11.6.0; .npmrc legacy-peer-deps=true is part of the lock contract
     ruby_test: ALLOW_DEMO_RENDERER_PASSWORD=true bin/rails test
     js_test: npm run typecheck
     # bin/rails fails closed without the demo renderer password.
     build: ALLOW_DEMO_RENDERER_PASSWORD=true bin/rails react_on_rails:generate_packs && ALLOW_DEMO_RENDERER_PASSWORD=true bin/shakapacker
-    # Recorded for future review-app wiring; unreachable while review_app is null.
     smoke: [/]
-    # Staging-only Control Plane config (.controlplane/controlplane.yml); no review-app
-    # workflow has ever existed in this repo. Re-add the block if one is wired up.
-    review_app: null
+    review_app:
+      workflow: .github/workflows/cpflow-deploy-review-app.yml
+      # The wrapper calls the reusable workflow as its deploy-review job; a separate
+      # hosted-review job then verifies the deployed app on pull_request events.
+      status_check: deploy-review / deploy
+      cpflow_app_name: react-on-rails-demo-flagship-review
+      # On cpflow 6.0.x, create a PR's first review app with a manual workflow_dispatch
+      # run: an app pre-created by `cpflow setup-app` fails the PR-event template refresh
+      # (shakacode/control-plane-flow#524).
     verify: true
 
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
