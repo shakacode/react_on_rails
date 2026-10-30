@@ -93,10 +93,11 @@ defaults:
   branch_prefix: chore/demo-fleet
   review_app:
     # Every public demo with a review-app pipeline uses the control-plane-flow
-    # reusable workflow; its check-run is named `deploy / deploy` (there is no
-    # `cpflow/review-app` commit status). The first deploy for a PR must be
-    # requested with a `+review-app-deploy` comment or `workflow_dispatch`;
-    # `pull_request` runs only skip until an app exists.
+    # reusable workflow; its check-run is named `deploy / deploy` by default (there
+    # is no `cpflow/review-app` commit status). A wrapper that names its calling job
+    # differently records its own `status_check`, as the flagship does. The first
+    # deploy for a PR must be requested with a `+review-app-deploy` comment or
+    # `workflow_dispatch`; `pull_request` runs only skip until an app exists.
     workflow: .github/workflows/cpflow-deploy-review-app.yml
     status_check: deploy / deploy
     cpflow_app_name: null
@@ -171,7 +172,7 @@ repos:
       # The wrapper calls the reusable workflow as its deploy-review job; a separate
       # hosted-review job then verifies the deployed app on pull_request events.
       status_check: deploy-review / deploy
-      cpflow_app_name: react-on-rails-demo-flagship-review
+      cpflow_app_name: react-on-rails-demo-flagship-review # per-PR app: <name>-<PR#>
       # On cpflow 6.0.x, create a PR's first review app with a manual workflow_dispatch
       # run: an app pre-created by `cpflow setup-app` fails the PR-event template refresh
       # (shakacode/control-plane-flow#524).
