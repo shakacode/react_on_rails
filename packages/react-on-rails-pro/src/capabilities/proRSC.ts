@@ -97,8 +97,9 @@ const streamRenderRSCComponent = (
 
   const { reactClientManifestFileName, reactServerClientManifestFileName } = railsContext;
 
-  // Initialize manifest loader and BUILD_ID on first render request.
-  // These are per-process constants that don't change between requests.
+  // Initialize manifest loader and BUILD_ID on each render request.
+  // These are per-VM constants derived from the bundle; setBuildId is
+  // idempotent for the same value and skips redundant work.
   setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
   const rscPayloadParams = railsContext.serverSideRSCPayloadParameters as
     | { rscBundleHash?: string }
