@@ -99,7 +99,23 @@ module ReactOnRailsPro
         meaningful_tags = meaningful_revalidation_tags(tags)
         return 0 if meaningful_tags.empty?
 
-        TagIndex.revalidate(*meaningful_tags)
+        # Normalized once for both legs: the String form is the shared tag
+        # vocabulary between Ruby and JavaScript (normalization is idempotent,
+        # so TagIndex.revalidate re-normalizing these strings is a no-op).
+        normalized_tags = TagIndex.normalize_tags(meaningful_tags).uniq
+        begin
+          TagIndex.revalidate(*normalized_tags)
+        ensure
+          # One write busts both caches (issue #5077): the Rails fragment cache
+          # above, and the renderer-side `unstable_cache` through the Node
+          # Renderer's /revalidate-tags endpoint. The two backends are
+          # independent, so the renderer fanout runs even when the Rails cache
+          # store raised out of TagIndex.revalidate (that error still
+          # propagates to the caller unchanged). Best-effort by contract:
+          # revalidate_renderer_tags never raises into this write path
+          # (after_commit), and a missed fanout falls back to the entry TTL.
+          Request.revalidate_renderer_tags(normalized_tags)
+        end
       end
 
       private

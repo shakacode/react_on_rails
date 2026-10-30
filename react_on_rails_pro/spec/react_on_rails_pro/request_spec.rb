@@ -802,6 +802,134 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe ".revalidate_renderer_tags" do
+    let(:renderer_password) { "revalidation-password" }
+
+    before do
+      allow(ReactOnRailsPro.configuration).to receive_messages(
+        server_renderer: "NodeRenderer", renderer_password:
+      )
+      # The fanout uses its own short-read-timeout client, not the shared SSR
+      # connection.
+      described_class.instance_variable_set(:@revalidation_connection, mock_connection)
+    end
+
+    after do
+      described_class.instance_variable_set(:@revalidation_connection, nil)
+    end
+
+    it "builds the dedicated client with the short read timeout and a single-slot pool" do
+      described_class.instance_variable_set(:@revalidation_connection, nil)
+      allow(ReactOnRailsPro::RendererHttpClient).to receive(:new).and_return(mock_connection)
+      allow(mock_connection).to receive(:post)
+        .and_return(ReactOnRailsPro::RendererHttpClient::Response.new(status: 200))
+
+      expect(described_class.revalidate_renderer_tags(["posts/42"])).to eq(1)
+
+      expect(ReactOnRailsPro::RendererHttpClient).to have_received(:new)
+        .with(hash_including(
+                connect_timeout: ReactOnRailsPro::Request::RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS,
+                read_timeout: ReactOnRailsPro::Request::RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS,
+                pool_size: 1
+              ))
+    end
+
+    def stub_revalidation_post(status: 200)
+      recorded = []
+      allow(mock_connection).to receive(:post) do |path, json:|
+        recorded << [path, json]
+        # Non-streaming posts return an already-consumed response (the client
+        # eagerly drives the exchange), so status is populated up front.
+        ReactOnRailsPro::RendererHttpClient::Response.new(status:)
+      end
+      recorded
+    end
+
+    it "is a no-op without the Node Renderer (ExecJS keeps no renderer cache)" do
+      allow(ReactOnRailsPro.configuration).to receive(:server_renderer).and_return("ExecJS")
+      stub_revalidation_post
+
+      expect(described_class.revalidate_renderer_tags(["posts/42"])).to eq(0)
+      expect(mock_connection).not_to have_received(:post)
+    end
+
+    it "POSTs the deduped tags with the renderer password and reports the accepted count" do
+      recorded = stub_revalidation_post
+
+      expect(described_class.revalidate_renderer_tags(%w[posts/42 products posts/42])).to eq(2)
+
+      expect(recorded).to eq([
+                               ["/revalidate-tags",
+                                { password: renderer_password, tags: %w[posts/42 products] }]
+                             ])
+    end
+
+    it "slices large invalidations into renderer-sized batches" do
+      recorded = stub_revalidation_post
+      tags = (1..65).map { |i| "tag-#{i}" }
+
+      expect(described_class.revalidate_renderer_tags(tags)).to eq(65)
+
+      expect(recorded.map { |(_, json)| json[:tags].size }).to eq([64, 1])
+    end
+
+    it "drops tags over the renderer's length cap with a warning instead of 400ing the batch" do
+      recorded = stub_revalidation_post
+      oversize = "x" * (ReactOnRailsPro::Request::RENDERER_REVALIDATE_TAG_MAX_LENGTH + 1)
+
+      expect(described_class.revalidate_renderer_tags(["ok-tag", oversize])).to eq(1)
+
+      expect(recorded).to eq([["/revalidate-tags", { password: renderer_password, tags: ["ok-tag"] }]])
+      expect(logger_mock).to have_received(:warn)
+    end
+
+    it "measures the length cap in UTF-16 code units, matching the renderer's JS semantics" do
+      recorded = stub_revalidation_post
+      # 129 astral-plane chars: 129 Ruby code points but 258 UTF-16 units — the
+      # renderer would 400 the whole batch if this tag were sent.
+      astral_oversize = "\u{1F600}" * 129
+      astral_at_cap = "\u{1F600}" * 128 # exactly 256 UTF-16 units
+
+      expect(described_class.revalidate_renderer_tags([astral_oversize, astral_at_cap])).to eq(1)
+
+      expect(recorded).to eq([["/revalidate-tags", { password: renderer_password, tags: [astral_at_cap] }]])
+      expect(logger_mock).to have_received(:warn)
+    end
+
+    it "drops blank and non-String tags from direct callers instead of letting them 400 the batch" do
+      recorded = stub_revalidation_post
+
+      expect(described_class.revalidate_renderer_tags(["", :symbol_tag, "ok-tag"])).to eq(1)
+
+      expect(recorded).to eq([["/revalidate-tags", { password: renderer_password, tags: ["ok-tag"] }]])
+      expect(logger_mock).to have_received(:warn)
+    end
+
+    it "returns 0 without POSTing when no tags survive filtering" do
+      stub_revalidation_post
+      oversize = "x" * (ReactOnRailsPro::Request::RENDERER_REVALIDATE_TAG_MAX_LENGTH + 1)
+
+      expect(described_class.revalidate_renderer_tags([oversize])).to eq(0)
+      expect(mock_connection).not_to have_received(:post)
+    end
+
+    it "logs and reports zero accepted tags on a non-200 response" do
+      stub_revalidation_post(status: 400)
+
+      expect(described_class.revalidate_renderer_tags(["posts/42"])).to eq(0)
+      expect(logger_mock).to have_received(:warn)
+    end
+
+    it "never raises into the caller's write path when the renderer is unreachable" do
+      allow(mock_connection).to receive(:post)
+        .and_raise(ReactOnRailsPro::RendererHttpClient::ConnectionError, "connection refused")
+
+      expect { described_class.revalidate_renderer_tags(["posts/42"]) }.not_to raise_error
+      expect(described_class.revalidate_renderer_tags(["posts/42"])).to eq(0)
+      expect(logger_mock).to have_received(:warn).at_least(:once)
+    end
+  end
+
   describe "thread-safe connection management" do
     before do
       described_class.instance_variable_set(:@connection, nil)

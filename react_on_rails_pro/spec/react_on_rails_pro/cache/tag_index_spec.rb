@@ -755,6 +755,45 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(Rails.cache.read("entry/two")).to be_nil
     end
 
+    it "fans the normalized tags out to the renderer exactly once per revalidation" do
+      record = TaggableRecord.new(cache_key: "posts/42")
+      allow(ReactOnRailsPro::Request).to receive(:revalidate_renderer_tags)
+
+      ReactOnRailsPro.revalidate_tags(record, "other-tag", "other-tag")
+
+      expect(ReactOnRailsPro::Request).to have_received(:revalidate_renderer_tags)
+        .with(%w[posts/42 other-tag]).once
+    end
+
+    it "still fans out to the renderer when the Rails cache store raises, then re-raises" do
+      allow(described_class).to receive(:revalidate)
+        .and_raise(ReactOnRailsPro::Error, "store exploded")
+      allow(ReactOnRailsPro::Request).to receive(:revalidate_renderer_tags)
+
+      # The two backends are independent: a Rails-cache failure must not strand
+      # the renderer's entries until TTL.
+      expect { ReactOnRailsPro.revalidate_tags("fanout-tag") }
+        .to raise_error(ReactOnRailsPro::Error, "store exploded")
+
+      expect(ReactOnRailsPro::Request).to have_received(:revalidate_renderer_tags).with(["fanout-tag"])
+    end
+
+    it "does not fan out when every tag is blank" do
+      allow(ReactOnRailsPro::Request).to receive(:revalidate_renderer_tags)
+
+      expect(ReactOnRailsPro.revalidate_tags(nil, "", "   ")).to eq(0)
+
+      expect(ReactOnRailsPro::Request).not_to have_received(:revalidate_renderer_tags)
+    end
+
+    it "returns the Rails-cache deletion count regardless of the renderer fanout" do
+      Rails.cache.write("entry/one", "one")
+      ReactOnRailsPro::Cache.register_tags(["fanout-tag"], "entry/one", nil)
+      allow(ReactOnRailsPro::Request).to receive(:revalidate_renderer_tags).and_return(0)
+
+      expect(ReactOnRailsPro.revalidate_tags("fanout-tag")).to eq(1)
+    end
+
     it "treats blank tag lists in register_tags as a no-op" do
       expect { ReactOnRailsPro::Cache.register_tags(nil, "entry/one", nil) }.not_to raise_error
       expect { ReactOnRailsPro::Cache.register_tags([], "entry/one", nil) }.not_to raise_error

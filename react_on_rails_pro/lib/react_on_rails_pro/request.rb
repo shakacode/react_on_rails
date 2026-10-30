@@ -25,6 +25,22 @@ module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     RAW_RENDER_CONTENT_TYPE = "application/vnd.react-on-rails.render-request+javascript"
     RAW_RENDER_HEADER_PREFIX = "x-react-on-rails-pro-"
+    # Mirror of the Node Renderer's /revalidate-tags request caps
+    # (packages/react-on-rails-pro-node-renderer/src/worker/tagRevalidation.ts).
+    # Exceeding either would 400 the whole request, so larger invalidations are
+    # sent in slices and oversize tags are dropped individually with a warning.
+    RENDERER_REVALIDATE_TAGS_BATCH_SIZE = 64
+    RENDERER_REVALIDATE_TAG_MAX_LENGTH = 256
+    # Connect AND read timeout for the revalidation fanout's dedicated
+    # connection: a blackholed renderer host (dropped SYNs) must bound the
+    # write-path stall the same way a slow response does. The
+    # endpoint replies in milliseconds (it only validates and hands the tags to
+    # the IPC broadcast), while the shared SSR connection's read timeout is
+    # sized for renders (ssr_timeout, default 5s). Revalidation runs
+    # synchronously inside after_commit, so a slow-but-accepting renderer must
+    # stall the caller's write by at most this bound per batch, after which the
+    # affected tags fall back to their revalidate TTL.
+    RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS = 1
 
     class UploadAssetsWaiter
       def initialize
@@ -87,6 +103,12 @@ module ReactOnRailsPro
           ReactOnRailsPro::RendererHttpClient.bump_client_generation
           @connection = new_conn
           old_conn&.close
+          # The revalidation client shares the same origin/auth; drop it so the
+          # next fanout rebuilds against the refreshed configuration. Lazy
+          # rebuild keeps this cheap for apps that never revalidate.
+          old_revalidation_conn = @revalidation_connection
+          @revalidation_connection = nil
+          old_revalidation_conn&.close
         end
       end
 
@@ -242,7 +264,97 @@ module ReactOnRailsPro
         JSON.parse(response.body)["exists"] == true
       end
 
+      # Best-effort fanout of a tag invalidation to the Node Renderer's
+      # /revalidate-tags endpoint, which rebroadcasts it to every renderer
+      # worker (issue #5077). Called from the model write path (after_commit
+      # via ReactOnRailsPro.revalidate_tags), so it must never raise: every
+      # failure is logged and the renderer's unstable_cache entries fall back
+      # to expiring by their revalidate TTL. Single attempt, no transport
+      # retries — a renderer outage must not stall application writes.
+      #
+      # Expects normalized String tags (Cache::TagIndex.normalize_tags), so
+      # Ruby and JavaScript invalidate the same tag vocabulary.
+      # Returns the number of tags accepted by the renderer.
+      def revalidate_renderer_tags(tags)
+        return 0 unless ReactOnRailsPro.configuration.server_renderer == "NodeRenderer"
+
+        valid_tags = renderer_revalidation_tags(Array(tags))
+        return 0 if valid_tags.empty?
+
+        accepted = 0
+        valid_tags.each_slice(RENDERER_REVALIDATE_TAGS_BATCH_SIZE) do |batch|
+          response = revalidation_connection.post("/revalidate-tags",
+                                                  json: {
+                                                    password: ReactOnRailsPro.configuration.renderer_password,
+                                                    tags: batch
+                                                  })
+          if response.status == 200
+            accepted += batch.size
+          else
+            Rails.logger.warn do
+              "[ReactOnRailsPro] Node Renderer rejected tag revalidation (HTTP #{response.status}); " \
+                "#{batch.size} tag(s) fall back to expiring by their revalidate TTL"
+            end
+          end
+        end
+        accepted
+      rescue StandardError => e
+        Rails.logger.warn do
+          "[ReactOnRailsPro] Could not reach the Node Renderer for tag revalidation (#{e.class}); " \
+            "affected unstable_cache entries expire by their revalidate TTL instead"
+        end
+        accepted || 0
+      end
+
       private
+
+      # Drops tags the renderer would reject (blank, non-String, or over the
+      # per-tag length cap) so one bad tag from a direct caller cannot 400 a
+      # whole batch, and dedupes the remainder.
+      def renderer_revalidation_tags(tags)
+        valid_tags, rejected_tags = tags.partition do |tag|
+          tag.is_a?(String) && !tag.empty? &&
+            renderer_tag_utf16_units(tag) <= RENDERER_REVALIDATE_TAG_MAX_LENGTH
+        end
+        if rejected_tags.any?
+          Rails.logger.warn do
+            "[ReactOnRailsPro] Skipping #{rejected_tags.size} cache tag(s) the renderer would " \
+              "reject (blank, non-String, or longer than #{RENDERER_REVALIDATE_TAG_MAX_LENGTH} " \
+              "UTF-16 units); their unstable_cache entries expire by their revalidate TTL instead"
+          end
+        end
+        valid_tags.uniq
+      end
+
+      # The renderer caps tag length in UTF-16 code units (JS String#length);
+      # Ruby String#length counts code points, which undercounts astral-plane
+      # characters (1 code point = 2 UTF-16 units), and one such undercounted
+      # tag would 400 the renderer's whole batch — the exact failure the
+      # partition above exists to prevent. A tag that cannot encode to UTF-16
+      # counts as oversize: the renderer rejects malformed Unicode anyway.
+      def renderer_tag_utf16_units(tag)
+        tag.encode(Encoding::UTF_16LE).bytesize / 2
+      rescue EncodingError
+        RENDERER_REVALIDATE_TAG_MAX_LENGTH + 1
+      end
+
+      # Dedicated client for the tag-revalidation fanout: same origin and
+      # auth, but a short read timeout (see
+      # RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS) and a single-slot pool —
+      # revalidation is rare, and it must never queue behind or stall like SSR
+      # traffic inside the caller's write path.
+      def revalidation_connection
+        conn = @revalidation_connection
+        return conn if conn
+
+        CONNECTION_MUTEX.synchronize do
+          @revalidation_connection ||= create_connection(
+            connect_timeout: RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS,
+            read_timeout: RENDERER_REVALIDATE_READ_TIMEOUT_SECONDS,
+            pool_size: 1
+          )
+        end
+      end
 
       def connection
         # Fast path: return existing connection without locking (lock-free for 99.99% of calls)
@@ -670,7 +782,7 @@ module ReactOnRailsPro
         response
       end
 
-      def create_connection
+      def create_connection(connect_timeout: nil, read_timeout: nil, pool_size: nil)
         config = ReactOnRailsPro.configuration
         url = config.renderer_url
         Rails.logger.debug do
@@ -680,9 +792,9 @@ module ReactOnRailsPro
 
         ReactOnRailsPro::RendererHttpClient.new(
           origin: url,
-          pool_size: config.renderer_http_pool_size,
-          connect_timeout: config.renderer_http_pool_timeout,
-          read_timeout: config.ssr_timeout,
+          pool_size: pool_size || config.renderer_http_pool_size,
+          connect_timeout: connect_timeout || config.renderer_http_pool_timeout,
+          read_timeout: read_timeout || config.ssr_timeout,
           force_http2: config.renderer_http_force_http2
         )
       rescue StandardError => e
