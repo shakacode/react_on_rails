@@ -1196,6 +1196,25 @@ describe ReactOnRailsProHelper do
           .with(/failed while re-stamping CSP nonces in a live cached stream/).once
       end
 
+      it "keeps the whole first chunk in place when it ends with a partial placeholder" do
+        # The first chunk is inlined at the component's position; later chunks are written
+        # after the template. Holding back the first chunk's tail would move it there.
+        rewriter = ReactOnRailsPro::CspNonceStreamRewriter.new("PLACEHOLDER", "live-BBB=")
+        queued = []
+        @main_output_queue = instance_double(Async::Queue)
+        allow(@main_output_queue).to receive(:enqueue) { |chunk| queued << chunk }
+        allow(response).to receive(:stream).and_return(instance_double(ActionController::Live::Buffer, closed?: false))
+        stream = instance_double(ReactOnRailsPro::StreamRequest)
+        allow(stream).to receive(:each_chunk)
+          .and_yield(%(<div>shell P)).and_yield(%(<script nonce="PLACEHOLDER">x()</script>))
+        promise = Async::Promise.new
+
+        expect(process_stream_chunks(stream, promise, nil, rewriter)).to be(true)
+
+        expect(promise.wait).to eq(%(<div>shell P))
+        expect(queued).to eq([%(<script nonce="live-BBB=">x()</script>)])
+      end
+
       it "returns stream chunks unchanged and warns when the cross-chunk rewrite raises" do
         allow(self).to receive(:request_csp_nonce).and_return("live-BBB=")
         allow(Rails.logger).to receive(:warn)

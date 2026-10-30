@@ -1892,9 +1892,10 @@ module ReactOnRailsProHelper
   # Fails open like the rest of the nonce machinery: a chunk the rewriter cannot process
   # streams with its placeholder for CSP to block instead of failing the stream. The
   # held-back tail is emitted on its own first, since joining it to the chunk may be what
-  # raised (incompatible encodings).
+  # raised (incompatible encodings). The first chunk is never held back: it is inlined at
+  # the component's position, while held-back text would surface after the template.
   def rewrite_live_stream_chunk(rewriter, chunk, first_chunk_promise)
-    rewriter.rewrite(chunk)
+    rewriter.rewrite(chunk, hold_back: first_chunk_promise.resolved?)
   rescue StandardError => e
     warn_cached_csp_nonce_degraded("re-stamping CSP nonces in a live cached stream", e)
     held_back = rewriter.flush
