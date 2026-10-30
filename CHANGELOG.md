@@ -58,6 +58,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   see the migration note in the
   [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache). Part of
   [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+- **[Pro]** **Node Renderer `POST /revalidate-tags` endpoint with cluster-wide fanout**: one
+  authenticated POST invalidates `unstable_cache` tags in **every** renderer worker — the receiving
+  worker stamps the invalidation at arrival, the master rebroadcasts it over IPC, and each worker
+  applies it inside every loaded bundle sandbox (all generations, so rolling-deploy bundles are
+  covered; pre-tags bundles are skipped with a one-time warning). In-memory caches gain their first
+  cross-worker invalidation path; standalone (`workersCount: 0`) renderers apply locally. Delivery is
+  best-effort with the entry TTL as the correctness floor. Caps: 64 distinct tags per request, 256
+  chars per tag. Part of
+  [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
   [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 

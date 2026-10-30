@@ -27,7 +27,11 @@ import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
 import logLicenseStatus from './shared/logLicenseStatus.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
-import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
+import {
+  isRevalidateTagsMessage,
+  isWorkerStartupFailureMessage,
+  type WorkerStartupFailureMessage,
+} from './shared/workerMessages.js';
 import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from './shared/utils.js';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from './worker/shutdownHooks.js';
 
@@ -258,6 +262,44 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   cluster.on('message', (worker, message) => {
     if (message === SHUTDOWN_WORKER_ACK_MESSAGE) {
       gracefulShutdownAcknowledgedWorkerIds.add(worker.id);
+      return;
+    }
+
+    // Tag invalidation fanout (issue #5077): rebroadcast to EVERY worker,
+    // including the sender — applying the echo is idempotent under mark-stale
+    // (max of carried timestamps), and special-casing the origin would leave
+    // its in-memory caches stale when it skipped the local apply. Fire and
+    // forget per worker: a failed send is logged, and that worker's entries
+    // fall back to expiring by TTL (the documented best-effort contract). A
+    // worker forked after this broadcast starts with empty caches, so the
+    // master keeps no invalidation history.
+    if (isRevalidateTagsMessage(message)) {
+      currentWorkers().forEach((targetWorker) => {
+        try {
+          // The send callback is load-bearing: a send on a dead or
+          // disconnecting worker does NOT throw — it returns false and reports
+          // ERR_IPC_CHANNEL_CLOSED asynchronously (verified empirically on
+          // Node 22) — and when no callback is supplied that failure is
+          // emitted as an unhandled 'error' event on the Worker object, which
+          // would crash the master. With the callback, the failure lands here
+          // as the documented best-effort log; that worker's entries expire by
+          // TTL instead.
+          targetWorker.send(message, (err: Error | null) => {
+            if (!err) return;
+            log.warn({
+              msg: 'Error sending tag revalidation to worker; its cached entries expire by TTL instead',
+              workerId: targetWorker.id,
+              err,
+            });
+          });
+        } catch (err: unknown) {
+          log.warn({
+            msg: 'Error sending tag revalidation to worker; its cached entries expire by TTL instead',
+            workerId: targetWorker.id,
+            err,
+          });
+        }
+      });
       return;
     }
 

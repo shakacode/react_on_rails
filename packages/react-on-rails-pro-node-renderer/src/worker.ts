@@ -66,6 +66,11 @@ import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './s
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 import { hasAnyVMContext, isDeclaredCurrentGenerationReady } from './worker/vm.js';
 import { prewarmCurrentGenerationBeforeListen } from './worker/startCurrentGeneration.js';
+import {
+  broadcastOrApplyTagRevalidation,
+  registerTagRevalidationListener,
+  validateRevalidationTags,
+} from './worker/tagRevalidation.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -627,6 +632,9 @@ export default function run(config: Partial<Config>) {
   ) as FastifyInstance;
 
   handleGracefulShutdown(app);
+  // Applies tag invalidations rebroadcast by the master (its own
+  // process.on('message') listener, coexisting with graceful shutdown's).
+  registerTagRevalidationListener();
 
   // We shouldn't have unhandled errors here, but just in case
   app.addHook('onError', (req, res, err, done) => {
@@ -1471,6 +1479,43 @@ export default function run(config: Partial<Config>) {
     const allExist = results.every((result) => result.exists);
 
     await setResponse({ status: 200, data: { exists: allExist, results }, headers: {} }, res);
+  });
+
+  // Invalidates unstable_cache entries by tag in every worker's bundle
+  // sandboxes (issue #5077). The invalidation instant is stamped HERE, when the
+  // POST arrives, and carried through the IPC fanout — a worker that applies it
+  // late must refuse exactly the entries rendered before this instant, no more.
+  // 200 means "accepted and being broadcast", not "applied in every worker":
+  // the contract is best-effort with the entry TTL as the correctness floor.
+  // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+  // this is an internal renderer service not exposed to the internet, the
+  // handler authenticates every request, and tag count/length are capped.
+  // lgtm[js/missing-rate-limiting]
+  app.post<{
+    Body: WithBodyArrayField<Record<string, unknown>, 'tags'>;
+  }>('/revalidate-tags', async (req, res) => {
+    // A POST with no parseable body leaves req.body undefined; it must fail
+    // authentication as a 401, not crash into the generic 500 handler.
+    const body: WithBodyArrayField<Record<string, unknown>, 'tags'> = req.body ?? {};
+    const authResult = authenticate(body as AuthBody);
+    if (authResult) {
+      await setResponse(authResult, res);
+      return;
+    }
+
+    const validation = validateRevalidationTags(extractBodyArrayField(body, 'tags'));
+    if ('error' in validation) {
+      log.info('POST /revalidate-tags rejected: %s', validation.error);
+      await setResponse(badRequestResponseResult(validation.error), res);
+      return;
+    }
+
+    const invalidatedAt = Date.now();
+    await broadcastOrApplyTagRevalidation(validation.tags, invalidatedAt);
+    await setResponse(
+      { status: 200, data: { accepted: true, tags: validation.tags.length, invalidatedAt }, headers: {} },
+      res,
+    );
   });
 
   app.get('/info', (_req, res) => {
