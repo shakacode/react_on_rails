@@ -78,6 +78,40 @@ involved (see [Tag Invalidation Through Redis](#tag-invalidation-through-redis))
 entries on a handler without `revalidateTag` logs a warning once per handler; the entries keep their
 tags, so a handler upgrade honors them later.
 
+## Invalidating from outside the renderer
+
+The Node Renderer exposes `POST /revalidate-tags`, authenticated with the same renderer password as
+every other endpoint. The receiving worker stamps the invalidation instant on arrival and forwards
+it to the renderer master, which rebroadcasts it over IPC to **every** worker — each worker applies
+it inside every loaded bundle sandbox (old bundle generations included, since they still serve
+requests during rolling deploys). A bundle built with a pre-tags `react-on-rails-pro` version is
+skipped with a one-time warning; its entries keep expiring by TTL.
+
+```bash
+curl -X POST http://renderer-host:3800/revalidate-tags \
+  -d 'password=<renderer password>' \
+  -d 'tags=product-42-reviews' \
+  -d 'tags=products'
+```
+
+Caps per request: at most 64 distinct tags, each a non-empty string of at most 256 characters —
+the same limits `unstable_cache` enforces on the write side.
+
+A `200` response means **accepted and being broadcast**, not applied-everywhere: delivery is
+fire-and-forget (normally milliseconds; a worker stuck in synchronous render work applies it when
+its event loop frees up, refusing exactly the entries rendered before the origin stamp). A worker
+that misses the broadcast — or a crash between accept and apply — falls back to the entry's TTL,
+which remains the correctness floor. Callers must treat failures the same way: log and move on,
+never block a write on this call.
+
+With `RedisCacheHandler` the broadcast is belt-and-suspenders for the same machine — the Redis
+invalidation record already covers every machine sharing the Redis. For **in-memory** handlers the
+endpoint is the only cross-worker path, and it reaches only the renderer instance you POST to.
+
+The Ruby-side bridge (`ReactOnRailsPro.revalidate_tag` fanning out to this endpoint from
+`after_commit`) ships separately; until then, call the endpoint from your own Rails code where you
+need read-your-writes.
+
 ## Use Shared Storage
 
 The default cache is process-local. Separate Node Renderer workers do not share its entries. For a
@@ -207,14 +241,16 @@ support tag invalidation. The contract:
 
 ## Invalidation Limits
 
-Tag-based invalidation currently works only from JavaScript: `unstable_revalidateTag` reaches the
-cache handlers registered in the worker that calls it. There is no Node Renderer tag-invalidation
-endpoint and no Ruby `ReactOnRailsPro::RSCCache` bridge yet, so a Rails-side write cannot invalidate
-JavaScript `unstable_cache` entries. In a multi-worker deployment each worker's **in-memory** cache
-is still invalidated independently; entries in a shared `RedisCacheHandler` are invalidated for every
-worker sharing the Redis (see
-[Tag Invalidation Through Redis](#tag-invalidation-through-redis)). The `CacheHandler` interface has
-no delete method.
+Tag-based invalidation works from JavaScript (`unstable_revalidateTag` reaches the cache handlers
+registered in the worker that calls it) and through the Node Renderer's authenticated
+`POST /revalidate-tags` endpoint, which fans the invalidation out to **every** worker of that
+renderer over IPC (see [Invalidating from outside the renderer](#invalidating-from-outside-the-renderer)).
+There is no Ruby bridge yet, so a Rails-side write does not invalidate JavaScript `unstable_cache`
+entries automatically — a Rails caller must POST to the endpoint itself. Entries in a shared
+`RedisCacheHandler` are invalidated for every worker on every machine sharing the Redis (see
+[Tag Invalidation Through Redis](#tag-invalidation-through-redis)); per-machine **in-memory** caches
+on OTHER renderer instances are only reached by POSTing to each instance. The `CacheHandler`
+interface has no delete method.
 
 Use a finite `revalidate` interval when data can change. Include all data that distinguishes the
 rendered result in the cached function arguments. The build ID comes from the RSC artifact ID
