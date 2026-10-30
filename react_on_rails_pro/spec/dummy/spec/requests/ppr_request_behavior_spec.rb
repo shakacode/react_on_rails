@@ -87,13 +87,17 @@ describe "PPR request-level behavior", :caching, :server_rendering do
      "(regression: resume phase losing or reusing props — break-it M4)" do
     key = "fresh-props-#{SecureRandom.hex(4)}"
 
-    get ppr_path(key, dynamic_value: "cold-props-value")
-    expect(response).to have_http_status(:ok)
-    # Bind the HOLE MARKUP, not a bare value scan: the rails-context tag echoes the
-    # request URL (href/location/search), so any dynamicValue appears in the body
-    # several times regardless of what the render produced.
-    expect(response.body).to include('<p id="ppr-dynamic-value">cold-props-value</p>')
-    expect(prerender_calls).to eq(1)
+    with_ppr_events do |events|
+      get ppr_path(key, dynamic_value: "cold-props-value")
+      expect(response).to have_http_status(:ok)
+      # Bind the HOLE MARKUP, not a bare value scan: the rails-context tag echoes the
+      # request URL (href/location/search), so any dynamicValue appears in the body
+      # several times regardless of what the render produced.
+      expect(response.body).to include('<p id="ppr-dynamic-value">cold-props-value</p>')
+      expect(prerender_calls).to eq(1)
+      # The cold request writes exactly one paired record (shell + PostponedState).
+      expect(events_named(events, "ppr.cache.write").length).to eq(1)
+    end
 
     renderer_stream_js_calls.clear
     with_ppr_events do |events|
@@ -112,6 +116,8 @@ describe "PPR request-level behavior", :caching, :server_rendering do
       # are DIFFERENT on purpose: with a shared value, stale cold-request bytes can
       # satisfy a fresh-props assertion (how break-it M4 survived the previous suite).
       expect(response.body).to include('<p id="ppr-dynamic-value">warm-props-value</p>')
+      # A warm request serves the cached record and writes nothing back.
+      expect(events_named(events, "ppr.cache.write")).to be_empty
     end
   end
 
@@ -160,8 +166,11 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     with_ppr_events do |events|
       get path
       expect(response).to have_http_status(:ok)
-      expect(prerender_calls).to eq(0)
-      expect(resume_calls).to eq(0)
+      # The WHOLE captured call list, not just the PPR counters: a warm static
+      # shell must make no renderer call of any kind — this also catches an
+      # unexpected non-PPR fallback render (plain streaming SSR) that neither
+      # prerender_calls nor resume_calls would count.
+      expect(renderer_stream_js_calls).to be_empty
       expect(response.body).not_to include("$RC(")
       # The cached shell's content actually reached the warm response — an empty
       # body would otherwise satisfy every zero-renderer-call assertion above.
@@ -185,6 +194,9 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     with_ppr_events do |events|
       get path
       expect(response).to have_http_status(:ok)
+      # The user still gets a real page, not just a blank 200: the shell content
+      # renders even though the hole's async block threw.
+      expect(response.body).to include("Static section rendered in the PPR shell")
       expect(prerender_calls).to eq(1)
       refusals = events_named(events, "ppr.cache.write_refused")
       expect(refusals.map { |entry| entry[:payload][:reason] }).to eq(["render_error"])
@@ -195,6 +207,7 @@ describe "PPR request-level behavior", :caching, :server_rendering do
     with_ppr_events do |events|
       get path
       expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Static section rendered in the PPR shell")
       # Not a cache hit: the failed render was never persisted.
       expect(prerender_calls).to eq(1)
       expect(events_named(events, "ppr.cache.write")).to be_empty
