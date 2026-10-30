@@ -154,6 +154,15 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/ppr_page_for_testing")
   end
 
+  # ShakaPerf PPR gate (#5103): expose the ppr.cache.lookup ring recorded by
+  # config/initializers/shakaperf_ppr_lookup_log.rb so the benchmark proves each measured
+  # request was a warm hit. 404 unless the app was booted with SHAKAPERF_PPR_CACHE=true.
+  def shakaperf_ppr_lookups
+    return head :not_found unless defined?(ShakaperfPprLookupLog)
+
+    render json: { lookups: ShakaperfPprLookupLog.entries }
+  end
+
   def rsc_echo_props
     stream_view_containing_react_components(template: "/pages/rsc_echo_props")
   end
