@@ -1901,7 +1901,7 @@ module ReactOnRailsProHelper
   # at the end of the stream that tail, and any first chunk still pending, is emitted.
   def flush_live_stream(first_chunk_promise, rewriter, pending)
     held_back = rewriter.flush
-    emit_live_stream_piece(first_chunk_promise, rewriter, pending, held_back) if held_back.present? || pending
+    emit_live_stream_piece(first_chunk_promise, rewriter, pending, held_back) if held_back.present?
   end
 
   # Returns the pieces to emit for a live stream chunk. Fails open like the rest of the
@@ -1926,15 +1926,21 @@ module ReactOnRailsProHelper
       return nil
     end
 
-    pending = pending ? join_stream_pieces(pending, piece) : piece
-    return pending if rewriter.holding_back?
+    joined = pending ? join_first_stream_pieces(first_chunk_promise, pending, piece) : piece
+    return nil unless joined
+    return joined if rewriter.holding_back?
 
-    first_chunk_promise.resolve(pending)
+    first_chunk_promise.resolve(joined)
     nil
+  end
+
+  # Joins a piece onto the pending first chunk. If they cannot be joined (incompatible
+  # encodings), inlines what is pending, queues the piece, and returns nil.
+  def join_first_stream_pieces(first_chunk_promise, pending, piece)
+    join_stream_pieces(pending, piece)
   rescue StandardError => e
-    # Joining failed (incompatible encodings): inline what is pending and queue the piece.
     warn_cached_csp_nonce_degraded("joining the first live cached stream chunk", e)
-    first_chunk_promise.resolve(pending) unless first_chunk_promise.resolved?
+    first_chunk_promise.resolve(pending)
     emit_stream_chunk(first_chunk_promise, piece)
     nil
   end
