@@ -85,11 +85,20 @@ describe "PPR in the browser", :js do
   # bundle files (script src=...) never serialize their contents into
   # page.html.
   def assert_fully_static_dom
+    assert_static_shell_content
+    assert_no_resume_artifacts
+  end
+
+  def assert_static_shell_content
     expect(page).to have_css("#ppr-shell-header", text: "PPR header for testing", wait: 15)
     expect(page).to have_css("#ppr-static-section", text: "Static section rendered in the PPR shell")
     expect(page).to have_css("#ppr-shell-footer")
+    # Settle gate: hydration commits only after the whole streamed document
+    # has arrived, so the negative assertions read a settled DOM.
     expect(page).to have_css("#ppr-counter[data-hydrated]", wait: 15)
+  end
 
+  def assert_no_resume_artifacts
     expect(page).to have_no_css("#ppr-hole-fallback")
     expect(page).to have_no_css("#ppr-hole-content")
     expect(page).to have_no_css("#ppr-dynamic-value")
