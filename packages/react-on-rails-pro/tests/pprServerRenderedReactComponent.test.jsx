@@ -288,6 +288,8 @@ describe('pprServerRenderedReactComponent', () => {
     props = {},
     postponedStateJson,
     throwJsErrors = false,
+    generateRSCPayload,
+    pprShellAssets,
   }) => {
     ReactOnRails.register({ [componentName]: component });
     return pprResumeServerRenderedReactComponent({
@@ -296,9 +298,11 @@ describe('pprServerRenderedReactComponent', () => {
       trace: false,
       props,
       throwJsErrors,
+      ...(generateRSCPayload ? { generateRSCPayload } : {}),
       railsContext: {
         ...testingRailsContext,
         ...(postponedStateJson != null ? { pprPostponedState: postponedStateJson } : {}),
+        ...(pprShellAssets != null ? { pprShellAssets } : {}),
       },
     });
   };
@@ -783,20 +787,63 @@ describe('pprServerRenderedReactComponent', () => {
       expect(html).toContain(HOLE_FALLBACK_TEXT);
     });
 
-    it('preserves RSC payload init scripts in the shell even when payload chunks are suppressed', async () => {
-      const { html, trailingChunk } = await runPostponedPrerender(createSlowGenerateRSCPayload());
+    it('warm response pushes payload chunks for the key the cached shell omits, with exactly one init', async () => {
+      const { html: shellHtml, trailingChunk } = await runPostponedPrerender(createSlowGenerateRSCPayload());
 
+      // Key-scoped counters matching injectRSCPayload's exact script shapes:
+      //   init: <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["KEY"];(...)["KEY"]||=[]</script>
+      //   push: <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["KEY"]||=[]).push("chunk")</script>
+      const INIT_RE = /delete \(self\.REACT_ON_RAILS_RSC_ERRORS\|\|=\{\}\)\[("(?:[^"\\]|\\.)*")\]/g;
+      const PUSH_RE = /\[("(?:[^"\\]|\\.)*")\]\|\|=\[\]\)\.push\(/g;
+      const countByKey = (regex, text) => {
+        const counts = new Map();
+        for (const match of text.matchAll(regex)) {
+          counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+        }
+        return counts;
+      };
+
+      // Cached shell: exactly one init script for the postponed payload's key, ZERO pushes
+      // for it (#5019-A: per-request chunks must not be cached), and the asset manifest
+      // records the key so the resume phase suppresses a duplicate init (#4897).
+      const shellInits = countByKey(INIT_RE, shellHtml);
+      expect([...shellInits.keys()]).toHaveLength(1);
+      const [payloadKey] = shellInits.keys();
+      expect(shellInits.get(payloadKey)).toBe(1);
+      const shellPushCount = countByKey(PUSH_RE, shellHtml).get(payloadKey) ?? 0;
+      expect(shellPushCount).toBe(0);
       const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
-      expect(manifest).toHaveProperty('initScriptKeys');
-      expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
-      // The init script keys must be non-empty — the RSC payload was registered even though
-      // its data chunks were suppressed. The resume pass uses these keys to avoid re-declaring
-      // arrays the shell already initialized.
-      expect(manifest.initScriptKeys.length).toBeGreaterThan(0);
+      expect(manifest.initScriptKeys).toContain(JSON.parse(payloadKey));
       // The initialization script itself must appear in the shell HTML (the ||=[] declaration),
       // even though the payload data (.push() calls) was suppressed.
-      expect(html).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-      expect(html).not.toContain(RSC_PAYLOAD_MARKER);
+      expect(shellHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+      expect(shellHtml).not.toContain(RSC_PAYLOAD_MARKER);
+
+      // Warm hit: resume the same component against the shell's PostponedState + asset
+      // manifest; the RSC payload delivers promptly (resume has no settle abort).
+      const { chunks: resumeChunks, errors: resumeErrors } = await collectStreamResult(
+        runResume({
+          component: PprShellWithRSCHole,
+          componentName: 'PprShellWithRSCHole',
+          postponedStateJson: trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY],
+          pprShellAssets: trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY],
+          generateRSCPayload: createSlowGenerateRSCPayload(0),
+        }),
+      );
+      expect(resumeErrors).toHaveLength(0);
+      const resumeHtml = resumeChunks.map((chunk) => chunk.html).join('');
+      const warmHtml = shellHtml + resumeHtml;
+
+      // With the shell's push count pinned to 0 above, this requires the resume stream to
+      // deliver at least one push for the same key — the postponed payload streams fresh on
+      // every warm hit. (The #5019-A "shell caches no pushes" work is done by the toBe(0)
+      // assertion; this line proves the warm side actually delivers.)
+      const warmPushCount = countByKey(PUSH_RE, warmHtml).get(payloadKey) ?? 0;
+      expect(warmPushCount).toBeGreaterThan(shellPushCount);
+      expect(resumeHtml).toContain(RSC_PAYLOAD_MARKER);
+      // ... while initialization still happens exactly once: the resume stream re-emits no
+      // init for a key the shell already initialized.
+      expect(countByKey(INIT_RE, warmHtml).get(payloadKey)).toBe(1);
     });
 
     it('discards partially-delivered RSC payload chunks that arrived before the settle abort', async () => {

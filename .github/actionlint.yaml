@@ -1,0 +1,9 @@
+---
+# Configuration for actionlint (.github/workflows/actionlint.yml).
+# https://github.com/rhysd/actionlint/blob/main/docs/config.md
+self-hosted-runner:
+  # Custom labels of self-hosted runners, beyond GitHub's default label set.
+  # rork-bench is the dedicated M1 benchmark box from issue #4073, used by
+  # the ppr job in shakaperf-release-gates.yml.
+  labels:
+    - rork-bench
