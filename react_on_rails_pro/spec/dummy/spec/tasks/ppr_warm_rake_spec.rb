@@ -172,6 +172,17 @@ describe "react_on_rails_pro:ppr:warm rake task" do
     expect { invoke_task }.not_to raise_error
   end
 
+  # The exact default: no strict opt-in at all. A failed path is reported in
+  # the summary on stdout and the task completes normally — the output matcher
+  # also proves no SystemExit escaped the block.
+  it "completes normally with PPR_WARM_STRICT unset when a path failed, printing the failure summary" do
+    allow(ReactOnRailsPro::Ppr::CacheWarmer).to receive(:call)
+      .and_return(build_summary(failed: ["/some-path"]))
+    ENV.delete("PPR_WARM_STRICT")
+
+    expect { invoke_task }.to output(/0 warmed, 0 already-warm, 0 no-ppr, 1 failed/).to_stdout
+  end
+
   it "does not abort under PPR_WARM_STRICT=true when every path warmed, and prints the summary" do
     allow(ReactOnRailsPro::Ppr::CacheWarmer).to receive(:call)
       .and_return(build_summary(warmed: ["/some-path"]))
