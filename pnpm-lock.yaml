@@ -303,7 +303,7 @@ importers:
         specifier: '>=5.0.0'
         version: 7.120.4
       fastify:
-        specifier: ^5.12.5
+        specifier: ^5.12.6
         version: 5.12.7
       fs-extra:
         specifier: ^11.2.0
@@ -617,7 +617,7 @@ importers:
   react_on_rails_pro/scripts/load:
     devDependencies:
       fastify:
-        specifier: ^5.12.5
+        specifier: ^5.12.6
         version: 5.12.7
 
   react_on_rails_pro/spec/dummy:
