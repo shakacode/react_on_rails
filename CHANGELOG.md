@@ -35,7 +35,50 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5184](https://github.com/shakacode/react_on_rails/issues/5184).
   [PR 5185](https://github.com/shakacode/react_on_rails/pull/5185) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **`unstable_cache` no longer crashes on RSC payload-endpoint requests**: `BUILD_ID` was initialized only
+  on page-render requests, so any `/rsc_payload/*` request (e.g. `RSCRoute.refetch()`) that landed on a renderer
+  worker which had not yet served a full page render threw `BUILD_ID not set`. The RSC bundle hash is now published
+  on both paths, and the renderer VM context carries the bundle identity as a structural fallback so future RSC
+  entrypoints are safe by default. Fixes [Issue 5076](https://github.com/shakacode/react_on_rails/issues/5076).
+  [PR 5141](https://github.com/shakacode/react_on_rails/pull/5141),
+  [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Security
+
+- **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
+  `rake react_on_rails:doctor` now reads every `react-server-dom-webpack` copy in `yarn.lock`, `package-lock.json`,
+  `pnpm-lock.yaml`, or `bun.lock`, including copies installed through `react-on-rails-rsc` and npm aliases. It warns
+  when a copy is affected by React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)): any 19.0 through 19.3
+  version below its line's patched release (19.0.9, 19.1.10, 19.2.9, 19.3.1), prereleases included. The fix updates
+  `react`, `react-dom`, and `react-server-dom-webpack` together to 19.3.1 (19.2.9 on the 19.2 line) and commits the
+  refreshed lockfile. Doctor also warns when no lockfile in the package root lists the package, or when a copy, such
+  as an experimental build, falls outside the advisories' version rules.
+  [PR 5247](https://github.com/shakacode/react_on_rails/pull/5247) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **The RSC generator declares React 19.3.1 as the floor**: New RSC apps now install `react` and `react-dom`
+  from `~19.3.1` instead of `~19.3.0`, so they cannot resolve React 19.3.0. React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect
+  `react-server-dom-webpack` 19.3.0, and the patched `react-server-dom-webpack` 19.3.1 peers on React 19.3.1.
+  `react-on-rails-rsc` 19.3.1 still accepts React 19.3.0, so this floor is stricter than the package requires. When an
+  existing app has React 19.3.0, the generator now warns and gives one command that upgrades `react`, `react-dom`, and
+  `react-server-dom-webpack` together, so a retained lockfile cannot keep the vulnerable copy.
+  [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **The Node Renderer requires `fastify` 5.12.6 or later**: The `react-on-rails-pro-node-renderer` package
+  now depends on `fastify` `^5.12.6` instead of `^5.8.5`, so an app upgrading with an existing lockfile cannot keep a
+  `fastify` release affected by the 5.12.x security fixes, including authentication bypass through malformed URLs
+  ([GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7)), request-validation bypasses
+  ([GHSA-hwr6-493r-vm6h](https://github.com/advisories/GHSA-hwr6-493r-vm6h)), and a header-validation bypass fixed
+  in 5.12.6 ([GHSA-389g-gv7q-r4x8](https://github.com/advisories/GHSA-389g-gv7q-r4x8)). Fresh 17.2.0 installs
+  already pick up a fixed `fastify`. If your app pins a `fastify` 5 release below 5.12.6 through pnpm `overrides`,
+  npm `overrides`, or Yarn `resolutions`, raise or remove that pin. Node 18.19 apps that use the documented Fastify 4
+  override keep it, but no Fastify 4 release fixes the authentication and request-validation bypasses, so
+  move to Node 20 or later to get the fixed Fastify 5.
+  [PR 5274](https://github.com/shakacode/react_on_rails/pull/5274) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Refresh `react-server-dom-webpack` for React's October 14 RSC advisories**: React published
   [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) (critical, remote
