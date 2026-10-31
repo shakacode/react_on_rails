@@ -1,6 +1,6 @@
 # Demo Fleet Orchestrator — Design Sketch
 
-**Status:** Draft, pending user review
+**Status:** Draft, pending user review. The release-track PR-opening step exists as [`script/demo-fleet-upgrade`](../../script/demo-fleet-upgrade), run by an operator with their own `gh` credentials; CI polling, review-app smoke, tracking-issue updates, and the freshness track remain unbuilt.
 **Date:** 2026-05-27
 **Companion to:** [rc-testing-plan.md](rc-testing-plan.md)
 
