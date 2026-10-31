@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.2.1.rc.2] - 2026-10-30
+
 #### Fixed
 
 - **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
@@ -3590,7 +3592,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.1...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.2...main
+[17.2.1.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.1...v17.2.1.rc.2
 [17.2.1.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.0...v17.2.1.rc.1
 [17.2.1.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...v17.2.1.rc.0
 [17.2.0]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...v17.2.0
