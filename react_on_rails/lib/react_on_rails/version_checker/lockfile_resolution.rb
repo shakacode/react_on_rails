@@ -93,18 +93,39 @@ module ReactOnRails
 
         # Keys under packages/snapshots name every installed copy:
         #   9.0: "name@1.2.3" or "name@1.2.3(peer@4.5.6)"; 6.0: "/name@1.2.3(...)"; 5.x: "/name/1.2.3_peer@4.5.6"
+        #   5.x and 6.0 from a non-default registry: "registry.example.com/name/1.2.3",
+        #   "localhost+4873/name/1.2.3", or "registry.example.com/name@1.2.3"
+        # Tarball, git, and file: copies are returned as their whole key, so callers report them as unknown
+        # instead of skipping them or misreading a tarball name such as "19.3.1.tgz" as a version. 9.0 keys
+        # them as "name@https://...tgz(peer@4.5.6)"; 5.x and 6.0 key them by source ("github.com/org/repo/sha",
+        # "file:vendor/pkg.tgz") and record the package only in the entry's name.
+        PLAIN_VERSION = /\A\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\z/
+
         def self.all_versions(path, package_name)
           doc = project_document(path)
           return [] unless doc
 
-          keys = %w[packages snapshots].flat_map { |section| doc[section].is_a?(Hash) ? doc[section].keys : [] }
-          keys.filter_map do |key|
-            key = key.to_s.delete_prefix("/")
-            rest = [key.delete_prefix("#{package_name}@"), key.delete_prefix("#{package_name}/")].find do |candidate|
-              candidate != key
+          key_pattern = %r{\A/?(?:[^/@]+/)?#{Regexp.escape(package_name)}[@/](.+)\z}
+          versions = []
+          %w[packages snapshots].each do |section|
+            entries = doc[section]
+            next unless entries.is_a?(Hash)
+
+            entries.each do |key, entry|
+              version = copy_version(key.to_s, entry, key_pattern, package_name)
+              versions << version if version
             end
-            strip_peer_suffix(rest) if rest&.match?(/\A\d/)
           end
+          versions.uniq
+        end
+
+        def self.copy_version(key, entry, key_pattern, package_name)
+          rest = key[key_pattern, 1]
+          resolution = key[0, key.index("(") || key.length]
+          return (resolution if entry.is_a?(Hash) && entry["name"] == package_name) unless rest
+
+          version = strip_peer_suffix(rest)
+          version&.match?(PLAIN_VERSION) ? version : resolution
         end
 
         def self.dependencies(doc)

@@ -82,6 +82,115 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       expect(versions_in("pnpm-lock.yaml" => pnpm5)).to eq(["19.0.1"])
     end
 
+    it "keeps pnpm tarball, git, and file copies so they are not skipped" do
+      lockfile = <<~YAML
+        lockfileVersion: '9.0'
+        importers:
+          .: {}
+        packages:
+          react-server-dom-webpack@19.3.1:
+            resolution: {integrity: sha512-abc}
+          react-server-dom-webpack@https://example.com/react-server-dom-webpack-19.3.0.tgz:
+            resolution: {tarball: https://example.com/react-server-dom-webpack-19.3.0.tgz}
+          react-server-dom-webpack@https://codeload.github.com/react/react/tar.gz/abc123:
+            resolution: {tarball: https://codeload.github.com/react/react/tar.gz/abc123}
+          react-server-dom-webpack@file:vendor/react-server-dom-webpack.tgz:
+            resolution: {integrity: sha512-def, tarball: file:vendor/react-server-dom-webpack.tgz}
+        snapshots:
+          react-server-dom-webpack@https://example.com/react-server-dom-webpack-19.3.0.tgz(react@19.3.0):
+            dependencies:
+              react: 19.3.0
+      YAML
+
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
+        "19.3.1",
+        "react-server-dom-webpack@https://example.com/react-server-dom-webpack-19.3.0.tgz",
+        "react-server-dom-webpack@https://codeload.github.com/react/react/tar.gz/abc123",
+        "react-server-dom-webpack@file:vendor/react-server-dom-webpack.tgz"
+      )
+    end
+
+    it "strips peers from a snapshot-only URL key and ignores URL keys of same-prefix packages" do
+      lockfile = <<~YAML
+        lockfileVersion: '9.0'
+        importers:
+          .: {}
+        snapshots:
+          react-server-dom-webpack@https://example.com/rsdw.tgz(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+            dependencies: {}
+          react-server-dom-webpack-extra@https://example.com/extra.tgz:
+            dependencies: {}
+      YAML
+
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to eq(["react-server-dom-webpack@https://example.com/rsdw.tgz"])
+    end
+
+    it "reads pnpm 5 package keys that start with a registry host" do
+      lockfile = <<~YAML
+        lockfileVersion: 5.4
+        dependencies: {}
+        packages:
+          registry.example.com/react-server-dom-webpack/19.3.0_react@19.3.0:
+            resolution: {integrity: sha512-abc}
+          localhost+4873/react-server-dom-webpack/19.2.8:
+            resolution: {integrity: sha512-ghi}
+          pkgs.example.com/react-server-dom-webpack/19.3.1.tgz_react@19.3.1:
+            resolution: {tarball: https://pkgs.example.com/react-server-dom-webpack/19.3.1.tgz}
+          registry.example.com/react-server-dom-webpack/-/react-server-dom-webpack-19.3.0.tgz_react@19.3.0:
+            resolution: {tarball: https://registry.example.com/react-server-dom-webpack/-/react-server-dom-webpack-19.3.0.tgz}
+          registry.example.com/react-server-dom-webpack-extra/1.0.0:
+            resolution: {integrity: sha512-def}
+      YAML
+
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
+        "19.3.0", "19.2.8",
+        "pkgs.example.com/react-server-dom-webpack/19.3.1.tgz_react@19.3.1",
+        "registry.example.com/react-server-dom-webpack/-/react-server-dom-webpack-19.3.0.tgz_react@19.3.0"
+      )
+    end
+
+    it "keeps pnpm 5 and 6 git and tarball copies that name the package only in their entry" do
+      lockfile = <<~YAML
+        lockfileVersion: '6.0'
+        dependencies: {}
+        packages:
+          /react-server-dom-webpack@19.3.1:
+            resolution: {integrity: sha512-abc}
+          github.com/acme/react/abc123:
+            resolution: {tarball: https://codeload.github.com/acme/react/tar.gz/abc123}
+            name: react-server-dom-webpack
+            version: 19.3.0
+          file:vendor/rsdw.tgz:
+            resolution: {integrity: sha512-def, tarball: file:vendor/rsdw.tgz}
+            name: react-server-dom-webpack
+            version: 19.3.0
+          github.com/acme/other/def456:
+            resolution: {tarball: https://codeload.github.com/acme/other/tar.gz/def456}
+            name: react-server-dom-webpack-extra
+            version: 1.0.0
+      YAML
+
+      expect(versions_in("pnpm-lock.yaml" => lockfile)).to contain_exactly(
+        "19.3.1", "github.com/acme/react/abc123", "file:vendor/rsdw.tgz"
+      )
+    end
+
+    it "reads scoped package keys with and without a registry host" do
+      lockfile = <<~YAML
+        lockfileVersion: 5.4
+        dependencies: {}
+        packages:
+          /@acme/flight/2.0.0:
+            resolution: {integrity: sha512-abc}
+          registry.example.com/@acme/flight/2.1.0:
+            resolution: {integrity: sha512-def}
+          /@acme/flight-extra/9.9.9:
+            resolution: {integrity: sha512-ghi}
+      YAML
+
+      expect(versions_in({ "pnpm-lock.yaml" => lockfile }, "@acme/flight")).to contain_exactly("2.0.0", "2.1.0")
+    end
+
     it "collects every Yarn classic block, including merged selectors" do
       lockfile = <<~LOCK
         # yarn lockfile v1
