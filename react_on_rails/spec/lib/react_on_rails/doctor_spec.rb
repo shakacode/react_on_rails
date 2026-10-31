@@ -11591,6 +11591,26 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "does not report success when a pnpm tarball copy sits beside a patched one" do
+      File.write("pnpm-lock.yaml", <<~YAML)
+        lockfileVersion: '9.0'
+        importers:
+          .: {}
+        snapshots:
+          react-server-dom-webpack@19.3.1(react@19.3.1):
+            dependencies: {}
+          react-server-dom-webpack@https://example.com/rsdw-19.3.0.tgz(react@19.3.0):
+            dependencies: {}
+      YAML
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:success)).to be_empty
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("Could not tell whether react-server-dom-webpack react-server-dom-webpack@https://example.com/rsdw-19.3.0.tgz")
+      )
+    end
+
     it "warns that the check did not run when no lockfile lists react-server-dom-webpack" do
       File.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\nimporters:\n  .: {}\nsnapshots: {}\n")
 
