@@ -1868,6 +1868,7 @@ module ReactOnRailsProHelper
   # Returns true if the stream was fully consumed, false if aborted (client disconnect).
   # When false, callers must NOT invoke on_complete to avoid caching partial data.
   def process_stream_chunks(stream, first_chunk_promise, all_chunks, live_chunk_rewriter = nil)
+    pending_first_chunk = nil
     stream.each_chunk do |chunk|
       # Client disconnected — abort without caching partial results
       if response.stream.closed?
@@ -1876,30 +1877,77 @@ module ReactOnRailsProHelper
       end
 
       all_chunks&.push(chunk)
-      chunk = rewrite_live_stream_chunk(live_chunk_rewriter, chunk, first_chunk_promise) if live_chunk_rewriter
-      emit_stream_chunk(first_chunk_promise, chunk)
-    end
+      next emit_stream_chunk(first_chunk_promise, chunk) unless live_chunk_rewriter
 
-    # The rewriter holds back a trailing partial placeholder until the next chunk arrives.
-    held_back = live_chunk_rewriter&.flush
-    emit_stream_chunk(first_chunk_promise, held_back) if held_back.present?
+      pending_first_chunk = emit_live_stream_chunk(first_chunk_promise, live_chunk_rewriter, pending_first_chunk,
+                                                   chunk)
+    end
+    flush_live_stream(first_chunk_promise, live_chunk_rewriter, pending_first_chunk) if live_chunk_rewriter
 
     # Handle case where stream has no chunks
     first_chunk_promise.resolve(nil) unless first_chunk_promise.resolved?
     true
   end
 
-  # Fails open like the rest of the nonce machinery: a chunk the rewriter cannot process
-  # streams with its placeholder for CSP to block instead of failing the stream. The
-  # held-back tail is emitted on its own first, since joining it to the chunk may be what
-  # raised (incompatible encodings).
-  def rewrite_live_stream_chunk(rewriter, chunk, first_chunk_promise)
-    rewriter.rewrite(chunk)
+  # Re-stamps a live stream chunk and emits its pieces; returns the first chunk text still
+  # pending, or nil.
+  def emit_live_stream_chunk(first_chunk_promise, rewriter, pending, chunk)
+    rewrite_live_stream_chunk(rewriter, chunk).reduce(pending) do |still_pending, piece|
+      emit_live_stream_piece(first_chunk_promise, rewriter, still_pending, piece)
+    end
+  end
+
+  # The rewriter holds back a trailing partial placeholder until the next chunk arrives;
+  # at the end of the stream that tail, and any first chunk still pending, is emitted.
+  def flush_live_stream(first_chunk_promise, rewriter, pending)
+    held_back = rewriter.flush
+    emit_live_stream_piece(first_chunk_promise, rewriter, pending, held_back) if held_back.present?
+  end
+
+  # Returns the pieces to emit for a live stream chunk. Fails open like the rest of the
+  # nonce machinery: a chunk the rewriter cannot process streams with its placeholder for
+  # CSP to block instead of failing the stream. The held-back tail is returned as its own
+  # piece first, since joining it to the chunk may be what raised (incompatible encodings).
+  def rewrite_live_stream_chunk(rewriter, chunk)
+    [rewriter.rewrite(chunk)]
   rescue StandardError => e
     warn_cached_csp_nonce_degraded("re-stamping CSP nonces in a live cached stream", e)
     held_back = rewriter.flush
-    emit_stream_chunk(first_chunk_promise, held_back) unless held_back.empty?
-    chunk
+    held_back.empty? ? [chunk] : [held_back, chunk]
+  end
+
+  # The first chunk is inlined at the component's position, while later chunks are written
+  # after the template. Text the rewriter holds back from the first chunk still belongs at
+  # that position, so the first chunk is resolved only once nothing is held back. Returns
+  # the first chunk text still pending, or nil.
+  def emit_live_stream_piece(first_chunk_promise, rewriter, pending, piece)
+    if first_chunk_promise.resolved?
+      emit_stream_chunk(first_chunk_promise, piece)
+      return nil
+    end
+
+    joined = pending ? join_first_stream_pieces(first_chunk_promise, pending, piece) : piece
+    return nil unless joined
+    return joined if rewriter.holding_back?
+
+    first_chunk_promise.resolve(joined)
+    nil
+  end
+
+  # Joins a piece onto the pending first chunk. If they cannot be joined (incompatible
+  # encodings), inlines what is pending, queues the piece, and returns nil.
+  def join_first_stream_pieces(first_chunk_promise, pending, piece)
+    join_stream_pieces(pending, piece)
+  rescue StandardError => e
+    warn_cached_csp_nonce_degraded("joining the first live cached stream chunk", e)
+    first_chunk_promise.resolve(pending)
+    emit_stream_chunk(first_chunk_promise, piece)
+    nil
+  end
+
+  def join_stream_pieces(first, second)
+    joined = String.new(first.to_str) << second.to_str
+    first.html_safe? && second.html_safe? ? joined.html_safe : joined
   end
 
   # The first chunk resolves the promise for synchronous return; the rest go to the main
