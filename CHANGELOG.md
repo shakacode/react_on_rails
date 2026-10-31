@@ -97,7 +97,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   (high, denial of service) against `react-server-dom-webpack` 19.0.0 through 19.3.0. React on Rails does not pin that
   package, so fresh installs already resolve a fixed version, but existing lockfiles keep the old one. **Action
   required for upgraders:** RSC apps should update `react`, `react-dom`, and `react-server-dom-webpack` together to
-  19.3.1 (or all three to 19.2.9 on the 19.2 line) and commit the refreshed lockfile. Check with
+  19.3.1 (or all three to 19.2.9 on the 19.2 line) and commit the refreshed lockfile. If a copy nested under
+  `react-on-rails-rsc` stays behind, pin it with npm `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`. Check with
   `pnpm why react-server-dom-webpack` (or the npm or Yarn equivalent).
   [PR 5276](https://github.com/shakacode/react_on_rails/pull/5276) by [justin808](https://github.com/justin808).
 

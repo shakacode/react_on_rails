@@ -33537,6 +33537,8 @@ package. Fresh installs already resolve a fixed version, but an existing lockfil
 
 - Update `react`, `react-dom`, and `react-server-dom-webpack` together to 19.3.1, or all three to 19.2.9 on the 19.2
   line, and commit the refreshed lockfile. The patched `react-server-dom-webpack` peers on the matching React version.
+  If a copy nested under `react-on-rails-rsc` stays behind, pin it with npm `overrides`, pnpm `pnpm.overrides`, or Yarn
+  `resolutions`.
 - Check what your lockfile resolves with `pnpm why react-server-dom-webpack` (or the npm or Yarn equivalent), or
   run `bundle exec rake react_on_rails:doctor`, which now warns about affected copies. It also warns when it cannot
   judge a pnpm copy installed from a tarball, a git repository, or a local file.
