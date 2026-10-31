@@ -224,7 +224,7 @@ describe ReactOnRailsProHelper do
           end
 
           expect(cache_data.keys)
-            .to include(%r{/App/cache-key})
+            .to include(%r{/csp-nonce-free/App/cache-key})
           expect(cache_data.first[1].value).to match(/div id="App-react-component"/)
         end
 
@@ -253,7 +253,7 @@ describe ReactOnRailsProHelper do
           render_cached.call
 
           expect(props_calls).to eq(1)
-          expect(cache_data.keys).to include(%r{/App/callable-cache-key})
+          expect(cache_data.keys).to include(%r{/csp-nonce-free/App/callable-cache-key})
         end
 
         it "doesn't call the block if content is cached" do
@@ -279,7 +279,7 @@ describe ReactOnRailsProHelper do
           render_uncached.call
 
           expect(props_calls).to eq(2)
-          expect(cache_data.keys).not_to include(%r{/App/skip-if-false})
+          expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/skip-if-false})
         end
 
         it "skips the cache when unless is true" do
@@ -295,7 +295,7 @@ describe ReactOnRailsProHelper do
           render_uncached.call
 
           expect(props_calls).to eq(2)
-          expect(cache_data.keys).not_to include(%r{/App/skip-unless-true})
+          expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/skip-unless-true})
         end
 
         context "with cache_tags" do
@@ -312,15 +312,15 @@ describe ReactOnRailsProHelper do
             render_cached.call
             render_cached.call
             expect(props_calls).to eq(1)
-            expect(cache_data.keys).to include(%r{/App/tagged-cache-key})
+            expect(cache_data.keys).to include(%r{/csp-nonce-free/App/tagged-cache-key})
 
             expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
-            expect(cache_data.keys).not_to include(%r{/App/tagged-cache-key})
+            expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/tagged-cache-key})
 
             result = render_cached.call
             expect(props_calls).to eq(2)
             expect(result).to match(/div id="App-react-component"/)
-            expect(cache_data.keys).to include(%r{/App/tagged-cache-key})
+            expect(cache_data.keys).to include(%r{/csp-nonce-free/App/tagged-cache-key})
           end
 
           it "revalidates every entry registered under the tag" do
@@ -334,8 +334,8 @@ describe ReactOnRailsProHelper do
             end
 
             expect(ReactOnRailsPro.revalidate_tags("shared-tag")).to eq(2)
-            expect(cache_data.keys).not_to include(%r{/App/tagged-key-one})
-            expect(cache_data.keys).not_to include(%r{/App/tagged-key-two})
+            expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/tagged-key-one})
+            expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/tagged-key-two})
           end
 
           it "is a no-op for tags that were never written" do
@@ -350,7 +350,7 @@ describe ReactOnRailsProHelper do
               end
             end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
 
-            expect(cache_data.keys).not_to include(%r{/App/invalid-tagged-key})
+            expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/invalid-tagged-key})
           end
 
           it "converts expires_at before writing tagged entries when the cache store lacks expires_at support" do
@@ -386,7 +386,7 @@ describe ReactOnRailsProHelper do
             render_cached.call
 
             expect(props_calls).to eq(2)
-            expect(cache_data.keys).not_to include(%r{/App/expired-expires-at-key})
+            expect(cache_data.keys).not_to include(%r{/csp-nonce-free/App/expired-expires-at-key})
             expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(0)
           end
         end
@@ -400,7 +400,7 @@ describe ReactOnRailsProHelper do
               props
             end
 
-            expect(cache_data.keys).to include(%r{/App/a/b})
+            expect(cache_data.keys).to include(%r{/csp-nonce-free/App/a/b})
             expect(cache_data.first[1].value).to match(/div id="App-react-component"/)
           end
         end
@@ -530,7 +530,8 @@ describe ReactOnRailsProHelper do
             props
           end
 
-          expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
+          expect(cache_data.keys[0])
+            .to match(%r{#{base_cache_key_with_prerender}/csp-nonce-free/ReactHelmetApp/cache-key})
           expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
         end
 
@@ -573,7 +574,8 @@ describe ReactOnRailsProHelper do
               props
             end
 
-            expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
+            expect(cache_data.keys[0])
+              .to match(%r{#{base_cache_key_with_prerender}/csp-nonce-free/ReactHelmetApp/cache-key})
             expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
           end
         end
@@ -639,6 +641,658 @@ describe ReactOnRailsProHelper do
             expect(captured_auto_load_bundle).to be(false)
           end
         end
+      end
+    end
+  end
+
+  # Regression coverage for https://github.com/shakacode/react_on_rails/issues/5021:
+  # cached component HTML must not serve the originating request's CSP nonce to
+  # later requests whose responses carry a different nonce.
+  describe "CSP nonce on cache hits", :caching do
+    it "re-stamps the immediate-hydration script with the current request's nonce" do
+      allow(self).to receive(:request_csp_nonce).and_return("miss-nonce-AAA=")
+
+      first_result = cached_react_component("App", cache_key: "csp-nonce-restamp", auto_load_bundle: false) do
+        { name: "first" }
+      end
+      expect(first_result).to include('nonce="miss-nonce-AAA="')
+
+      allow(self).to receive(:request_csp_nonce).and_return("hit-nonce-BBB=")
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-restamp", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result).to include('nonce="hit-nonce-BBB="')
+      expect(second_result).not_to include("miss-nonce-AAA=")
+      # The re-stamped value must render without Rails re-escaping it in a real view.
+      expect(second_result).to be_html_safe
+      # The cache-write marker never leaks into served markup.
+      expect(first_result).not_to include("rorp-cached-csp-nonce")
+      expect(second_result).not_to include("rorp-cached-csp-nonce")
+    end
+
+    # Writes a fabricated nonce-partition entry under the real partitioned key and serves
+    # it back through the public helper with the given live nonce, raising if the props
+    # block runs (every consumer below expects a HIT).
+    def serve_from_cache(cached_html, key:, live_nonce: "live-BBB=")
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: key, csp_nonce_active: true
+      )
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+      allow(self).to receive(:request_csp_nonce).and_return(live_nonce)
+
+      cached_react_component("App", cache_key: key, auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+    end
+
+    it "re-stamps only attributes carrying the entry's originating nonce" do
+      # Cached SSR output can embed attacker-influenced raw markup (via an app-level HTML
+      # injection sink). A guessed nonce must never be promoted to the live nonce; only
+      # the framework-recorded originating value is re-stamped.
+      result = serve_from_cache(
+        "<div>cached</div>" \
+        '<script nonce="attacker-guess">evil()</script>' \
+        '<script nonce="origin-AAA=">framework()</script>' \
+        "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->",
+        key: "csp-nonce-exact"
+      )
+
+      expect(result).to include('<script nonce="live-BBB=">framework()</script>')
+      expect(result).to include('<script nonce="attacker-guess">evil()</script>')
+      expect(result).not_to include("origin-AAA=")
+      expect(result).not_to include("rorp-cached-csp-nonce")
+      # A SafeBuffer written to a real store must come back out html_safe after the
+      # marker slice and nonce gsub (SafeBuffer#gsub drops the flag if unhandled).
+      expect(result).to be_html_safe
+    end
+
+    it "re-stamps every occurrence of the entry's placeholder, in any spelling" do
+      # The placeholder is a random value only the framework saw, so every occurrence is
+      # framework-emitted: attribute spellings, and the railsContext JSON the client reads
+      # for scripts it inserts later.
+      result = serve_from_cache(
+        "<div>cached</div>" \
+        "<script NONCE = 'origin-AAA='>x()</script>" \
+        '<script type="application/json" id="js-react-on-rails-context">{"cspNonce":"origin-AAA="}</script>' \
+        "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->",
+        key: "csp-nonce-every-occurrence"
+      )
+
+      expect(result).to include("<script NONCE = 'live-BBB='>x()</script>")
+      expect(result).to include('{"cspNonce":"live-BBB="}')
+      expect(result).not_to include("origin-AAA=")
+      expect(result).to be_html_safe
+    end
+
+    # Regression for https://github.com/shakacode/react_on_rails/issues/5267: with a
+    # predictable nonce generator (here a stable, session-style value), stored HTML
+    # injected through an app sink can carry the writing request's nonce. On a cache hit
+    # it must keep that stale nonce for CSP to block, while framework scripts are
+    # re-stamped to the serving request's nonce.
+    it "never promotes app markup carrying the writing request's nonce on a cache hit" do
+      injected = '<script nonce="session-AAA=">stolen()</script>'
+      allow(self).to receive(:react_component).and_wrap_original do |original, *args, **kwargs|
+        "#{original.call(*args, **kwargs)}#{injected}".html_safe
+      end
+      allow(self).to receive(:request_csp_nonce).and_return("session-AAA=")
+
+      first_result = cached_react_component("App", cache_key: "csp-nonce-5267", auto_load_bundle: false) do
+        { name: "first" }
+      end
+      # The writing response itself works: framework scripts carry its nonce, and no
+      # placeholder or marker reaches the page.
+      framework_nonces = first_result.scan(/nonce="([^"]+)"/).flatten.uniq
+      expect(framework_nonces).to eq(["session-AAA="])
+      expect(first_result).not_to include("rorp-cached-csp-nonce")
+
+      allow(self).to receive(:request_csp_nonce).and_return("victim-BBB=")
+      second_result = cached_react_component("App", cache_key: "csp-nonce-5267", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result).to include(injected)
+      expect(second_result).to match(/<script nonce="victim-BBB=">\s*typeof ReactOnRails/)
+      expect(second_result.scan(/nonce="([^"]+)"/).flatten.uniq).to contain_exactly("victim-BBB=", "session-AAA=")
+    end
+
+    it "re-stamps a nested cached render to the enclosing render's placeholder" do
+      allow(self).to receive(:request_csp_nonce).and_return("request-AAAAAAAAAAAAAAAAAAAA=")
+
+      outer_placeholder = nil
+      inner_result = with_csp_nonce_placeholder do |placeholder|
+        outer_placeholder = placeholder
+        cached_react_component("App", cache_key: "csp-nonce-nested", auto_load_bundle: false) { { name: "inner" } }
+      end
+
+      # The enclosing entry can then re-stamp the nested framework scripts on its own hits.
+      expect(inner_result.scan(/nonce="([^"]+)"/).flatten.uniq).to eq([outer_placeholder])
+    end
+
+    it "never lets a cached render's placeholder reach a later uncached render" do
+      allow(self).to receive(:request_csp_nonce).and_return("request-AAA=")
+
+      cached_react_component("App", cache_key: "csp-nonce-scope", auto_load_bundle: false) { { name: "c" } }
+      uncached = react_component("App", props: { name: "u" }, auto_load_bundle: false)
+
+      expect(uncached.scan(/nonce="([^"]+)"/).flatten.uniq).to eq(["request-AAA="])
+      expect(rails_context[:cspNonce]).to eq("request-AAA=")
+    end
+
+    it "fully bypasses the component cache for a malformed nonce (no read, no write)" do
+      # A present-but-invalid nonce can neither use the validated partition (no marker
+      # can record its value, so its entries could never be re-stamped) nor the
+      # nonce-free partition (the JS pipeline sanitizes by stripping before validating,
+      # so markup rendered under a malformed-but-sanitizable nonce — "AAA BBB=" stamped
+      # as "AAABBB=" — can carry a live, possibly session-derived value that would
+      # replay verbatim to genuinely nonce-free requests). One behavior, four observable
+      # directions, each on its own cache key:
+
+      # 1. A malformed reader is never served the validated partition's entry.
+      allow(self).to receive(:request_csp_nonce).and_return("valid-writer-AAA=")
+      cached_react_component("App", cache_key: "csp-bypass-read-nonce", auto_load_bundle: false) do
+        { name: "valid-writer" }
+      end
+      allow(self).to receive(:request_csp_nonce).and_return("abc!")
+      result = cached_react_component("App", cache_key: "csp-bypass-read-nonce", auto_load_bundle: false) do
+        { name: "malformed-reader" }
+      end
+      expect(result).to include("malformed-reader")
+      expect(result).not_to include("valid-writer-AAA=")
+
+      # 2. A malformed reader never reads the nonce-free partition either.
+      allow(self).to receive(:request_csp_nonce).and_return(nil)
+      cached_react_component("App", cache_key: "csp-bypass-read-free", auto_load_bundle: false) do
+        { name: "nonce-free-writer" }
+      end
+      allow(self).to receive(:request_csp_nonce).and_return("abc!")
+      result = cached_react_component("App", cache_key: "csp-bypass-read-free", auto_load_bundle: false) do
+        { name: "malformed-reader" }
+      end
+      expect(result).to include("malformed-reader")
+      expect(result).not_to include("nonce-free-writer")
+
+      # 3. A malformed writer never populates the validated partition.
+      allow(self).to receive(:request_csp_nonce).and_return("bad nonce value!")
+      cached_react_component("App", cache_key: "csp-bypass-write-nonce", auto_load_bundle: false) do
+        { name: "malformed-writer" }
+      end
+      allow(self).to receive(:request_csp_nonce).and_return("valid-reader-BBB=")
+      fresh_render = false
+      result = cached_react_component("App", cache_key: "csp-bypass-write-nonce", auto_load_bundle: false) do
+        fresh_render = true
+        { name: "valid-reader" }
+      end
+      expect(fresh_render).to be(true)
+      expect(result).to include('nonce="valid-reader-BBB="')
+      expect(result).not_to include("malformed-writer")
+
+      # 4. A malformed writer never populates the nonce-free partition.
+      allow(self).to receive(:request_csp_nonce).and_return("AAA BBB=")
+      cached_react_component("App", cache_key: "csp-bypass-write-free", auto_load_bundle: false) do
+        { name: "malformed-writer" }
+      end
+      allow(self).to receive(:request_csp_nonce).and_return(nil)
+      fresh_render = false
+      result = cached_react_component("App", cache_key: "csp-bypass-write-free", auto_load_bundle: false) do
+        fresh_render = true
+        { name: "nonce-free-reader" }
+      end
+      expect(fresh_render).to be(true)
+      expect(result).not_to include("malformed-writer")
+    end
+
+    it "warns once per view context when a malformed nonce bypasses caching, never otherwise" do
+      # The bypass is otherwise silent (a 0% hit rate with no signal), so the warning is
+      # part of the observable contract: exactly once per view context (one per request
+      # in a real app — the per-request half is pinned in the cached-component request
+      # spec), naming the remedy, carrying only the nonce LENGTH, never the value.
+      allow(Rails.logger).to receive(:warn)
+
+      cached_react_component("App", cache_key: "csp-nonce-nowarn-free", auto_load_bundle: false) do
+        { name: "nonce-free" }
+      end
+      allow(self).to receive(:request_csp_nonce).and_return("valid-AAA=")
+      cached_react_component("App", cache_key: "csp-nonce-nowarn-valid", auto_load_bundle: false) do
+        { name: "valid-nonce" }
+      end
+      expect(Rails.logger).not_to have_received(:warn)
+
+      allow(self).to receive(:request_csp_nonce).and_return("bad nonce!")
+      2.times do |index|
+        cached_react_component("App", cache_key: ["csp-nonce-warn", index], auto_load_bundle: false) do
+          { name: "fresh-#{index}" }
+        end
+      end
+
+      expect(Rails.logger).to have_received(:warn)
+        .with(/Component caching bypassed for this request.*length 10.*content_security_policy_nonce_generator/m)
+        .once
+      expect(Rails.logger).not_to have_received(:warn).with(/bad nonce!/)
+    end
+
+    it "serves cached markup unchanged when the nonce is stable across requests" do
+      allow(self).to receive(:request_csp_nonce).and_return("stable-AAA=")
+
+      first_result = cached_react_component("App", cache_key: "csp-nonce-stable", auto_load_bundle: false) do
+        { name: "first" }
+      end
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-stable", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      # Byte-for-byte: a stable nonce must not trigger any rewrite, marker residue, or
+      # re-escaping — the hit serves exactly the fragment the miss produced. The miss
+      # output additionally carries request-scoped preamble the framework renders once
+      # per request (the attribution comment and the rails-context tag), so strip exactly
+      # those two known nodes and require full equality — a truncated or mutated hit
+      # must fail, not hide as a shorter suffix.
+      context_tag_pattern =
+        %r{\A<script type="application/json" id="js-react-on-rails-context">.*?</script>\n?}m
+      expected_fragment = first_result
+                          .sub(/\A<!-- Powered by React on Rails Pro.*?-->\n/m, "")
+                          .sub(context_tag_pattern, "")
+      expect(expected_fragment).to start_with("<div")
+      expect(second_result).to eq(expected_fragment)
+      expect(second_result).to include('nonce="stable-AAA="')
+      expect(second_result).not_to include("rorp-cached-csp-nonce")
+      expect(second_result).to be_html_safe
+    end
+
+    it "never strips app content that mimics the marker from nonce-free entries" do
+      # Nonce-free entries carry no framework marker, so a trailing marker-shaped comment
+      # is app content (e.g. CMS-supplied) and must survive the cache round-trip verbatim.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-mimic-free", csp_nonce_active: false
+      )
+      cached_html = "<div>cached</div><!--rorp-cached-csp-nonce-placeholder:app-supplied-AAA=-->"
+      Rails.cache.write(expected_cache_key, cached_html.html_safe)
+
+      result = cached_react_component("App", cache_key: "csp-nonce-mimic-free", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      # The whole entry as a suffix: nothing stripped, mutated, or inserted anywhere in
+      # the served fragment (framework attribution may only prefix it).
+      expect(result).to end_with(cached_html)
+    end
+
+    it "consumes only the framework marker when nonce-active app content also mimics it" do
+      # The framework marker is appended LAST at write time, so on the nonce-active
+      # partition the trailing match is always framework-owned; an app-supplied
+      # marker-shaped comment right before it stays in the served markup verbatim.
+      result = serve_from_cache(
+        "<div>cached</div>" \
+        '<script nonce="origin-AAA=">framework()</script>' \
+        "<!--rorp-cached-csp-nonce-placeholder:app-mimic-BBB=-->" \
+        "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->",
+        key: "csp-nonce-mimic-active", live_nonce: "live-CCC="
+      )
+
+      # The entire expected rewritten fragment as a suffix: only the trailing framework
+      # marker consumed, only the nonce re-stamped, nothing else mutated or inserted.
+      expect(result).to end_with(
+        "<div>cached</div>" \
+        '<script nonce="live-CCC=">framework()</script>' \
+        "<!--rorp-cached-csp-nonce-placeholder:app-mimic-BBB=-->"
+      )
+      expect(result).not_to include("origin-AAA=")
+    end
+
+    it "does not reuse entries cached without a nonce once a nonce generator is active" do
+      first_result = cached_react_component("App", cache_key: "csp-nonce-keying", auto_load_bundle: false) do
+        { name: "first" }
+      end
+      expect(first_result).not_to include("nonce=")
+
+      allow(self).to receive(:request_csp_nonce).and_return("late-nonce-CCC=")
+      second_props_evaluated = false
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-keying", auto_load_bundle: false) do
+        second_props_evaluated = true
+        { name: "second" }
+      end
+
+      expect(second_props_evaluated).to be(true)
+      expect(second_result).to include('nonce="late-nonce-CCC="')
+    end
+
+    it "re-stamps nonces inside cached_react_component_hash componentHtml", :requires_webpack_assets do
+      allow(self).to receive(:request_csp_nonce).and_return("hash-miss-AAA=")
+
+      first_result = cached_react_component_hash("ReactHelmetApp", cache_key: "csp-nonce-hash") do
+        { helloWorldData: { name: "CSP" } }
+      end
+      expect(first_result["componentHtml"]).to include('nonce="hash-miss-AAA="')
+
+      allow(self).to receive(:request_csp_nonce).and_return("hash-hit-BBB=")
+
+      second_result = cached_react_component_hash("ReactHelmetApp", cache_key: "csp-nonce-hash") do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(second_result["componentHtml"]).to include('nonce="hash-hit-BBB="')
+      expect(second_result["componentHtml"]).not_to include("hash-miss-AAA=")
+    end
+
+    it "re-stamps nonce-bearing strings in every cached_react_component_hash field" do
+      # A render function can return extra HTML-string fields alongside componentHtml
+      # (e.g. an Apollo state tag) whose scripts are stamped from railsContext.cspNonce.
+      expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+        "App", cache_key: "csp-nonce-hash-fields", prerender: true, csp_nonce_active: true
+      )
+      cached_hash = {
+        "componentHtml" => '<div>cached</div><script nonce="origin-AAA=">hydrate()</script>' \
+                           "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->".html_safe,
+        "apolloStateTag" => '<script nonce="origin-AAA=">window.__APOLLO_STATE__={}</script>'.html_safe,
+        "scriptTags" => ['<script nonce="origin-AAA=">one()</script>'],
+        "title" => "<title>Cached</title>"
+      }
+      Rails.cache.write(expected_cache_key, cached_hash)
+      allow(self).to receive(:request_csp_nonce).and_return("live-BBB=")
+
+      result = cached_react_component_hash("App", cache_key: "csp-nonce-hash-fields",
+                                                  auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      expect(result["componentHtml"]).to include('<script nonce="live-BBB=">hydrate()</script>')
+      expect(result["apolloStateTag"]).to eq('<script nonce="live-BBB=">window.__APOLLO_STATE__={}</script>')
+      expect(result["apolloStateTag"]).to be_html_safe
+      expect(result["scriptTags"]).to eq(['<script nonce="live-BBB=">one()</script>'])
+      expect(result["title"]).to eq("<title>Cached</title>")
+      expect(result.values.grep(String).join).not_to include("origin-AAA=")
+    end
+
+    it "leaves nonce-like text inside the cached props JSON untouched" do
+      allow(self).to receive(:request_csp_nonce).and_return("props-miss-AAA=")
+
+      # The prop text deliberately carries the ORIGINATING nonce value itself: on the
+      # wire it becomes the JSON-escaped nonce=\"props-miss-AAA=\", the closest possible
+      # in-JSON neighbor of the re-stampable attribute. A matcher that ever accepted the
+      # escaped form would corrupt this JSON on the hit.
+      cached_react_component("App", cache_key: "csp-nonce-props", auto_load_bundle: false) do
+        { embedded: 'literal nonce="props-miss-AAA=" text' }
+      end
+
+      allow(self).to receive(:request_csp_nonce).and_return("props-hit-BBB=")
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-props", auto_load_bundle: false) do
+        raise "props block must not run on a cache hit"
+      end
+
+      # The JSON-escaped prop text must survive the re-stamp verbatim; only the
+      # executable script's attribute changes.
+      expect(second_result).to include('nonce=\"props-miss-AAA=\"')
+      expect(second_result).to include('nonce="props-hit-BBB="')
+    end
+
+    it "never splices a malformed nonce into cached markup" do
+      allow(self).to receive(:request_csp_nonce).and_return("good-nonce-AAA=")
+
+      cached_react_component("App", cache_key: "csp-nonce-malformed", auto_load_bundle: false) do
+        { name: "first" }
+      end
+
+      allow(self).to receive(:request_csp_nonce).and_return('evil" onload="alert(1)')
+
+      second_result = cached_react_component("App", cache_key: "csp-nonce-malformed", auto_load_bundle: false) do
+        { name: "second" }
+      end
+
+      # The malformed request renders fresh in the nonce-free partition; nothing splices
+      # the malformed value as a real attribute (content_tag escapes it) and the rewrite
+      # never runs with it.
+      expect(second_result).not_to include(' onload="alert')
+      expect(second_result).not_to include("good-nonce-AAA=")
+    end
+
+    # Fail-open guarantee: no failure inside the nonce machinery — detection, validation
+    # of a generator-returned value, write-time marker append, hit-time marker
+    # extraction, or the re-stamp itself — may fail the request. Each seam degrades to
+    # what pre-#5021 code served (cached markup as-is, possibly carrying a stale nonce
+    # for CSP to block) and warns once per failed step per view context with the error
+    # class, never the raised message (it can embed secret-adjacent values).
+    describe "fail-open degradation" do
+      it "degrades to the malformed-nonce bypass when the generator returns poison values" do
+        # A generator can RETURN a value that makes the presence/shape checks themselves
+        # raise even though csp_nonce returned normally. Both poison classes must degrade
+        # to the malformed-nonce bypass (cache unusable, request renders fresh), never
+        # raise out of the gate. Without the validation-seam rescues, each predicate call
+        # below raises (ArgumentError / Encoding::CompatibilityError) and fails the spec.
+        allow(Rails.logger).to receive(:warn)
+
+        # Invalid UTF-8 bytes: String#present? raises ArgumentError (ActiveSupport's
+        # String#blank? rescues only Encoding::CompatibilityError).
+        allow(self).to receive(:request_csp_nonce).and_return((+"\xC3").force_encoding(Encoding::UTF_8))
+        expect(current_csp_nonce_for_cached_html).to be_nil
+        expect(malformed_csp_nonce_bypasses_component_cache?).to be(true)
+        expect(pro_component_cache_usable?({})).to be(false)
+
+        # ASCII-incompatible encoding: the shape regexp match raises
+        # Encoding::CompatibilityError.
+        allow(self).to receive(:request_csp_nonce).and_return("abc123".encode(Encoding::UTF_16LE))
+        expect(current_csp_nonce_for_cached_html).to be_nil
+        expect(malformed_csp_nonce_bypasses_component_cache?).to be(true)
+        expect(pro_component_cache_usable?({})).to be(false)
+
+        expect(Rails.logger).to have_received(:warn)
+          .with(/CSP nonce handling for cached components failed while/)
+          .at_least(:once)
+        expect(Rails.logger).not_to have_received(:warn).with(/abc123/)
+      end
+
+      it "serves a cache hit and warns once when the nonce generator raises" do
+        cached_react_component("App", cache_key: "csp-detect-raise", auto_load_bundle: false) do
+          { name: "nonce-free-writer" }
+        end
+
+        allow(self).to receive(:request_csp_nonce).and_raise(RuntimeError, "generator exploded")
+        allow(Rails.logger).to receive(:warn)
+
+        result = cached_react_component("App", cache_key: "csp-detect-raise", auto_load_bundle: false) do
+          raise "props block must not run on a cache hit"
+        end
+
+        # Detection failure handles the request as nonce-free, so it still HITS the
+        # nonce-free entry (the props block raising proves the hit) and serves it.
+        expect(result).to include("nonce-free-writer")
+        expect(Rails.logger).to have_received(:warn)
+          .with(/CSP nonce handling for cached components failed while detecting.*RuntimeError/m)
+          .once
+        expect(Rails.logger).not_to have_received(:warn).with(/generator exploded/)
+      end
+
+      it "still caches and serves the entry when recording the write-time marker raises" do
+        allow(self).to receive(:append_cached_csp_nonce_marker_to_html)
+          .and_raise(RuntimeError, "marker append exploded")
+        allow(Rails.logger).to receive(:warn)
+        allow(self).to receive(:request_csp_nonce).and_return("miss-nonce-AAA=")
+
+        first_result = cached_react_component("App", cache_key: "csp-append-raise", auto_load_bundle: false) do
+          { name: "first" }
+        end
+        # The miss still swaps its own placeholder for the request nonce.
+        expect(first_result).to include('nonce="miss-nonce-AAA="')
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while recording the placeholder CSP nonce at cache-write time/)
+          .once
+
+        allow(self).to receive(:request_csp_nonce).and_return("hit-nonce-BBB=")
+        second_result = cached_react_component("App", cache_key: "csp-append-raise", auto_load_bundle: false) do
+          raise "props block must not run on a cache hit"
+        end
+
+        # The marker-free entry cannot be re-stamped: the hit serves the placeholder for
+        # CSP to block (the pre-#5021 symptom) instead of failing.
+        expect(second_result).not_to include('nonce="hit-nonce-BBB="')
+        expect(second_result).not_to include("miss-nonce-AAA=")
+      end
+
+      it "serves the cached entry unmodified, marker included, when marker extraction raises" do
+        allow(self).to receive(:extract_cached_csp_nonce_marker_from_html)
+          .and_raise(ArgumentError, "invalid byte sequence in UTF-8")
+        allow(Rails.logger).to receive(:warn)
+
+        cached_html = "<div>cached</div>" \
+                      '<script nonce="origin-AAA=">framework()</script>' \
+                      "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->"
+        result = serve_from_cache(cached_html, key: "csp-extract-raise")
+
+        # Without the extracted marker no re-stamp can run; the entry is served exactly
+        # as cached — the marker rides along as an inert HTML comment, and the stale
+        # nonce stays for CSP to block. (The freshly rendered request preamble ahead of
+        # it may legitimately mention the live nonce; only the cached fragment matters.)
+        expect(result).to end_with(cached_html)
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while extracting the cache entry's originating-nonce marker/)
+          .once
+      end
+
+      it "serves the cached markup with its original nonce and warns when the re-stamp raises" do
+        allow(Rails.logger).to receive(:warn)
+        allow(self).to receive(:replace_csp_nonce_placeholder)
+          .and_raise(Encoding::CompatibilityError, "re-stamp exploded")
+
+        result = serve_from_cache(
+          "<div>cached</div>" \
+          '<script nonce="origin-AAA=">framework()</script>' \
+          "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->",
+          key: "csp-restamp-raise"
+        )
+
+        # The cached script keeps its stale nonce (the pre-#5021 symptom); it was never
+        # re-stamped with the live nonce. The freshly rendered request preamble ahead of
+        # the fragment may legitimately mention the live nonce.
+        expect(result).to include('<script nonce="origin-AAA=">framework()</script>')
+        expect(result).not_to include('nonce="live-BBB=">framework()')
+        # The marker was consumed before the failed re-stamp; only the rewrite degraded.
+        expect(result).not_to include("rorp-cached-csp-nonce")
+        expect(result).to be_html_safe
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping cached CSP nonce attributes/)
+          .once
+      end
+
+      it "returns the held-back tail and the chunk unchanged when the live rewrite raises" do
+        allow(Rails.logger).to receive(:warn)
+        rewriter = ReactOnRailsPro::CspNonceStreamRewriter.new("PLACEHOLDER", "live-BBB=")
+        rewriter.rewrite("first PLACE")
+        allow(rewriter).to receive(:rewrite).and_raise(Encoding::CompatibilityError, "join exploded")
+
+        result = rewrite_live_stream_chunk(rewriter, "next chunk")
+
+        expect(result).to eq(["PLACE", "next chunk"])
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping CSP nonces in a live cached stream/).once
+      end
+
+      it "keeps a first chunk ending in a partial placeholder at the component position" do
+        # The first chunk is inlined at the component's position; later chunks are written
+        # after the template. Text held back from the first chunk must stay with it.
+        queued = run_live_stream([%(<div>shell P), %(<p>more</p>), %(<script nonce="PLACEHOLDER">x()</script>)])
+
+        expect(@first_chunk).to eq(%(<div>shell P<p>more</p>))
+        expect(queued).to eq([%(<script nonce="live-BBB=">x()</script>)])
+      end
+
+      it "swaps a placeholder split across the first two chunks into the first chunk" do
+        queued = run_live_stream([%(<script nonce="PLACE), %(HOLDER">a()</script>), "<p>rest</p>"])
+
+        expect(@first_chunk).to eq(%(<script nonce="live-BBB=">a()</script>))
+        expect(queued).to eq(["<p>rest</p>"])
+      end
+
+      it "resolves the first chunk with its held-back tail when the stream ends" do
+        queued = run_live_stream([%(<div>only P)])
+
+        expect(@first_chunk).to eq(%(<div>only P))
+        expect(queued).to be_empty
+      end
+
+      def run_live_stream(chunks)
+        rewriter = ReactOnRailsPro::CspNonceStreamRewriter.new("PLACEHOLDER", "live-BBB=")
+        queued = []
+        @main_output_queue = instance_double(Async::Queue)
+        allow(@main_output_queue).to receive(:enqueue) { |chunk| queued << chunk }
+        allow(response).to receive(:stream).and_return(instance_double(ActionController::Live::Buffer, closed?: false))
+        stream = instance_double(ReactOnRailsPro::StreamRequest)
+        chunks.reduce(allow(stream).to(receive(:each_chunk))) { |stub, chunk| stub.and_yield(chunk) }
+        promise = Async::Promise.new
+
+        expect(process_stream_chunks(stream, promise, nil, rewriter)).to be(true)
+        @first_chunk = promise.wait
+        queued
+      end
+
+      it "returns stream chunks unchanged and warns when the cross-chunk rewrite raises" do
+        allow(self).to receive(:request_csp_nonce).and_return("live-BBB=")
+        allow(Rails.logger).to receive(:warn)
+
+        # Mixed-encoding chunks (a multibyte UTF-8 chunk plus a high-byte BINARY chunk)
+        # make the chunk-document join raise Encoding::CompatibilityError.
+        chunks = [
+          %(<script nonce="origin-AAA=">café()</script>),
+          (+"\xC3").force_encoding(Encoding::ASCII_8BIT)
+        ]
+
+        result = rewrite_cached_csp_nonces_across_chunks(chunks, "origin-AAA=")
+
+        expect(result).to equal(chunks)
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping CSP nonces across cached stream chunks/)
+          .once
+      end
+    end
+
+    context "with async context" do
+      around do |example|
+        Sync do
+          @react_on_rails_async_barrier = Async::Barrier.new
+          example.run
+        ensure
+          @react_on_rails_async_barrier = nil
+        end
+      end
+
+      it "re-stamps nonces on cached_async_react_component cache hits" do
+        allow(self).to receive(:request_csp_nonce).and_return("async-miss-AAA=")
+
+        first_result = cached_async_react_component("App", cache_key: "csp-nonce-async", auto_load_bundle: false) do
+          { name: "first" }
+        end
+        expect(first_result.value).to include('nonce="async-miss-AAA="')
+
+        allow(self).to receive(:request_csp_nonce).and_return("async-hit-BBB=")
+
+        second_result = cached_async_react_component("App", cache_key: "csp-nonce-async", auto_load_bundle: false) do
+          raise "props block must not run on a cache hit"
+        end
+
+        expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(second_result.value).to include('nonce="async-hit-BBB="')
+        expect(second_result.value).not_to include("async-miss-AAA=")
+      end
+
+      it "fully bypasses the component cache for a malformed nonce on the async path" do
+        # The async helper has its own cache gate, independent of fetch_react_component's;
+        # regressing it to ordinary cache use must fail here, not only on the sync path.
+        allow(self).to receive(:request_csp_nonce).and_return("bad nonce!")
+        renders = 0
+
+        results = Array.new(2) do
+          cached_async_react_component("App", cache_key: "csp-nonce-async-bypass", auto_load_bundle: false) do
+            renders += 1
+            { name: "fresh" }
+          end
+        end
+        results.each(&:value)
+
+        expect(renders).to eq(2)
+        expect(results).not_to include(a_kind_of(ReactOnRailsPro::ImmediateAsyncValue))
+        expect(cache_data.keys.count).to eq(0)
       end
     end
   end
@@ -1689,6 +2343,129 @@ describe ReactOnRailsProHelper do
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
+      # Regression coverage for issue #5021 on the chunk-replay path: every cached chunk
+      # (not just the first) can carry nonce-stamped inline scripts — the immediate-hydration
+      # script in the first chunk and console-replay scripts in later chunks here. Both
+      # nonces are at least 22 characters, so the placeholder matches the serving nonce's
+      # length, the cross-chunk rewrite preserves the original chunk framing, and the
+      # per-chunk assertions stay meaningful (differing lengths collapse the replay into
+      # the first chunk; see the straddle examples below).
+      it "re-stamps nonces in every replayed chunk on a cache HIT" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        allow(self).to receive(:request_csp_nonce).and_return("stream-miss-AAAAAAAAAAAA=")
+        first_run_chunks = run_stream
+        expect(first_run_chunks.join).to include('nonce="stream-miss-AAAAAAAAAAAA="')
+
+        # Simulate a fresh request lifecycle with a different per-request nonce
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        @rails_context = nil
+        allow(self).to receive(:request_csp_nonce).and_return("stream-hit-BBBBBBBBBBBBB=")
+
+        second_run_chunks = run_stream
+        expect(chunks_read.count).to eq(0)
+
+        expect(second_run_chunks.join).not_to include("stream-miss-AAAAAAAAAAAA=")
+        nonce_carrying_chunks = second_run_chunks.select { |chunk| chunk.include?('nonce="') }
+        expect(nonce_carrying_chunks.length).to be >= 2
+        nonce_carrying_chunks.each do |chunk|
+          chunk_nonces = chunk.scan(/nonce="([^"]*)"/).flatten.uniq
+          expect(chunk_nonces).to eq(["stream-hit-BBBBBBBBBBBBB="])
+        end
+      end
+
+      # React's streaming writer flushes at fixed-size buffer boundaries, so a
+      # `nonce="..."` attribute can straddle two cached chunks (the same boundary
+      # problem issue #4984 hit for dom ids). Per-chunk rewriting misses the split
+      # attribute; the replay must re-stamp across chunk boundaries.
+      it "re-stamps a nonce attribute that straddles two cached chunks" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+          component_name,
+          cache_key: ["stream-cache-spec", component_name],
+          prerender: true,
+          csp_nonce_active: true
+        )
+        straddled_chunks = [
+          "<div>shell</div>",
+          %(<script nonce="orig),
+          %(in-AAA=">hydrate()</script>),
+          "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->"
+        ]
+        Rails.cache.write(view_cache_key, straddled_chunks, expires_in: 60)
+        allow(self).to receive(:request_csp_nonce).and_return("live-BBB=")
+
+        joined = run_stream.join
+
+        expect(chunks_read.count).to eq(0)
+        expect(joined).to include(%(<script nonce="live-BBB=">hydrate()</script>))
+        expect(joined).not_to include("origin-AAA=")
+      end
+
+      it "preserves chunk framing and per-chunk html_safe flags for a same-length re-stamp" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+          component_name,
+          cache_key: ["stream-cache-spec", component_name],
+          prerender: true,
+          csp_nonce_active: true
+        )
+        # Deliberately mixed flags: the straddle head is html_safe, its tail is not. The
+        # re-split must restore each original chunk's own flag (a SafeBuffer join would
+        # otherwise escape the plain tail, a plain join would drop the head's safety).
+        straddled_chunks = [
+          "<div>shell</div>",
+          %(<script nonce="orig).html_safe,
+          %(in-AAA=">hydrate()</script>),
+          "<!--rorp-cached-csp-nonce-placeholder:origin-AAA=-->"
+        ]
+        Rails.cache.write(view_cache_key, straddled_chunks, expires_in: 60)
+        # Same length as the originating "origin-AAA=" value, so the rewrite keeps every
+        # byte offset and the original chunk boundaries are re-split exactly.
+        allow(self).to receive(:request_csp_nonce).and_return("live-BBBBB=")
+
+        run_chunks = run_stream
+
+        expect(chunks_read.count).to eq(0)
+        # Chunks after the first are streamed contiguously; the re-stamped attribute
+        # reassembles across the preserved boundary.
+        expect(run_chunks[1..].join).to include(%(<script nonce="live-BBBBB=">hydrate()</script>))
+        expect(run_chunks.join).not_to include("origin-AAA=")
+        # The straddled tail stays in the final streamed chunk instead of being
+        # collapsed into the first (landing) chunk.
+        expect(run_chunks.last).to end_with(%(-BBBBB=">hydrate()</script>))
+        # Per-chunk html_safe vector survives the join/rewrite/re-split round trip.
+        expect(run_chunks[-2]).to be_html_safe
+        expect(run_chunks.last).not_to be_html_safe
+      end
+
+      it "fully bypasses the component cache for a malformed nonce on the stream path" do
+        # The stream helper has its own cache gate, independent of fetch_react_component's;
+        # regressing it to ordinary cache use must fail here, not only on the sync path.
+        mock_request_and_response(count: 2)
+        render_with_cached_stream
+        allow(self).to receive(:request_csp_nonce).and_return("bad nonce!")
+
+        first_run_chunks = run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        second_run_chunks = run_stream
+
+        # Fresh Node render both times (no cached replay), and nothing was written.
+        expect(chunks_read.count).to eq(chunks.count)
+        expect(second_run_chunks).not_to be_empty
+        expect(first_run_chunks).not_to be_empty
+        expect(cache_data.keys.count).to eq(0)
+      end
+
       # Regression for https://github.com/shakacode/react_on_rails/issues/4581.
       #
       # A shell-ready render whose async boundary errors emits a chunk with
@@ -2255,7 +3032,7 @@ describe ReactOnRailsProHelper do
 
         result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: -> { false }) { nil }
 
-        expect(result).to eq([nil, false, true])
+        expect(result).to eq([nil, false, true, nil])
         expect(Rails.cache.exist?(cache_key)).to be(false)
       end
 
@@ -2264,7 +3041,7 @@ describe ReactOnRailsProHelper do
 
         result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: nil) { nil }
 
-        expect(result).to eq([nil, false, false])
+        expect(result).to eq([nil, false, false, nil])
         expect(Rails.cache.exist?(cache_key)).to be(true)
       end
 
@@ -2281,8 +3058,8 @@ describe ReactOnRailsProHelper do
           "outer rejected"
         end
 
-        expect(inner_result).to eq(["inner rejected", false, true])
-        expect(outer_result).to eq(["outer rejected", false, true])
+        expect(inner_result).to eq(["inner rejected", false, true, nil])
+        expect(outer_result).to eq(["outer rejected", false, true, nil])
         expect(Rails.cache.exist?(inner_key)).to be(false)
         expect(Rails.cache.exist?(outer_key)).to be(false)
       end
@@ -2299,7 +3076,7 @@ describe ReactOnRailsProHelper do
 
         result = send(:fetch_cache_entry, cache_key, nil, cache_write_if: -> { false }) { "rejected" }
 
-        expect(result).to eq(["rejected", false, true])
+        expect(result).to eq(["rejected", false, true, nil])
         expect(notifications).to include("cache_generate.active_support")
         expect(notifications).not_to include("cache_write.active_support")
       ensure
@@ -2339,7 +3116,7 @@ describe ReactOnRailsProHelper do
           cache_write_if: -> { false }
         ) { "fresh error" }
 
-        expect(result).to eq(["fresh error", false, true])
+        expect(result).to eq(["fresh error", false, true, nil])
         expect(Rails.cache.read(cache_key)).to eq("stale")
         allow(Time).to receive(:now).and_return(started_at + 8)
         expect(Rails.cache.exist?(cache_key)).to be(false)
@@ -2933,6 +3710,70 @@ describe ReactOnRailsProHelper do
         expect(captured_auto_load_bundle).to be(false)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      # Regression coverage for issue #5021 on the static RSC hit path: React's own
+      # Suspense-reveal runtime scripts survive the payload strip and stay in the cached
+      # HTML, so their nonces must be re-stamped per request.
+      it "re-stamps nonces in cached static RSC HTML on cache hits" do
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:request_csp_nonce).and_return("static-hit-BBB=")
+          nonce_keyed_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["static_rsc_component", ["static-rsc-cache-spec", component_name]],
+            prerender: true,
+            csp_nonce_active: true
+          )
+          stale_html = '<div>static</div><script nonce="static-miss-AAA=">reveal()</script>' \
+                       "<!--rorp-cached-csp-nonce-placeholder:static-miss-AAA=-->"
+          Rails.cache.write(nonce_keyed_cache_key, stale_html, expires_in: 60)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        expect(result).to include('nonce="static-hit-BBB="')
+        expect(result).not_to include("static-miss-AAA=")
+      end
+
+      it "fully bypasses the component cache for a malformed nonce on the static RSC path" do
+        # The static RSC helper has its own cache gate, independent of
+        # fetch_react_component's; regressing it to ordinary cache use must fail here,
+        # not only on the sync path.
+        renders = 0
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:request_csp_nonce).and_return("bad nonce!")
+          allow(self).to receive(:buffered_stream_react_component) do
+            renders += 1
+            "<div>fresh static rsc</div>".html_safe
+          end
+
+          2.times do
+            cached_static_rsc_component(
+              component_name,
+              cache_key: ["static-rsc-bypass", component_name],
+              id: "#{component_name}-react-component-0",
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end
+        end
+
+        expect(renders).to eq(2)
+        expect(cache_data.keys.count).to eq(0)
       end
 
       it "respects explicit auto_load_bundle false on cache misses" do

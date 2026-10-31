@@ -44,6 +44,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **[Pro]** **Fix CSP nonce handling in fragment-cached components**: The `cached_*` helpers now refresh executable inline script nonces on cache hits, preventing CSP from blocking hydration, console replay, and streaming scripts.
+  Only nonces the framework emitted are refreshed. A cached render gives framework scripts a random placeholder nonce, and every response swaps it for its own nonce. App markup that carries the request's nonce, such as stored HTML injected while the nonce generator is session-derived, keeps its stale nonce for CSP to block on cache hits.
+  **Upgrade notes:** App code that needs a nonce inside a cached component should read `railsContext.cspNonce`; a nonce passed in through props or Rails helpers is not refreshed. Overrides of these private Pro helpers must accept and forward their new parameters: `normalize_cached_pro_attribution` and `normalize_cached_pro_attribution_html` (`cached_csp_nonce`), `append_cached_csp_nonce_marker` (`placeholder`), `consumer_stream_async` (`live_chunk_rewriter:` keyword), and `process_stream_chunks` (`live_chunk_rewriter`); `fetch_cache_entry` now returns a fourth value. Framework emitters read the nonce through `ReactOnRails::Helper#csp_nonce`, which returns the placeholder during cached renders; code that overrides or stubs it should use the new `request_csp_nonce` for the request's own nonce. Component cache keys use a new `csp-nonce-placeholder` partition segment, so nonce-rendered entries written before upgrading are not reused. See [CSP caching caveats](docs/pro/strict-csp.md#caching-caveats) for details.
+  Fixes [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021) and [Issue 5267](https://github.com/shakacode/react_on_rails/issues/5267). [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by [AbanoubGhadban](https://github.com/AbanoubGhadban) and [PR 5270](https://github.com/shakacode/react_on_rails/pull/5270) by [justin808](https://github.com/justin808).
+
 #### Security
 
 - **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
@@ -67,6 +72,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   existing app has React 19.3.0, the generator now warns and gives one command that upgrades `react`, `react-dom`, and
   `react-server-dom-webpack` together, so a retained lockfile cannot keep the vulnerable copy.
   [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **Doctor's `react-server-dom-webpack` check no longer skips pnpm tarball, git, or `file:` copies**:
+  `pnpm-lock.yaml` copies installed from a tarball URL, a git repository, or a local file, and pnpm 5 and 6 copies
+  from a non-default registry, are now read too. Doctor warns that it cannot tell whether a non-registry copy includes the
+  fixes, instead of reporting the lockfile as not affected.
+  [PR 5275](https://github.com/shakacode/react_on_rails/pull/5275) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **The Node Renderer requires `fastify` 5.12.6 or later**: The `react-on-rails-pro-node-renderer` package
   now depends on `fastify` `^5.12.6` instead of `^5.8.5`, so an app upgrading with an existing lockfile cannot keep a
