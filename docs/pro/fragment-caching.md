@@ -88,7 +88,7 @@ Keep a stable render order for pages that share a cached component key. If a com
 
 ### CSP Nonces
 
-The `cached_*` helpers are safe to combine with a nonce-enforcing `script-src`: cache hits re-stamp the attributes carrying the entry's originating nonce with the serving request's nonce, and cache keys segregate nonce-rendered entries from nonce-free ones. Requests whose nonce falls outside the base64/base64url shape bypass the `cached_*` helpers' caching entirely (they render fresh), and plain Rails `cache do … end` blocks around `react_component` or `redux_store` do **not** get this treatment — see [Strict CSP → Caching Caveats](./strict-csp.md#caching-caveats).
+The `cached_*` helpers are safe to combine with a nonce-enforcing `script-src`: cache hits re-stamp the framework's own scripts with the serving request's nonce, and cache keys segregate nonce-rendered entries from nonce-free ones. Only nonces the framework emitted are re-stamped, so app markup that copied the writing request's nonce stays blocked on cache hits; inside a cached component, read the nonce from `railsContext.cspNonce`. Requests whose nonce falls outside the base64/base64url shape bypass the `cached_*` helpers' caching entirely (they render fresh), and plain Rails `cache do … end` blocks around `react_component` or `redux_store` do **not** get this treatment — see [Strict CSP → Caching Caveats](./strict-csp.md#caching-caveats).
 
 ## Tag-Based Revalidation
 
