@@ -1177,23 +1177,55 @@ describe ReactOnRailsProHelper do
           .once
       end
 
-      it "streams the held-back tail and the chunk unchanged when the live rewrite raises" do
+      it "returns the held-back tail and the chunk unchanged when the live rewrite raises" do
         allow(Rails.logger).to receive(:warn)
         rewriter = ReactOnRailsPro::CspNonceStreamRewriter.new("PLACEHOLDER", "live-BBB=")
         rewriter.rewrite("first PLACE")
         allow(rewriter).to receive(:rewrite).and_raise(Encoding::CompatibilityError, "join exploded")
+
+        result = rewrite_live_stream_chunk(rewriter, "next chunk")
+
+        expect(result).to eq(["PLACE", "next chunk"])
+        expect(Rails.logger).to have_received(:warn)
+          .with(/failed while re-stamping CSP nonces in a live cached stream/).once
+      end
+
+      it "keeps a first chunk ending in a partial placeholder at the component position" do
+        # The first chunk is inlined at the component's position; later chunks are written
+        # after the template. Text held back from the first chunk must stay with it.
+        queued = run_live_stream([%(<div>shell P), %(<p>more</p>), %(<script nonce="PLACEHOLDER">x()</script>)])
+
+        expect(@first_chunk).to eq(%(<div>shell P<p>more</p>))
+        expect(queued).to eq([%(<script nonce="live-BBB=">x()</script>)])
+      end
+
+      it "swaps a placeholder split across the first two chunks into the first chunk" do
+        queued = run_live_stream([%(<script nonce="PLACE), %(HOLDER">a()</script>), "<p>rest</p>"])
+
+        expect(@first_chunk).to eq(%(<script nonce="live-BBB=">a()</script>))
+        expect(queued).to eq(["<p>rest</p>"])
+      end
+
+      it "resolves the first chunk with its held-back tail when the stream ends" do
+        queued = run_live_stream([%(<div>only P)])
+
+        expect(@first_chunk).to eq(%(<div>only P))
+        expect(queued).to be_empty
+      end
+
+      def run_live_stream(chunks)
+        rewriter = ReactOnRailsPro::CspNonceStreamRewriter.new("PLACEHOLDER", "live-BBB=")
         queued = []
         @main_output_queue = instance_double(Async::Queue)
         allow(@main_output_queue).to receive(:enqueue) { |chunk| queued << chunk }
+        allow(response).to receive(:stream).and_return(instance_double(ActionController::Live::Buffer, closed?: false))
+        stream = instance_double(ReactOnRailsPro::StreamRequest)
+        chunks.reduce(allow(stream).to(receive(:each_chunk))) { |stub, chunk| stub.and_yield(chunk) }
         promise = Async::Promise.new
-        promise.resolve("first ")
 
-        result = rewrite_live_stream_chunk(rewriter, "next chunk", promise)
-
-        expect(queued).to eq(["PLACE"])
-        expect(result).to eq("next chunk")
-        expect(Rails.logger).to have_received(:warn)
-          .with(/failed while re-stamping CSP nonces in a live cached stream/).once
+        expect(process_stream_chunks(stream, promise, nil, rewriter)).to be(true)
+        @first_chunk = promise.wait
+        queued
       end
 
       it "returns stream chunks unchanged and warns when the cross-chunk rewrite raises" do

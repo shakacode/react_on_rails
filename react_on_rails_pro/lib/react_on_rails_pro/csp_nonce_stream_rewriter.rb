@@ -43,6 +43,11 @@ module ReactOnRailsPro
       chunk.html_safe? ? emitted.html_safe : emitted
     end
 
+    # True while a trailing partial placeholder waits for the next chunk.
+    def holding_back?
+      !@held_back.empty?
+    end
+
     # Returns the held-back tail once the stream ends; it was not a placeholder after all.
     def flush
       held_back = @held_back
