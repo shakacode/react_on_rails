@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.2.1.rc.3] - 2026-11-01
+
 #### Fixed
 
 - **pnpm lockfiles are read on Psych older than 5.2.5**: The version check and doctor read `pnpm-lock.yaml` with
@@ -3601,7 +3603,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.2...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.3...main
+[17.2.1.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.2...v17.2.1.rc.3
 [17.2.1.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.1...v17.2.1.rc.2
 [17.2.1.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.0...v17.2.1.rc.1
 [17.2.1.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...v17.2.1.rc.0
