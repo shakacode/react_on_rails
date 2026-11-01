@@ -17,6 +17,7 @@ module ReactOnRails
         def self.copy_version: (String key, untyped entry, Regexp key_pattern, String package_name) -> String?
         def self.dependencies: (Hash[String, untyped] doc) -> Hash[String, untyped]?
         def self.project_document: (String path) -> Hash[String, untyped]?
+        def self.safe_load_documents: (String content) -> Array[untyped]
         def self.strip_peer_suffix: (String? version) -> String?
       end
 

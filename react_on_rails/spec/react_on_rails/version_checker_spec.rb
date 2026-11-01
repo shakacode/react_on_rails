@@ -1235,6 +1235,24 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        # Psych before 5.2.5 has no YAML.safe_load_stream (Ruby 3.4's default Psych is 5.2.2).
+        context "when Psych has no YAML.safe_load_stream" do
+          before do
+            allow(YAML).to receive(:respond_to?).and_call_original
+            allow(YAML).to receive(:respond_to?).with(:safe_load_stream).and_return(false)
+            allow(YAML).to receive(:safe_load_stream).and_raise(NoMethodError, "undefined method 'safe_load_stream'")
+          end
+
+          # Readable lockfiles resolve the installed 16.6.0; unusable ones fall back, without
+          # raising, to their package.json exact pin of 16.6.0.
+          %w[pnpm_v5 pnpm_v6 pnpm_v9 pnpm_v11_multidoc pnpm_v9_time_field
+             pnpm_corrupt pnpm_wrong_shape pnpm_yaml_alias].each do |fixture|
+            it "resolves #{fixture} as it does with safe_load_stream" do
+              expect(node_package_version_for(fixture).raw).to eq("16.6.0")
+            end
+          end
+        end
+
         # The relaxed rule from #1898: the INSTALLED version is what gets checked, so a lockfile
         # entry still resolves by package name even after package.json's range was edited.
         %w[yarn_classic_stale_selector yarn_berry_v8_stale_selector pnpm_v9_stale_selector].each do |fixture|

@@ -113,6 +113,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **pnpm lockfiles are read on Psych older than 5.2.5**: The version check and doctor read `pnpm-lock.yaml` with
+  `YAML.safe_load_stream`, which Psych added in 5.2.5 (Ruby 3.4 ships 5.2.2). On older Psych every pnpm lockfile
+  read failed silently, so the version check fell back to `package.json` and doctor's `react-server-dom-webpack`
+  check reported "could not check". Older Psych now parses the stream and safe-loads each document. Fixes
+  [Issue 5300](https://github.com/shakacode/react_on_rails/issues/5300).
+  [PR 5301](https://github.com/shakacode/react_on_rails/pull/5301) by [justin808](https://github.com/justin808).
+
 #### Security
 
 - **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
