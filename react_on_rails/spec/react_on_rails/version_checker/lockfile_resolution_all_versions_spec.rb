@@ -307,4 +307,38 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       expect(versions_in("yarn.lock" => yarn, "package-lock.json" => npm)).to contain_exactly("19.3.0", "19.3.1")
     end
   end
+
+  # Psych before 5.2.5 has no YAML.safe_load_stream; the fallback must keep its safety rules.
+  describe "PnpmLockfile.safe_load_documents without YAML.safe_load_stream" do
+    subject(:load) { described_class::PnpmLockfile.safe_load_documents(content) }
+
+    before do
+      allow(YAML).to receive(:respond_to?).and_call_original
+      allow(YAML).to receive(:respond_to?).with(:safe_load_stream).and_return(false)
+    end
+
+    context "with a multi-document stream" do
+      let(:content) { "env: {}\n---\nlockfileVersion: '9.0'\nimporters: {}\n" }
+
+      it "loads every document" do
+        expect(load).to eq([{ "env" => {} }, { "lockfileVersion" => "9.0", "importers" => {} }])
+      end
+    end
+
+    context "with an alias" do
+      let(:content) { "a: &x {b: 1}\nc: *x\n" }
+
+      it "rejects it" do
+        expect { load }.to raise_error(Psych::AliasesNotEnabled)
+      end
+    end
+
+    context "with an unpermitted class tag" do
+      let(:content) { "a: !ruby/object:OpenStruct {b: 1}\n" }
+
+      it "rejects it" do
+        expect { load }.to raise_error(Psych::DisallowedClass)
+      end
+    end
+  end
 end
