@@ -1240,7 +1240,6 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           before do
             allow(YAML).to receive(:respond_to?).and_call_original
             allow(YAML).to receive(:respond_to?).with(:safe_load_stream).and_return(false)
-            allow(YAML).to receive(:safe_load_stream).and_raise(NoMethodError, "undefined method 'safe_load_stream'")
           end
 
           # Readable lockfiles resolve the installed 16.6.0; unusable ones fall back, without

@@ -310,7 +310,7 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
 
   # Psych before 5.2.5 has no YAML.safe_load_stream; the fallback must keep its safety rules.
   describe "PnpmLockfile.safe_load_documents without YAML.safe_load_stream" do
-    subject(:load) { described_class::PnpmLockfile.safe_load_documents(content) }
+    subject(:documents) { described_class::PnpmLockfile.safe_load_documents(content) }
 
     before do
       allow(YAML).to receive(:respond_to?).and_call_original
@@ -321,7 +321,7 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       let(:content) { "env: {}\n---\nlockfileVersion: '9.0'\nimporters: {}\n" }
 
       it "loads every document" do
-        expect(load).to eq([{ "env" => {} }, { "lockfileVersion" => "9.0", "importers" => {} }])
+        expect(documents).to eq([{ "env" => {} }, { "lockfileVersion" => "9.0", "importers" => {} }])
       end
     end
 
@@ -329,7 +329,7 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       let(:content) { "a: &x {b: 1}\nc: *x\n" }
 
       it "rejects it" do
-        expect { load }.to raise_error(Psych::AliasesNotEnabled)
+        expect { documents }.to raise_error(Psych::AliasesNotEnabled)
       end
     end
 
@@ -337,7 +337,7 @@ RSpec.describe ReactOnRails::VersionChecker::LockfileResolution do
       let(:content) { "a: !ruby/object:OpenStruct {b: 1}\n" }
 
       it "rejects it" do
-        expect { load }.to raise_error(Psych::DisallowedClass)
+        expect { documents }.to raise_error(Psych::DisallowedClass)
       end
     end
   end
