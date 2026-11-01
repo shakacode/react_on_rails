@@ -143,8 +143,21 @@ module ReactOnRails
         # ISO timestamps (a time: map), which Psych types as Date/Time and safe parsing would
         # otherwise reject.
         def self.project_document(path)
-          docs = YAML.safe_load_stream(File.read(path), permitted_classes: [Date, Time])
+          docs = safe_load_documents(File.read(path))
           docs.reverse_each.find { |d| d.is_a?(Hash) && (d.key?("importers") || d.key?("dependencies")) }
+        end
+
+        # YAML.safe_load_stream exists only from Psych 5.2.5 (Ruby 3.4 ships 5.2.2). Older Psych
+        # parses the stream and safe-loads each document, which keeps the same alias and class
+        # restrictions.
+        def self.safe_load_documents(content)
+          return YAML.safe_load_stream(content, permitted_classes: [Date, Time]) if YAML.respond_to?(:safe_load_stream)
+
+          Psych.parse_stream(content).children.map do |document|
+            single = Psych::Nodes::Stream.new
+            single.children << document
+            YAML.safe_load(single.to_yaml, permitted_classes: [Date, Time])
+          end
         end
 
         # lockfileVersion >= 6: "16.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)" -> "16.6.0"
