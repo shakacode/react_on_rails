@@ -73,6 +73,8 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
+    # The flag must belong to the same shell command as the binstub, hence no ; & | between them.
+    STATIC_WATCHER_COMMAND_REGEX = %r{\bbin/shakapacker(?:-watch)?\s(?:[^;&|]*\s)?(?:--watch|-w)(?![\w-])}
     TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m
     TEMPLATE_COMMENT_PATTERN = /<!--.*?-->|<%#.*?%>/m
     ERB_EXPRESSION_PATTERN = /<%(?![#%])={0,2}\s*(?<expression>.*?)-?%>/m
@@ -3109,7 +3111,9 @@ module ReactOnRails
     def static_procfile_available?
       return false unless File.exist?("Procfile.dev-static-assets")
 
-      File.read("Procfile.dev-static-assets").include?("bin/shakapacker --watch")
+      active_procfile_lines(File.read("Procfile.dev-static-assets")).any? do |line|
+        line.match?(STATIC_WATCHER_COMMAND_REGEX)
+      end
     rescue StandardError
       false
     end
