@@ -73,8 +73,8 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
-    # A "#" inside shell quotes does not start a comment.
-    PROCFILE_TEXT_BEFORE_COMMENT_REGEX = /\A(?:[^'"#]|'[^']*'|"(?:\\.|[^"\\])*")*/
+    # As in the shell, "#" starts a comment only at the beginning of a word and outside quotes.
+    PROCFILE_TEXT_BEFORE_COMMENT_REGEX = /\A(?:\\.|[^'"#\\]|(?<![\s;&|()])#|'[^']*'|"(?:\\.|[^"\\])*")*/
     # The flag must belong to the same shell command as the binstub, hence no ; & | between them.
     STATIC_WATCHER_COMMAND_REGEX = %r{\bbin/shakapacker(?:-watch)?\s(?:[^;&|]*\s)?(?:--watch|-w)(?![\w-])}
     TEMPLATE_HTML_COMMENT_PATTERN = /<!--.*?-->/m

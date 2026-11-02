@@ -4294,7 +4294,9 @@ RSpec.describe ReactOnRails::Doctor do
         "js: RAILS_ENV=development bin/shakapacker -w --progress\n",
         "js: sh -c 'bundle exec rake react_on_rails:locale && bin/shakapacker -w'\n",
         "js: sh -c 'echo \"# Starting watcher\"; exec bin/shakapacker --watch'\n",
-        "js: echo \"# Starting watcher\"; bin/shakapacker -w\n"
+        "js: echo \"# Starting watcher\"; bin/shakapacker -w\n",
+        "js: ASSET_URL=https://cdn.example/app#v1 bin/shakapacker --watch\n",
+        "js: echo it\\'s up; bin/shakapacker -w\n"
       ].each do |content|
         it "accepts #{content.strip.inspect}" do
           expect(static_procfile_available_with(content)).to be(true)
@@ -4312,11 +4314,18 @@ RSpec.describe ReactOnRails::Doctor do
         "# js: bin/shakapacker --watch\nweb: bin/rails server\n",
         "js: bin/shakapacker # add -w to rebuild on save\n",
         "web: bin/rails server # bin/shakapacker -w\n",
-        "js: echo \"built\" # bin/shakapacker --watch\n"
+        "js: echo \"built\" # bin/shakapacker --watch\n",
+        "web: bin/rails server;# bin/shakapacker -w\n"
       ].each do |content|
         it "rejects #{content.strip.inspect}" do
           expect(static_procfile_available_with(content)).to be(false)
         end
+      end
+
+      it "applies the same comment rule to the other Procfile checks" do
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: APP_URL=http://x/a#b bin/rails server\n")).to be(true)
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: echo \"# up\"; bin/rails server\n")).to be(true)
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: echo up # bin/rails server\n")).to be(false)
       end
 
       it "returns false when Procfile.dev-static-assets does not exist" do
