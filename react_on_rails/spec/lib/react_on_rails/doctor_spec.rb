@@ -4292,7 +4292,9 @@ RSpec.describe ReactOnRails::Doctor do
         "js: bin/shakapacker-watch -w\n",
         "js: bin/shakapacker --progress --watch\n",
         "js: RAILS_ENV=development bin/shakapacker -w --progress\n",
-        "js: sh -c 'bundle exec rake react_on_rails:locale && bin/shakapacker -w'\n"
+        "js: sh -c 'bundle exec rake react_on_rails:locale && bin/shakapacker -w'\n",
+        "js: sh -c 'echo \"# Starting watcher\"; exec bin/shakapacker --watch'\n",
+        "js: echo \"# Starting watcher\"; bin/shakapacker -w\n"
       ].each do |content|
         it "accepts #{content.strip.inspect}" do
           expect(static_procfile_available_with(content)).to be(true)
@@ -4308,7 +4310,9 @@ RSpec.describe ReactOnRails::Doctor do
         "js: bin/shakapacker && echo -w\n",
         "# js: bin/shakapacker -w\nweb: bin/rails server\n",
         "# js: bin/shakapacker --watch\nweb: bin/rails server\n",
-        "js: bin/shakapacker # add -w to rebuild on save\n"
+        "js: bin/shakapacker # add -w to rebuild on save\n",
+        "web: bin/rails server # bin/shakapacker -w\n",
+        "js: echo \"built\" # bin/shakapacker --watch\n"
       ].each do |content|
         it "rejects #{content.strip.inspect}" do
           expect(static_procfile_available_with(content)).to be(false)
