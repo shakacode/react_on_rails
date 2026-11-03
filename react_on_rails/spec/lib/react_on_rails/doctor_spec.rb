@@ -4278,6 +4278,73 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).not_to include(a_string_including("Development server Procfile.dev"))
     end
 
+    describe "static Procfile watcher detection" do
+      def static_procfile_available_with(content)
+        write_project_file("Procfile.dev-static-assets", content)
+        doctor.send(:static_procfile_available?)
+      end
+
+      [
+        "js: bin/shakapacker --watch\n",
+        "js: bin/shakapacker -w\n",
+        "js: ./bin/shakapacker -w\n",
+        "js: bin/shakapacker-watch --watch\n",
+        "js: bin/shakapacker-watch -w\n",
+        "js: bin/shakapacker --progress --watch\n",
+        "js: RAILS_ENV=development bin/shakapacker -w --progress\n",
+        "js: sh -c 'bundle exec rake react_on_rails:locale && bin/shakapacker -w'\n",
+        "js: sh -c 'echo \"# Starting watcher\"; exec bin/shakapacker --watch'\n",
+        "js: echo \"# Starting watcher\"; bin/shakapacker -w\n",
+        "js: ASSET_URL=https://cdn.example/app#v1 bin/shakapacker --watch\n",
+        "js: echo it\\'s up; bin/shakapacker -w\n"
+      ].each do |content|
+        it "accepts #{content.strip.inspect}" do
+          expect(static_procfile_available_with(content)).to be(true)
+        end
+      end
+
+      [
+        "web: bin/rails server\n",
+        "js: bin/shakapacker\n",
+        "js: bin/shakapacker-watch\n",
+        "js: bin/shakapacker --watch-options-stdin\n",
+        "js: bin/shakapacker-dev-server --watch\n",
+        "js: bin/shakapacker && echo -w\n",
+        "# js: bin/shakapacker -w\nweb: bin/rails server\n",
+        "# js: bin/shakapacker --watch\nweb: bin/rails server\n",
+        "js: bin/shakapacker # add -w to rebuild on save\n",
+        "web: bin/rails server # bin/shakapacker -w\n",
+        "js: echo \"built\" # bin/shakapacker --watch\n",
+        "web: bin/rails server;# bin/shakapacker -w\n"
+      ].each do |content|
+        it "rejects #{content.strip.inspect}" do
+          expect(static_procfile_available_with(content)).to be(false)
+        end
+      end
+
+      it "applies the same comment rule to the other Procfile checks" do
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: APP_URL=http://x/a#b bin/rails server\n")).to be(true)
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: echo \"# up\"; bin/rails server\n")).to be(true)
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: echo up # bin/rails server\n")).to be(false)
+      end
+
+      it "returns false when Procfile.dev-static-assets does not exist" do
+        expect(doctor.send(:static_procfile_available?)).to be(false)
+      end
+
+      it "reports the high-risk warning, not the missing-Procfile error, for a -w watcher" do
+        write_project_file("Procfile.dev", "dev-server: bin/shakapacker-dev-server\n")
+        write_project_file("Procfile.dev-static-assets", "js: bin/shakapacker -w\n")
+
+        doctor.send(:add_shared_output_path_procfile_guidance)
+
+        error_messages = checker.messages.select { |msg| msg[:type] == :error }.map { |msg| msg[:content] }
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(error_messages).not_to include(a_string_including("Procfile.dev-static-assets is missing"))
+        expect(warning_messages).to include(a_string_including("Shared output path is high-risk"))
+      end
+    end
+
     context "with fix enabled" do
       let(:fix_mode) { true }
 

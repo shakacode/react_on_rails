@@ -120,6 +120,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5300](https://github.com/shakacode/react_on_rails/issues/5300).
   [PR 5301](https://github.com/shakacode/react_on_rails/pull/5301) by [justin808](https://github.com/justin808).
 
+- **Doctor recognizes more static watcher commands**: With a shared output path and a dev-server `Procfile.dev`,
+  `rake react_on_rails:doctor` exited 1 reporting `Procfile.dev-static-assets` missing unless that file contained the
+  exact text `bin/shakapacker --watch`. It now accepts `--watch` or `-w` on `bin/shakapacker` or the generated
+  `bin/shakapacker-watch`, and ignores commented-out commands.
+  [PR 5304](https://github.com/shakacode/react_on_rails/pull/5304) by [justin808](https://github.com/justin808).
+
 #### Security
 
 - **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
