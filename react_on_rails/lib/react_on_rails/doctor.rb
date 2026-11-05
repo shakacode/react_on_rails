@@ -2046,7 +2046,13 @@ module ReactOnRails
     end
 
     # The Pro Node Renderer's ExecJS fallback renders through the same pool, so it uses the same runtime.
+    # With the fallback disabled, ExecJS never renders, so there is no runtime to explain or warn about.
     def report_execjs_fallback_runtime(execjs_name)
+      unless pro_execjs_fallback_enabled?
+        checker.add_info("  ExecJS available as fallback: #{execjs_name}")
+        return
+      end
+
       runtime_name = server_rendering_execjs_runtime_name(execjs_name)
       checker.add_info("  ExecJS available as fallback: #{runtime_name}")
       report_execjs_bun_runtime(execjs_name, runtime_name) if execjs_name == ReactOnRails::ExecJSRuntime::BUN_NAME

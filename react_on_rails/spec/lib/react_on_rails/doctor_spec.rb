@@ -5152,6 +5152,17 @@ RSpec.describe ReactOnRails::Doctor do
         expect(info_messages).to include(a_string_including("ExecJS autodetected Bun.sh"))
       end
 
+      it "does not warn about Bun when the Pro NodeRenderer fallback is disabled" do
+        allow(doctor).to receive_messages(resolved_pro_server_renderer: "NodeRenderer",
+                                          pro_execjs_fallback_enabled?: false)
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(bun_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback: Bun.sh"))
+        expect(warning_messages).to be_empty
+      end
+
       it "suggests EXECJS_RUNTIME=Node when EXECJS_RUNTIME explicitly selects Bun" do
         ENV["EXECJS_RUNTIME"] = "Bun"
         allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(bun_runtime)
