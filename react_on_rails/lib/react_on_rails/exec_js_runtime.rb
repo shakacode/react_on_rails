@@ -7,7 +7,9 @@ module ReactOnRails
   # bundle (issue #5288). When ExecJS autodetected Bun and Node.js is installed, React on
   # Rails server rendering uses Node.js instead. Only React on Rails changes: ExecJS.runtime
   # stays as it is for other ExecJS users. An explicit EXECJS_RUNTIME, including
-  # EXECJS_RUNTIME=Bun, always wins.
+  # EXECJS_RUNTIME=Bun, always wins. ExecJS cannot tell `ExecJS.runtime = ExecJS::Runtimes::Bun`
+  # in Ruby code apart from autodetection, so that form also renders with Node.js; use
+  # EXECJS_RUNTIME=Bun to force Bun.
   module ExecJSRuntime
     BUN_NAME = "Bun.sh"
 
