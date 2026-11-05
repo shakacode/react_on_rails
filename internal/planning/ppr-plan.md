@@ -82,8 +82,8 @@ These are evidence, not plan. They stay as-is:
   The only document describing the architecture we actually built: layer
   diagram, delimiter protocol, key design decisions, Production Readiness Gap
   table.
-- P6 spike results — `react_on_rails_pro/spec/dummy/spike/prerender-resume/RESULTS.md`
-  on branch `abanoub/4771-prerender-resume-spike` only. PR
+- P6 spike results — [`RESULTS.md`](https://github.com/shakacode/react_on_rails/blob/af5841a8d9f2a201eb4795d90d05e741561c1edd/react_on_rails_pro/spec/dummy/spike/prerender-resume/RESULTS.md)
+  at PR #4851's final head commit `af5841a8d`, not on `main`. PR
   [#4851](https://github.com/shakacode/react_on_rails/pull/4851) closed
   unmerged on 2026-11-04; §1.3 notes which of its claims are unproven.
 
@@ -461,8 +461,8 @@ Owners and dates are **proposals for maintainer confirmation** (review under
 
 ### Land the evidence first (already written, blocking)
 
-- [x] PR #4851 (P6 spike): closed unmerged on 2026-11-04; `RESULTS.md` stays on its branch, with the §1.3 caveats
-- [x] PR #4769 (scroll-priority design spec): closed unmerged on 2026-11-04, superseded by #4841 (D9)
+- [x] Resolved, not landed: PR #4851 (P6 spike) closed unmerged on 2026-11-04. Its `RESULTS.md` is not on `main`; cite the commit-pinned link in the evidence base, with the §1.3 caveats
+- [x] Resolved, not landed: PR #4769 (scroll-priority design spec) closed unmerged on 2026-11-04, superseded by #4841 (D9)
 - [ ] ~~Port `ppr-spike-findings.md` out of closed `react_on_rails_rsc` PR #194~~ — **done in this PR** (`internal/analysis/ppr-spike-findings.md`)
 
 ### PPR v1 — productize the spike
