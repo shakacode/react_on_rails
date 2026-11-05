@@ -132,13 +132,17 @@ export async function serverRenderTanStackAppAsync(
 
   // Async path uses router.load() public API, so no private store access is needed.
   // No router.ssr flag is set here: React effects (including Transitioner's auto-load)
-  // do not execute during server-side renderToString, and router.dehydrate() does not
-  // depend on router.ssr.
+  // do not execute during server-side renderToString.
   await router.load();
+
+  // TanStack Router has no router.dehydrate() method; external state (for example a
+  // TanStack Query cache) is shipped through RouterOptions.dehydrate, which TanStack's
+  // own SSR server calls once after loading and passes to RouterOptions.hydrate on the client.
+  const dehydratedData: unknown = await router.options?.dehydrate?.();
 
   const dehydratedState: DehydratedRouterState = {
     url,
-    dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
+    dehydratedRouter: dehydratedData === undefined ? null : { dehydratedData },
     // Keep ssrRouter payload for compatibility and to restore server match data
     // before first client render.
     ssrRouter: buildSsrRouterState(router),
