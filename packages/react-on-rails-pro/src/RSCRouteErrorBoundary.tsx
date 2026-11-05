@@ -18,12 +18,19 @@
 'use client';
 
 import * as React from 'react';
-import { Component, use, type ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
 import type { RSCRefetchRecovery } from './RSCProvider.tsx';
 import { toServerComponentFetchError } from './ServerComponentFetchError.ts';
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
-  const payload = use(promise);
+  // React.use via NAMESPACE access, deliberately not a named import: the
+  // package ships native ESM, and Node statically verifies named imports
+  // against CommonJS react at link time, so `import { use } from 'react'` on
+  // React 18 dies with "SyntaxError: Named export 'use' not found" before
+  // RSCRoute's branded floor guard can run. Pinned by
+  // scripts/packed-esm-floor.test.mjs against the packed artifact.
+  // An Error payload means the RSC bundle failed before the component rendered.
+  const payload = React.use(promise);
   if (payload instanceof Error) throw payload;
   return payload;
 };
