@@ -35,6 +35,20 @@ module ReactOnRails
         nil
       end
 
+      # Every version of +package_name+ that the lockfiles in +dir+ resolve, transitive copies
+      # included. .version answers "what did package.json's direct dependency resolve to"; this
+      # answers "which copies get installed", so a security check sees a vulnerable nested copy
+      # (react-server-dom-webpack arrives through react-on-rails-rsc, not package.json).
+      # Unreadable lockfiles contribute nothing. Returns a unique Array of version Strings.
+      def self.all_versions(dir, package_name)
+        ALL_VERSION_READERS.flat_map do |filename, reader|
+          path = File.join(dir, filename)
+          next [] unless File.exist?(path)
+
+          guard { reader.call(path, package_name) } || []
+        end.uniq
+      end
+
       # Yarn Berry (yarn 2+) yarn.lock content, dispatched from version_from_yarn_lock when the
       # __metadata marker is present. Returns a version String or nil.
       def self.berry_yarn_version(content, package_name)
@@ -77,6 +91,43 @@ module ReactOnRails
           end
         end
 
+        # Keys under packages/snapshots name every installed copy:
+        #   9.0: "name@1.2.3" or "name@1.2.3(peer@4.5.6)"; 6.0: "/name@1.2.3(...)"; 5.x: "/name/1.2.3_peer@4.5.6"
+        #   5.x and 6.0 from a non-default registry: "registry.example.com/name/1.2.3",
+        #   "localhost+4873/name/1.2.3", or "registry.example.com/name@1.2.3"
+        # Tarball, git, and file: copies are returned as their whole key, so callers report them as unknown
+        # instead of skipping them or misreading a tarball name such as "19.3.1.tgz" as a version. 9.0 keys
+        # them as "name@https://...tgz(peer@4.5.6)"; 5.x and 6.0 key them by source ("github.com/org/repo/sha",
+        # "file:vendor/pkg.tgz") and record the package only in the entry's name.
+        PLAIN_VERSION = /\A\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\z/
+
+        def self.all_versions(path, package_name)
+          doc = project_document(path)
+          return [] unless doc
+
+          key_pattern = %r{\A/?(?:[^/@]+/)?#{Regexp.escape(package_name)}[@/](.+)\z}
+          versions = []
+          %w[packages snapshots].each do |section|
+            entries = doc[section]
+            next unless entries.is_a?(Hash)
+
+            entries.each do |key, entry|
+              version = copy_version(key.to_s, entry, key_pattern, package_name)
+              versions << version if version
+            end
+          end
+          versions.uniq
+        end
+
+        def self.copy_version(key, entry, key_pattern, package_name)
+          rest = key[key_pattern, 1]
+          resolution = key[0, key.index("(") || key.length]
+          return (resolution if entry.is_a?(Hash) && entry["name"] == package_name) unless rest
+
+          version = strip_peer_suffix(rest)
+          version&.match?(PLAIN_VERSION) ? version : resolution
+        end
+
         def self.dependencies(doc)
           return doc.dig("importers", ".", "dependencies") if doc.key?("importers")
 
@@ -92,8 +143,21 @@ module ReactOnRails
         # ISO timestamps (a time: map), which Psych types as Date/Time and safe parsing would
         # otherwise reject.
         def self.project_document(path)
-          docs = YAML.safe_load_stream(File.read(path), permitted_classes: [Date, Time])
+          docs = safe_load_documents(File.read(path))
           docs.reverse_each.find { |d| d.is_a?(Hash) && (d.key?("importers") || d.key?("dependencies")) }
+        end
+
+        # YAML.safe_load_stream exists only from Psych 5.2.5 (Ruby 3.4 ships 5.2.2). Older Psych
+        # parses the stream and safe-loads each document, which keeps the same alias and class
+        # restrictions.
+        def self.safe_load_documents(content)
+          return YAML.safe_load_stream(content, permitted_classes: [Date, Time]) if YAML.respond_to?(:safe_load_stream)
+
+          Psych.parse_stream(content).children.map do |document|
+            single = Psych::Nodes::Stream.new
+            single.children << document
+            YAML.safe_load(single.to_yaml, permitted_classes: [Date, Time])
+          end
         end
 
         # lockfileVersion >= 6: "16.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)" -> "16.6.0"
@@ -117,6 +181,19 @@ module ReactOnRails
 
           # "react-on-rails@16.6.0" / "@scope/pkg@1.2.3" -> version after the last "@"
           resolution.rpartition("@").last
+        end
+
+        # packages is keyed by install path ("name", "parent/name"); entry[0] is "name@version".
+        def self.all_versions(path, package_name)
+          packages = JSON.parse(jsonc_to_json(File.read(path)))["packages"]
+          return [] unless packages.is_a?(Hash)
+
+          packages.values.filter_map do |entry|
+            resolution = entry.is_a?(Array) ? entry[0] : nil
+            next unless resolution.is_a?(String) && resolution.start_with?("#{package_name}@")
+
+            resolution.delete_prefix("#{package_name}@")
+          end
         end
 
         # One complete JSON string literal (escape-aware), a // line comment, a /* */ block
@@ -157,14 +234,99 @@ module ReactOnRails
           # can merge several selectors into one key. Matching "#{name}@" cannot collide with
           # longer names ("react-on-rails-pro@..." does not start with "react-on-rails@").
           doc.each do |key, entry|
-            next if key == "__metadata"
-            next unless key.to_s.split(",").any? { |selector| selector.strip.start_with?("#{package_name}@") }
+            next unless entry_for?(key, package_name)
 
             return entry["version"]&.to_s if entry.is_a?(Hash)
           end
           nil
         end
+
+        def self.all_versions(content, package_name)
+          doc = YAML.safe_load(content, permitted_classes: [Date, Time])
+          return [] unless doc.is_a?(Hash)
+
+          # An alias ("flight@npm:react-server-dom-webpack@19.3.0") is keyed by the alias name, but
+          # its resolution still names the real package.
+          doc.filter_map do |key, entry|
+            next unless entry.is_a?(Hash)
+            next unless entry_for?(key, package_name) || entry["resolution"].to_s.start_with?("#{package_name}@")
+
+            entry["version"]&.to_s
+          end
+        end
+
+        def self.entry_for?(key, package_name)
+          return false if key == "__metadata"
+
+          key.to_s.split(",").any? { |selector| selector.strip.start_with?("#{package_name}@") }
+        end
       end
+
+      # Yarn classic yarn.lock: one block per resolved copy, keyed by its selectors
+      # ("name@^1.0.0", "name@~1.0.2":) with an indented version "1.0.3" line. An npm alias
+      # selector ("flight@npm:name@19.3.0") names the real package after "npm:".
+      module ClassicYarnLockfile
+        def self.all_versions(path, package_name)
+          content = File.read(path)
+          return BerryYarnLockfile.all_versions(content, package_name) if content[0, 1024].include?("__metadata:")
+
+          selector = /\A"?(?:[^\s"]+@npm:)?#{Regexp.escape(package_name)}@/
+          versions = []
+          in_block = false
+          content.each_line do |line|
+            if line.match?(/\A\S/)
+              in_block = line.match?(selector)
+            elsif in_block && (match = line.match(/\A\s+version\s+"?([^"\s]+)"?/))
+              versions << match[1]
+              in_block = false
+            end
+          end
+          versions
+        end
+      end
+
+      # package-lock.json v2/v3 keys every copy by install path ("node_modules/name",
+      # "node_modules/parent/node_modules/name"); an npm alias installs under the alias path and
+      # records the real package in "name". v1 nests copies under dependencies, and records an
+      # alias's real package in its version ("flight": { "version": "npm:name@1.2.3" }).
+      module NpmLockfile
+        def self.all_versions(path, package_name)
+          doc = JSON.parse(File.read(path))
+          return [] unless doc.is_a?(Hash)
+
+          install_path = %r{(?:\A|/)node_modules/#{Regexp.escape(package_name)}\z}
+          from_packages = (doc["packages"].is_a?(Hash) ? doc["packages"] : {}).filter_map do |key, entry|
+            next unless entry.is_a?(Hash)
+
+            entry["version"] if key.match?(install_path) || (key != "" && entry["name"] == package_name)
+          end
+          from_packages + v1_versions(doc["dependencies"], package_name)
+        end
+
+        def self.v1_versions(dependencies, package_name)
+          return [] unless dependencies.is_a?(Hash)
+
+          alias_prefix = "npm:#{package_name}@"
+          dependencies.flat_map do |name, entry|
+            next [] unless entry.is_a?(Hash)
+
+            version = entry["version"].to_s
+            own = if version.start_with?(alias_prefix) then [version.delete_prefix(alias_prefix)]
+                  elsif name == package_name && !version.empty? then [version]
+                  else
+                    []
+                  end
+            own + v1_versions(entry["dependencies"], package_name)
+          end
+        end
+      end
+
+      ALL_VERSION_READERS = {
+        "yarn.lock" => ClassicYarnLockfile.method(:all_versions),
+        "package-lock.json" => NpmLockfile.method(:all_versions),
+        "pnpm-lock.yaml" => PnpmLockfile.method(:all_versions),
+        "bun.lock" => BunLockfile.method(:all_versions)
+      }.freeze
     end
   end
 end

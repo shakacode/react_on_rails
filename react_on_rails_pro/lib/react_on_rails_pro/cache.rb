@@ -21,7 +21,9 @@ module ReactOnRailsPro
     ACTIVE_SUPPORT_EXPIRES_AT_VERSION = Gem::Version.new("7.0.0")
     EXPIRED_CACHE_WRITE_TTL = 1 # seconds; minimum positive TTL for race-expired writes
     RSC_BUNDLE_MISSING_CACHE_KEY = "rsc-bundle-missing"
-    CSP_NONCE_CACHE_KEY_SEGMENT = "csp-nonce"
+    # Renamed from "csp-nonce" when cached renders switched to a placeholder nonce (issue
+    # #5267), so entries written before that change are never read.
+    CSP_NONCE_CACHE_KEY_SEGMENT = "csp-nonce-placeholder"
     CSP_NONCE_FREE_CACHE_KEY_SEGMENT = "csp-nonce-free"
 
     class << self

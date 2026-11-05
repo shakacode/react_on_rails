@@ -4278,6 +4278,73 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).not_to include(a_string_including("Development server Procfile.dev"))
     end
 
+    describe "static Procfile watcher detection" do
+      def static_procfile_available_with(content)
+        write_project_file("Procfile.dev-static-assets", content)
+        doctor.send(:static_procfile_available?)
+      end
+
+      [
+        "js: bin/shakapacker --watch\n",
+        "js: bin/shakapacker -w\n",
+        "js: ./bin/shakapacker -w\n",
+        "js: bin/shakapacker-watch --watch\n",
+        "js: bin/shakapacker-watch -w\n",
+        "js: bin/shakapacker --progress --watch\n",
+        "js: RAILS_ENV=development bin/shakapacker -w --progress\n",
+        "js: sh -c 'bundle exec rake react_on_rails:locale && bin/shakapacker -w'\n",
+        "js: sh -c 'echo \"# Starting watcher\"; exec bin/shakapacker --watch'\n",
+        "js: echo \"# Starting watcher\"; bin/shakapacker -w\n",
+        "js: ASSET_URL=https://cdn.example/app#v1 bin/shakapacker --watch\n",
+        "js: echo it\\'s up; bin/shakapacker -w\n"
+      ].each do |content|
+        it "accepts #{content.strip.inspect}" do
+          expect(static_procfile_available_with(content)).to be(true)
+        end
+      end
+
+      [
+        "web: bin/rails server\n",
+        "js: bin/shakapacker\n",
+        "js: bin/shakapacker-watch\n",
+        "js: bin/shakapacker --watch-options-stdin\n",
+        "js: bin/shakapacker-dev-server --watch\n",
+        "js: bin/shakapacker && echo -w\n",
+        "# js: bin/shakapacker -w\nweb: bin/rails server\n",
+        "# js: bin/shakapacker --watch\nweb: bin/rails server\n",
+        "js: bin/shakapacker # add -w to rebuild on save\n",
+        "web: bin/rails server # bin/shakapacker -w\n",
+        "js: echo \"built\" # bin/shakapacker --watch\n",
+        "web: bin/rails server;# bin/shakapacker -w\n"
+      ].each do |content|
+        it "rejects #{content.strip.inspect}" do
+          expect(static_procfile_available_with(content)).to be(false)
+        end
+      end
+
+      it "applies the same comment rule to the other Procfile checks" do
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: APP_URL=http://x/a#b bin/rails server\n")).to be(true)
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: echo \"# up\"; bin/rails server\n")).to be(true)
+        expect(doctor.send(:procfile_serves_rails_pages?, "web: echo up # bin/rails server\n")).to be(false)
+      end
+
+      it "returns false when Procfile.dev-static-assets does not exist" do
+        expect(doctor.send(:static_procfile_available?)).to be(false)
+      end
+
+      it "reports the high-risk warning, not the missing-Procfile error, for a -w watcher" do
+        write_project_file("Procfile.dev", "dev-server: bin/shakapacker-dev-server\n")
+        write_project_file("Procfile.dev-static-assets", "js: bin/shakapacker -w\n")
+
+        doctor.send(:add_shared_output_path_procfile_guidance)
+
+        error_messages = checker.messages.select { |msg| msg[:type] == :error }.map { |msg| msg[:content] }
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(error_messages).not_to include(a_string_including("Procfile.dev-static-assets is missing"))
+        expect(warning_messages).to include(a_string_including("Shared output path is high-risk"))
+      end
+    end
+
     context "with fix enabled" do
       let(:fix_mode) { true }
 
@@ -11476,6 +11543,196 @@ RSpec.describe ReactOnRails::Doctor do
         .to include(a_string_including("disable lazyCompilation another way"))
       # An equivalent config must not also produce a spurious success alongside the warning.
       expect(success_messages).to be_empty
+    end
+  end
+
+  describe "check_rsc_flight_advisories" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+    end
+
+    def messages_of(type)
+      checker.messages.select { |message| message[:type] == type }.map { |message| message[:content] }
+    end
+
+    def write_pnpm_lock(*versions)
+      snapshots = versions.map do |version|
+        "  react-server-dom-webpack@#{version}(react@#{version}):\n    dependencies: {}\n"
+      end
+      File.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\nimporters:\n  .: {}\nsnapshots:\n#{snapshots.join}")
+    end
+
+    it "warns about a vulnerable 19.3.0 in pnpm-lock.yaml and names 19.3.1" do
+      write_pnpm_lock("19.3.0")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including(
+          "Your lockfile resolves react-server-dom-webpack 19.3.0",
+          "GHSA-xqc2-xf4c-x3h3 (critical remote code execution)",
+          "GHSA-h3gv-c5rc-p453 (denial of service)",
+          "update react, react-dom, and react-server-dom-webpack together to 19.3.1",
+          "commit the\nrefreshed lockfile"
+        )
+      )
+    end
+
+    it "points 19.2-line copies in yarn.lock at 19.2.9" do
+      File.write("yarn.lock", "react-server-dom-webpack@~19.2.8:\n  version \"19.2.8\"\n")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("react-server-dom-webpack 19.2.8", "together to 19.2.9\n")
+      )
+    end
+
+    it "names both patched releases when copies span the 19.2 and 19.3 lines" do
+      write_pnpm_lock("19.3.0", "19.2.8")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("19.3.0, 19.2.8", "together to 19.3.1 (or 19.2.9 for copies on the 19.2 line)")
+      )
+    end
+
+    it "warns about a vulnerable copy nested behind a patched one in package-lock.json" do
+      File.write("package-lock.json", JSON.generate(
+                                        "lockfileVersion" => 3,
+                                        "packages" => {
+                                          "node_modules/react-server-dom-webpack" => { "version" => "19.3.1" },
+                                          "node_modules/react-on-rails-rsc/node_modules/react-server-dom-webpack" =>
+                                            { "version" => "19.3.0" }
+                                        }
+                                      ))
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(a_string_including("react-server-dom-webpack 19.3.0,"))
+    end
+
+    it "reports success for patched releases on every line" do
+      write_pnpm_lock("19.3.1", "19.2.9", "19.1.10", "19.0.9")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to be_empty
+      expect(messages_of(:success)).to contain_exactly(
+        a_string_including("react-server-dom-webpack 19.3.1, 19.2.9, 19.1.10, 19.0.9 are not affected")
+      )
+    end
+
+    it "classifies versions by the advisory rules" do
+      statuses = %w[19.0.8 19.1.9 19.2.8 19.3.0 19.3.1-rc.0 19.3.1 19.2.9 19.4.0 20.0.0 19.3.2-canary-abc
+                    19.4.0-canary-abc 0.0.0-experimental-abc 18.3.1 not-a-version].to_h do |version|
+        [version, doctor.send(:rsc_flight_version_status, version)]
+      end
+
+      expect(statuses).to eq(
+        "19.0.8" => :vulnerable, "19.1.9" => :vulnerable, "19.2.8" => :vulnerable, "19.3.0" => :vulnerable,
+        "19.3.1-rc.0" => :vulnerable, "19.3.1" => :patched, "19.2.9" => :patched, "19.4.0" => :patched,
+        "20.0.0" => :patched, "19.3.2-canary-abc" => :unknown, "19.4.0-canary-abc" => :unknown,
+        "0.0.0-experimental-abc" => :unknown, "18.3.1" => :unknown, "not-a-version" => :unknown
+      )
+    end
+
+    it "does not claim an experimental build is fixed" do
+      write_pnpm_lock("0.0.0-experimental-abc")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:success)).to be_empty
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("Could not tell whether react-server-dom-webpack 0.0.0-experimental-abc includes the fixes")
+      )
+    end
+
+    it "does not report success when a pnpm tarball copy sits beside a patched one" do
+      File.write("pnpm-lock.yaml", <<~YAML)
+        lockfileVersion: '9.0'
+        importers:
+          .: {}
+        snapshots:
+          react-server-dom-webpack@19.3.1(react@19.3.1):
+            dependencies: {}
+          react-server-dom-webpack@https://example.com/rsdw-19.3.0.tgz(react@19.3.0):
+            dependencies: {}
+      YAML
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:success)).to be_empty
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("Could not tell whether react-server-dom-webpack react-server-dom-webpack@https://example.com/rsdw-19.3.0.tgz")
+      )
+    end
+
+    it "warns that the check did not run when no lockfile lists react-server-dom-webpack" do
+      File.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\nimporters:\n  .: {}\nsnapshots: {}\n")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including(
+          "Could not check react-server-dom-webpack",
+          "No readable yarn.lock, package-lock.json, pnpm-lock.yaml, or bun.lock in #{Dir.pwd} lists it.",
+          "If your lockfile lives at a workspace root"
+        )
+      )
+    end
+
+    it "steers 19.0 and 19.1 copies to 19.3.1" do
+      File.write("yarn.lock", "react-server-dom-webpack@~19.1.0:\n  version \"19.1.9\"\n")
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(
+        a_string_including("react-server-dom-webpack 19.1.9", "together to 19.3.1\n", "pnpm.overrides")
+      )
+    end
+
+    it "warns about a vulnerable npm alias copy" do
+      File.write("package-lock.json", JSON.generate(
+                                        "lockfileVersion" => 3,
+                                        "packages" => {
+                                          "node_modules/react-server-dom-webpack" => { "version" => "19.3.1" },
+                                          "node_modules/flight" => {
+                                            "name" => "react-server-dom-webpack", "version" => "19.3.0"
+                                          }
+                                        }
+                                      ))
+
+      doctor.send(:check_rsc_flight_advisories)
+
+      expect(messages_of(:warning)).to contain_exactly(a_string_including("react-server-dom-webpack 19.3.0,"))
+    end
+
+    it "runs as part of the RSC doctor section" do
+      pro_config = double("ProConfig",
+                          enable_rsc_support: true,
+                          server_renderer: "NodeRenderer",
+                          rsc_bundle_js_file: "rsc-bundle.js",
+                          rsc_payload_generation_url_path: "rsc_payload/")
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      allow(doctor).to receive(:puts)
+      write_pnpm_lock("19.3.0")
+
+      doctor.send(:check_rsc_setup)
+
+      expect(messages_of(:warning))
+        .to include(a_string_including("Your lockfile resolves react-server-dom-webpack 19.3.0"))
     end
   end
 

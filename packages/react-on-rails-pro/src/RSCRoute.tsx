@@ -21,8 +21,6 @@ import * as React from 'react';
 import {
   Component,
   createContext,
-  forwardRef,
-  use,
   useCallback,
   useContext,
   useEffect,
@@ -32,6 +30,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type Ref,
 } from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from './RSCRouteSuccessfulVersion.ts';
@@ -144,8 +143,14 @@ export function useCurrentRSCRoute(): RSCRouteHandle {
 }
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
-  // use is available in React 18.3+
-  const promiseResult = use(promise);
+  // React.use via NAMESPACE access, deliberately not a named import: the
+  // package ships native ESM, and Node statically verifies named imports
+  // against CommonJS react at link time — `import { use } from 'react'` on
+  // React 18 dies with "SyntaxError: Named export 'use' not found" before the
+  // branded floor guard below can run. Namespace properties are not verified,
+  // so the module links everywhere and the guard owns the failure. Pinned by
+  // scripts/packed-esm-floor.test.mjs against the packed artifact.
+  const promiseResult = React.use(promise);
 
   // In case that an error happened during the rendering of the RSC payload before the rendering of the component itself starts
   // RSC bundle will return an error object serialized inside the RSC payload
@@ -179,113 +184,152 @@ const toServerComponentFetchError = (
 
 type RefetchErrorState = [string, ServerComponentFetchError];
 type RSCContextValue = ReturnType<typeof useRSC>;
-type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue };
+// React 19 ref-as-prop: `ref` is a regular prop on function components, so no
+// forwardRef wrapper is needed. This keeps the RSC client runtime floor at
+// React 19.0 — the same floor PromiseWrapper's `use` already imposes (the
+// documented support window starts higher, at react-on-rails-rsc 19.2.x with
+// React >= 19.2.7). CI pins the floor via test:react-floor-guard, which runs
+// real isolated react/react-dom installs: 18.3.1 below the floor (branded
+// error, no mocks), 19.0.x (runtime floor), 19.1.x, and 19.2.7 (oldest
+// documented supported RSC line).
+//
+// Deliberately NOT using useEffectEvent anywhere in this file, for three
+// load-bearing reasons; do not "modernize" these patterns without revisiting
+// all of them:
+// 1. It would raise the RSC client floor to React 19.2 (the hook's first
+//    stable release) — the floor lane above fails on 19.0.x the moment it is
+//    adopted.
+// 2. An effect event has a new identity every render, which would destabilize
+//    `refetch` → `handle` → the context provider value (imperativeRefetch
+//    test 2d pins this).
+// 3. On React 19.2.x it silently freezes at its mount-time closure inside
+//    ForwardRef/SimpleMemoComponent fibers (fixed in 19.3.0 by
+//    facebook/react#34831) — a trap for any future adoption that also
+//    reintroduces forwardRef or React.memo here (test 2c pins callback
+//    freshness).
+// `| undefined` is load-bearing: consumers compiling with
+// exactOptionalPropertyTypes pass conditional refs (`cond ? ref : undefined`),
+// which TS rejects against a bare optional property (TS2375). Guarded by
+// scripts/check-public-ref-types.test.mjs against the shipped declarations.
+type RouteHandleRef = { ref?: Ref<RSCRouteHandle> | undefined };
+type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue } & RouteHandleRef;
 
-const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
-  ({ componentName, componentProps, onRefetchError, rscContext }, ref) => {
-    const { getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions } =
-      rscContext;
-    const currentRouteKey = useMemo(
-      () => createRSCPayloadKey(componentName, componentProps),
-      [componentName, componentProps],
-    );
-    const successfulVersion = successfulVersions[currentRouteKey] ?? 0;
-    const [refetchErrorState, setRefetchErrorState] = useState<RefetchErrorState | null>(null);
-    const refetchError = refetchErrorState?.[0] === currentRouteKey ? refetchErrorState[1] : null;
+function RSCRouteContent({
+  componentName,
+  componentProps,
+  onRefetchError,
+  rscContext,
+  ref,
+}: RSCRouteContentProps) {
+  const { getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions } =
+    rscContext;
+  const currentRouteKey = useMemo(
+    () => createRSCPayloadKey(componentName, componentProps),
+    [componentName, componentProps],
+  );
+  const successfulVersion = successfulVersions[currentRouteKey] ?? 0;
+  const [refetchErrorState, setRefetchErrorState] = useState<RefetchErrorState | null>(null);
+  const refetchError = refetchErrorState?.[0] === currentRouteKey ? refetchErrorState[1] : null;
 
-    // Read the latest committed props in `refetch`, even when a descendant
-    // captured the handle at an earlier render.
-    const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
-    const onRefetchErrorRef = useRef(onRefetchError);
-    const latestRefetchRequestRef = useRef(0);
-    // Version 0 means "evicted or not yet seen"; it lets a later monotonic
-    // success token clear a stale refetch error after the key reloads.
-    const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
-    const isMountedRef = useRef(false);
-    useLayoutEffect(() => {
-      isMountedRef.current = true;
-      return () => {
-        isMountedRef.current = false;
-      };
-    }, []);
-    useLayoutEffect(() => {
-      latestPropsRef.current = [componentName, componentProps];
-    }, [componentName, componentProps]);
-    useLayoutEffect(() => {
-      onRefetchErrorRef.current = onRefetchError;
-    }, [onRefetchError]);
-    useLayoutEffect(
-      () => retainComponent(componentName, componentProps),
-      [componentName, componentProps, retainComponent],
-    );
-    useLayoutEffect(() => {
-      const previous = previousSuccessfulVersionRef.current;
-      const current = { key: currentRouteKey, version: successfulVersion };
-      previousSuccessfulVersionRef.current = current;
+  // Read the latest committed props in `refetch`, even when a descendant
+  // captured the handle at an earlier render. Deliberately a ref, NOT a
+  // useEffectEvent: an effect event has a new identity every render, which
+  // would destabilize `refetch` → `handle` → the context provider value and
+  // re-render every useCurrentRSCRoute consumer on every route render.
+  // Guarded by imperativeRefetch test 2d.
+  const latestPropsRef = useRef<[string, unknown]>([componentName, componentProps]);
+  const onRefetchErrorRef = useRef(onRefetchError);
+  const latestRefetchRequestRef = useRef(0);
+  // Version 0 means "evicted or not yet seen"; it lets a later monotonic
+  // success token clear a stale refetch error after the key reloads.
+  const previousSuccessfulVersionRef = useRef({ key: currentRouteKey, version: successfulVersion });
+  const isMountedRef = useRef(false);
+  useLayoutEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    latestPropsRef.current = [componentName, componentProps];
+  }, [componentName, componentProps]);
+  useLayoutEffect(() => {
+    onRefetchErrorRef.current = onRefetchError;
+  }, [onRefetchError]);
+  useLayoutEffect(
+    () => retainComponent(componentName, componentProps),
+    [componentName, componentProps, retainComponent],
+  );
+  useLayoutEffect(() => {
+    const previous = previousSuccessfulVersionRef.current;
+    const current = { key: currentRouteKey, version: successfulVersion };
+    previousSuccessfulVersionRef.current = current;
 
-      if (shouldClearRefetchErrorOnSuccessfulVersionChange(previous, current)) {
-        setRefetchErrorState(null);
+    if (shouldClearRefetchErrorOnSuccessfulVersionChange(previous, current)) {
+      setRefetchErrorState(null);
+    }
+  }, [currentRouteKey, successfulVersion]);
+
+  const refetch = useCallback((): Promise<ReactNode> => {
+    const [n, p] = latestPropsRef.current;
+    const requestKey = createRSCPayloadKey(n, p);
+    // eslint-disable-next-line no-multi-assign
+    const requestId = (latestRefetchRequestRef.current += 1);
+    const recoverOnError = process.env.NODE_ENV === 'production';
+    // refetchComponent swaps the cache promise and bumps the provider's
+    // version inside startTransition. That re-renders every <RSCRoute>
+    // (including this one) as a transition commit, so old content stays
+    // visible while the new promise streams in.
+    const refetchPromise = refetchComponent(n, p, recoverOnError);
+    const sharedRefetchVersion = getRefetchVersion(n, p);
+    const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+      const serverComponentFetchError = toServerComponentFetchError(error, n, p);
+      if (
+        recoverOnError &&
+        isMountedRef.current &&
+        latestRefetchRequestRef.current === requestId &&
+        getRefetchVersion(n, p) === sharedRefetchVersion &&
+        createRSCPayloadKey(...latestPropsRef.current) === requestKey
+      ) {
+        setRefetchErrorState([requestKey, serverComponentFetchError]);
       }
-    }, [currentRouteKey, successfulVersion]);
+      throw serverComponentFetchError;
+    });
+    if (recoverOnError) {
+      void handledRefetchPromise.catch(() => undefined);
+    }
+    return handledRefetchPromise;
+  }, [getRefetchVersion, refetchComponent]);
 
-    const refetch = useCallback((): Promise<ReactNode> => {
-      const [n, p] = latestPropsRef.current;
-      const requestKey = createRSCPayloadKey(n, p);
-      // eslint-disable-next-line no-multi-assign
-      const requestId = (latestRefetchRequestRef.current += 1);
-      const recoverOnError = process.env.NODE_ENV === 'production';
-      // refetchComponent swaps the cache promise and bumps the provider's
-      // version inside startTransition. That re-renders every <RSCRoute>
-      // (including this one) as a transition commit, so old content stays
-      // visible while the new promise streams in.
-      const refetchPromise = refetchComponent(n, p, recoverOnError);
-      const sharedRefetchVersion = getRefetchVersion(n, p);
-      const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
-        const serverComponentFetchError = toServerComponentFetchError(error, n, p);
-        if (
-          recoverOnError &&
-          isMountedRef.current &&
-          latestRefetchRequestRef.current === requestId &&
-          getRefetchVersion(n, p) === sharedRefetchVersion &&
-          createRSCPayloadKey(...latestPropsRef.current) === requestKey
-        ) {
-          setRefetchErrorState([requestKey, serverComponentFetchError]);
-        }
-        throw serverComponentFetchError;
-      });
-      if (recoverOnError) {
-        void handledRefetchPromise.catch(() => undefined);
-      }
-      return handledRefetchPromise;
-    }, [getRefetchVersion, refetchComponent]);
+  const clearRefetchError = useCallback(() => {
+    if (isMountedRef.current) {
+      setRefetchErrorState((state) => (state?.[0] === currentRouteKey ? null : state));
+    }
+  }, [currentRouteKey]);
 
-    const clearRefetchError = useCallback(() => {
-      if (isMountedRef.current) {
-        setRefetchErrorState((state) => (state?.[0] === currentRouteKey ? null : state));
-      }
-    }, [currentRouteKey]);
+  const handle = useMemo<RSCRouteHandle>(
+    () => ({ refetch, retry: refetch, refetchError, clearRefetchError }),
+    [clearRefetchError, refetch, refetchError],
+  );
+  useImperativeHandle(ref, () => handle, [handle]);
+  useEffect(() => {
+    if (refetchError) {
+      // Read through the layout-effect-synced ref so the latest committed
+      // onRefetchError prop is observed (imperativeRefetch test 2c) without
+      // this effect re-running on callback identity changes — the ref-box
+      // equivalent of useEffectEvent, kept for the reasons listed above
+      // RouteHandleRef (React 19.0 floor, identity stability, 19.2 freeze).
+      onRefetchErrorRef.current?.(refetchError);
+    }
+  }, [refetchError]);
 
-    const handle = useMemo<RSCRouteHandle>(
-      () => ({ refetch, retry: refetch, refetchError, clearRefetchError }),
-      [clearRefetchError, refetch, refetchError],
-    );
-    useImperativeHandle(ref, () => handle, [handle]);
-    useEffect(() => {
-      if (refetchError) {
-        onRefetchErrorRef.current?.(refetchError);
-      }
-    }, [refetchError]);
-
-    const componentPromise = getComponent(componentName, componentProps);
-    return (
-      <CurrentRSCRouteContext.Provider value={handle}>
-        <PromiseWrapper promise={componentPromise} />
-      </CurrentRSCRouteContext.Provider>
-    );
-  },
-);
-
-RSCRouteContent.displayName = 'RSCRouteContent';
+  const componentPromise = getComponent(componentName, componentProps);
+  return (
+    <CurrentRSCRouteContext.Provider value={handle}>
+      <PromiseWrapper promise={componentPromise} />
+    </CurrentRSCRouteContext.Provider>
+  );
+}
 
 /**
  * Reads the RSC context above the error boundary (so a missing provider still
@@ -295,24 +339,25 @@ RSCRouteContent.displayName = 'RSCRouteContent';
  * the boundary and surface as `ServerComponentFetchError`, matching async
  * fetch failures (#4372).
  */
-const RSCRouteContentWithErrorBoundary = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
-  ({ componentName, componentProps, onRefetchError }, ref) => {
-    const rscContext = useRSC();
-    return (
-      <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
-        <RSCRouteContent
-          ref={ref}
-          componentName={componentName}
-          componentProps={componentProps}
-          onRefetchError={onRefetchError}
-          rscContext={rscContext}
-        />
-      </RSCRouteErrorBoundary>
-    );
-  },
-);
-
-RSCRouteContentWithErrorBoundary.displayName = 'RSCRouteContentWithErrorBoundary';
+function RSCRouteContentWithErrorBoundary({
+  componentName,
+  componentProps,
+  onRefetchError,
+  ref,
+}: Omit<RSCRouteProps, 'ssr'> & RouteHandleRef) {
+  const rscContext = useRSC();
+  return (
+    <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
+      <RSCRouteContent
+        ref={ref}
+        componentName={componentName}
+        componentProps={componentProps}
+        onRefetchError={onRefetchError}
+        rscContext={rscContext}
+      />
+    </RSCRouteErrorBoundary>
+  );
+}
 
 /**
  * Renders a React Server Component inside a React Client Component.
@@ -340,23 +385,44 @@ RSCRouteContentWithErrorBoundary.displayName = 'RSCRouteContentWithErrorBoundary
  * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
  * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
  */
-const RSCRoute = forwardRef<RSCRouteHandle, RSCRouteProps>(
-  ({ componentName, componentProps, ssr = true, onRefetchError }, ref): ReactNode => {
-    if (!ssr && typeof window === 'undefined') {
-      throw new RSCRouteSSRFalseBailoutError(componentName);
-    }
-
-    return (
-      <RSCRouteContentWithErrorBoundary
-        ref={ref}
-        componentName={componentName}
-        componentProps={componentProps}
-        onRefetchError={onRefetchError}
-      />
+// React added `use` (and ref-as-prop) in 19.0; on older React `React.use` is
+// undefined and the render path would die with a bare "use is not a function"
+// (or, depending on tree shape, an unrelated-looking provider error) instead
+// of naming the real requirement. `React.use` is read off the namespace — see
+// PromiseWrapper — so even a native-ESM consumer reaches this guard instead of
+// a link-time SyntaxError. This is the RSC client path's actual runtime floor,
+// guarded in CI by test:react-floor-guard and scripts/packed-esm-floor.test.mjs.
+function assertReactSupportsRSCRoute(): void {
+  if (typeof React.use !== 'function') {
+    throw new Error(
+      `[React on Rails Pro] <RSCRoute> requires React >= 19 (found ${React.version}): the RSC client ` +
+        `path uses React's \`use\` and ref-as-prop, which were added in React 19. Upgrade react and ` +
+        `react-dom to a supported version pair — see the React on Rails Pro React Server Components ` +
+        `docs for the support table.`,
     );
-  },
-);
+  }
+}
 
-RSCRoute.displayName = 'RSCRoute';
+function RSCRoute({
+  componentName,
+  componentProps,
+  ssr = true,
+  onRefetchError,
+  ref,
+}: RSCRouteProps & RouteHandleRef): ReactNode {
+  assertReactSupportsRSCRoute();
+  if (!ssr && typeof window === 'undefined') {
+    throw new RSCRouteSSRFalseBailoutError(componentName);
+  }
+
+  return (
+    <RSCRouteContentWithErrorBoundary
+      ref={ref}
+      componentName={componentName}
+      componentProps={componentProps}
+      onRefetchError={onRefetchError}
+    />
+  );
+}
 
 export default RSCRoute;

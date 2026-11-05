@@ -161,3 +161,20 @@ unless gsub_file_content(
 end
 # test:rsc script now automatically detects React version and skips on React 18
 # No override needed - the script checks React version and exits cleanly if < 19
+
+# The react-floor-guard lane re-runs the imperativeRefetch suite against pinned
+# React installs, and that suite imports @testing-library/jest-dom — removed by
+# this conversion (only @testing-library/react survives, hoisted from the core
+# package's own devDependencies) — so the lane cannot run on the minimum matrix:
+# drop it from the chain. rscRouteReactFloor.client.test.tsx stays in
+# test:non-rsc on purpose: it needs no jest-dom and its below-floor branch runs
+# for real against the converted React 18 workspace. The public-ref-types
+# (tsc-only) and packed-esm-floor (plain node) lanes also stay: they need no
+# testing-library and install their own React pins.
+unless gsub_file_content(
+  "../packages/react-on-rails-pro/package.json",
+  "pnpm run test:react-floor-guard && ",
+  ""
+)
+  abort "Failed to remove the react-floor-guard lane from the React on Rails Pro test chain"
+end

@@ -42,6 +42,16 @@ module ReactOnRails
       RSC_SUPPORTED_REACT_MINOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(1)
       RSC_MINIMUM_REACT_PATCH = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(2)
       RSC_SUPPORTED_REACT_LINE = "#{RSC_SUPPORTED_REACT_MAJOR}.#{RSC_SUPPORTED_REACT_MINOR}.x".freeze
+      # Historical fact, not the generator floor: React's 2026-10-14 advisories patched
+      # react-server-dom-webpack at 19.3.1 on the 19.3 line (doctor's RSC_FLIGHT_PATCHED_VERSIONS).
+      # Never bump it with the floor; drop the advisory sentence once the supported line leaves 19.3.
+      RSC_ADVISORY_PATCHED_REACT_VERSION = "19.3.1"
+      RSC_ADVISORY_REACT_LINE = RSC_ADVISORY_PATCHED_REACT_VERSION.sub(/\.\d+\z/, ".x").freeze
+      # Keep in sync with doctor's report_vulnerable_rsc_flight_versions fallback.
+      RSC_NESTED_FLIGHT_OVERRIDE_HINT = <<~HINT.strip
+        If a react-server-dom-webpack copy nested under react-on-rails-rsc stays behind,
+        pin it with npm `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`.
+      HINT
       MAX_LAYOUT_NAME_ATTEMPTS = 99
 
       # Main entry point for RSC setup.
@@ -89,29 +99,41 @@ module ReactOnRails
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  RSC requires React #{RSC_SUPPORTED_REACT_LINE} (detected: #{react_version})
 
-            This generator installs react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, which requires
-            React #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}. The React on Rails Pro node renderer refuses
-            to start when React and react-on-rails-rsc are on different lines.
+            This generator installs react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, which requires React #{RSC_SUPPORTED_REACT_LINE}.
+            The React on Rails Pro node renderer refuses to start when React and react-on-rails-rsc are on
+            different lines. New apps get React #{RSC_MINIMUM_REACT_VERSION} or later. React's 2026-10-14 security
+            advisories affect react-server-dom-webpack below #{RSC_ADVISORY_PATCHED_REACT_VERSION} on the #{RSC_ADVISORY_REACT_LINE} line.
 
-            To install a compatible React version:
-              #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
+            To install a compatible set:
+              #{manual_add_packages_command(rsc_flight_upgrade_packages(RSC_REACT_VERSION_RANGE))}
 
-            Run `bundle exec rake react_on_rails:doctor` afterwards to confirm the pairing.
+            #{RSC_NESTED_FLIGHT_OVERRIDE_HINT}
+
+            Then commit the refreshed lockfile and run `bundle exec rake react_on_rails:doctor` to confirm the pairing.
           MSG
         elsif patch < RSC_MINIMUM_REACT_PATCH
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  React #{react_version} is below the recommended minimum for RSC.
 
-            Please upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
-              #{manual_add_packages_command(["react@#{RSC_MINIMUM_REACT_VERSION}", "react-dom@#{RSC_MINIMUM_REACT_VERSION}"])}
+            React's 2026-10-14 security advisories affect react-server-dom-webpack below #{RSC_ADVISORY_PATCHED_REACT_VERSION} on the
+            #{RSC_ADVISORY_REACT_LINE} line, and each patched react-server-dom-webpack requires the matching React release.
+            Upgrade all three together to #{RSC_MINIMUM_REACT_VERSION} so a retained lockfile does not keep a vulnerable copy:
+              #{manual_add_packages_command(rsc_flight_upgrade_packages(RSC_MINIMUM_REACT_VERSION))}
 
-            react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} is coordinated with
-            React/React DOM #{RSC_MINIMUM_REACT_VERSION}+ for the React on Rails Pro 17 RSC runtime.
+            #{RSC_NESTED_FLIGHT_OVERRIDE_HINT}
+
+            Then commit the refreshed lockfile and run `bundle exec rake react_on_rails:doctor` to confirm the pairing.
           MSG
         end
       end
 
       private
+
+      # react-server-dom-webpack arrives through react-on-rails-rsc, so naming it upgrades the copy a
+      # retained lockfile would otherwise keep; the patched release shares React's version number.
+      def rsc_flight_upgrade_packages(version)
+        %w[react react-dom react-server-dom-webpack].map { |package| "#{package}@#{version}" }
+      end
 
       def add_rsc_config_to_pro_initializer
         initializer_path = "config/initializers/react_on_rails_pro.rb"

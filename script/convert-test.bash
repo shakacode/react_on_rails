@@ -59,6 +59,20 @@ assert_script_includes() {
   return 1
 }
 
+assert_script_excludes() {
+  local json_file="$1"
+  local script_name="$2"
+  local unexpected="$3"
+
+  if ruby -rjson -e 'abort if JSON.parse(File.read(ARGV[0])).dig("scripts", ARGV[1]).include?(ARGV[2])' \
+    "$json_file" "$script_name" "$unexpected"; then
+    return 0
+  fi
+
+  fail "expected $script_name to exclude $unexpected"
+  return 1
+}
+
 run_test() {
   local test_fn="$1"
   CURRENT_TEST="$test_fn"
@@ -137,8 +151,10 @@ JSON
 {
   "name": "react-on-rails-pro",
   "scripts": {
+    "test": "pnpm run test:suite-selection && pnpm run test:non-rsc && pnpm run test:streaming && pnpm run test:rsc && pnpm run test:react-floor-guard && pnpm run test:public-ref-types && pnpm run test:packed-esm-floor && pnpm run test:packed-react-compatibility",
     "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(\\\\.rsc\\\\.test\\\\.|streamServerRenderedReactComponent|streamBackpressure|rscSsrSynchrony|injectRSCPayload|parseLengthPrefixedStream|SuspenseHydration|registerServerComponent).*\"",
-    "test:rsc": "NODE_CONDITIONS=react-server node scripts/run-react19-jest.mjs --require-react-server tests/*.rsc.test.*"
+    "test:rsc": "NODE_CONDITIONS=react-server node scripts/run-react19-jest.mjs --require-react-server tests/*.rsc.test.*",
+    "test:react-floor-guard": "node --test scripts/run-react-floor-guard.test.mjs && node scripts/run-react-floor-guard.mjs"
   },
   "dependencies": {
     "react": "19.2.0",
@@ -215,8 +231,27 @@ test_excludes_lowercase_rsc_suites_from_minimum_tests() {
   assert_script_includes packages/react-on-rails-pro/package.json "test:non-rsc" "rscSsrSynchrony"
 }
 
+test_strips_floor_guard_lane_and_floor_test_from_minimum_chain() {
+  write_fixture
+
+  ruby script/convert
+
+  # The react-floor-guard lane re-runs the imperativeRefetch suite, which
+  # imports @testing-library/jest-dom — removed by the conversion — so the lane
+  # must leave the chain entirely.
+  assert_script_excludes packages/react-on-rails-pro/package.json "test" "test:react-floor-guard"
+  # The floor test file needs no jest-dom and must KEEP running in the minimum
+  # matrix: its below-floor branch exercises the branded error on the converted
+  # React 18 workspace for real.
+  assert_script_excludes packages/react-on-rails-pro/package.json "test:non-rsc" "rscRouteReactFloor"
+  # Lanes that need no testing-library stay in the chain.
+  assert_script_includes packages/react-on-rails-pro/package.json "test" "test:public-ref-types"
+  assert_script_includes packages/react-on-rails-pro/package.json "test" "test:packed-esm-floor"
+}
+
 run_test test_strips_react_19_only_workspace_overrides
 run_test test_excludes_lowercase_rsc_suites_from_minimum_tests
+run_test test_strips_floor_guard_lane_and_floor_test_from_minimum_chain
 
 if [ "$TESTS_FAILED" -eq 0 ]; then
   echo "PASS: $TESTS_RUN tests"

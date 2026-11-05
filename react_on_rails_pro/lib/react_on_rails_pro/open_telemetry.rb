@@ -25,7 +25,8 @@ module ReactOnRailsPro
     RESPONSE_SIZE_ATTRIBUTE = "http.response.body.size"
     STATUS_ATTRIBUTE = "http.response.status_code"
     TRACE_HEADER_NAMES = %w[traceparent tracestate].freeze
-    RENDER_PATH_PATTERN = %r{\A/bundles/[^/]+/([^/]+)/[0-9a-f]{32}\z}
+    # The last segment is a cache digest or a per-render request id; both would explode span cardinality.
+    RENDER_PATH_PATTERN = %r{\A/bundles/[^/]+/([^/]+)/[^/]+\z}
 
     class ClientSpan
       def initialize(span, context)

@@ -241,6 +241,147 @@ describe('buildVM and runInVM', () => {
 
       expect(infoSpy).toHaveBeenCalledTimes(2);
     });
+
+    // --- BUILD_ID injection (issue #5076) ---
+    // Test probes for the cross-package contract defined in src/worker/vm.ts and
+    // packages/react-on-rails-pro/src/cache/buildIdProvider.ts.
+    const BUNDLE_ID_CONTEXT_KEY = '__reactOnRailsProBundleId';
+
+    test('injects the bundle identity as a tamper-proof, non-enumerable property', async () => {
+      getConfig().supportModules = false;
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const bundlePath = uploadedBundlePathForTest();
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      // Verify the property value matches path.basename of the bundle path
+      expect(
+        await executionContext.runInVM(`globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}]`, bundlePath),
+      ).toBe(expectedBundleId);
+
+      // Verify the property descriptor is locked down
+      expect(
+        await executionContext.runInVM(
+          `(() => {
+            const descriptor = Object.getOwnPropertyDescriptor(
+              globalThis,
+              ${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)},
+            );
+            const replaced = Reflect.set(
+              globalThis,
+              ${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)},
+              'tampered',
+            );
+            return {
+              configurable: descriptor.configurable,
+              enumerable: descriptor.enumerable,
+              replaced,
+              writable: descriptor.writable,
+              stillOriginal: globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}] === ${JSON.stringify(expectedBundleId)},
+            };
+          })()`,
+          bundlePath,
+        ),
+      ).toBe(
+        JSON.stringify({
+          configurable: false,
+          enumerable: false,
+          replaced: false,
+          writable: false,
+          stillOriginal: true,
+        }),
+      );
+    });
+
+    test('protects the bundle identity from additionalContext overrides', async () => {
+      getConfig().supportModules = false;
+      getConfig().additionalContext = {
+        [BUNDLE_ID_CONTEXT_KEY]: 'attacker-controlled-value',
+      };
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const bundlePath = uploadedBundlePathForTest();
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      // Object.defineProperty runs after additionalContext is applied,
+      // so the host-injected value must win over any additionalContext override.
+      expect(
+        await executionContext.runInVM(`globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}]`, bundlePath),
+      ).toBe(expectedBundleId);
+    });
+
+    test('trusted path aliases preserve canonical identity', async () => {
+      getConfig().supportModules = false;
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      // Create an alias: a different request path that maps to the same canonical bundle
+      const aliasRequestPath = path.resolve(
+        serverBundleCachePath(testName),
+        'alias-request-path',
+        `${BUNDLE_TIMESTAMP}.js`,
+      );
+
+      const prewarmed = await prewarmDeclaredBundleGeneration(
+        [bundlePath],
+        [{ requestBundlePath: aliasRequestPath, canonicalBundlePath: bundlePath }],
+      );
+
+      // The alias request path should resolve to the same canonical identity
+      const aliasId = await prewarmed.runInVM(
+        `globalThis[${JSON.stringify(BUNDLE_ID_CONTEXT_KEY)}]`,
+        aliasRequestPath,
+      );
+
+      expect(aliasId).toBe(expectedBundleId);
+    });
+
+    // --- BUILD_ID mismatch reporter (issue #5076) ---
+    const BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY = '__reactOnRailsProReportBuildIdMismatch';
+
+    test('mismatch reporter reaches host log.warn without console replay', async () => {
+      getConfig().supportModules = false;
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+      await createUploadedBundleForTest();
+      const executionContext = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
+      const bundlePath = uploadedBundlePathForTest();
+
+      // Verify the reporter is a function
+      expect(
+        await executionContext.runInVM(
+          `typeof globalThis[${JSON.stringify(BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY)}]`,
+          bundlePath,
+        ),
+      ).toBe('function');
+
+      // Call the reporter with mismatched ids
+      await executionContext.runInVM(
+        `globalThis[${JSON.stringify(BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY)}]('explicit-aaa', 'vm-bbb')`,
+        bundlePath,
+      );
+
+      // Warning reached host-side log.warn, not console replay
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BUILD_ID mismatch'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('explicit-aaa'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('vm-bbb'));
+      expect(executionContext.getVMContext(bundlePath)!.sharedConsoleHistory.getConsoleHistory()).toEqual([]);
+
+      warnSpy.mockRestore();
+    });
+    // Matching-identity no-warning behavior is verified in the provider test
+    // (buildIdProvider.test.ts: "setBuildId does not warn when explicit id
+    // matches VM-injected identity"), which is where the dedup decision lives.
   });
 
   describe('additionalContext', () => {

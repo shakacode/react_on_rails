@@ -287,7 +287,10 @@ export const SOURCE_MAP_LOOKUP_ATTEMPT_CONTEXT_KEY = '__reactOnRailsProCreateSou
  * Name of the host-callback global injected into the VM context for stacks
  * serialized by react-on-rails before they can escape to the host formatter.
  */
+// Value-set parity is role-blind: swaps preserving the literal set still pass.
+// MIRROR VALUES OF: packages/react-on-rails/src/errorUtils.ts
 export const SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY = '__reactOnRailsProRemapStackTrace';
+// MIRROR VALUES END
 
 function extractSourceMappingUrl(bundleContents: string): string | undefined {
   // Matches `//# sourceMappingURL=...` (or legacy `//@`) comments; the last one wins.

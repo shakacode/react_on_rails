@@ -548,28 +548,9 @@ You should return a React.Component always for the client side entry point.`);
 }
 
 /**
- * Render a single component by its DOM ID.
- * This is the main entry point for rendering individual components.
- * @public
+ * Initializes the stores one island needs before it renders on demand.
  */
-export function renderComponent(domId: string): void {
-  const railsContext = getRailsContext();
-
-  // If no react on rails context
-  if (!railsContext) return;
-
-  // Compare attribute values directly so valid DOM IDs do not need CSS-selector escaping.
-  let el: Element | null = null;
-  const componentElements = document.querySelectorAll('[data-dom-id]');
-  for (let index = 0; index < componentElements.length; index += 1) {
-    if (componentElements[index].getAttribute('data-dom-id') === domId) {
-      el = componentElements[index];
-      break;
-    }
-  }
-  // No store work when the requested island does not exist (matching the Pro renderer).
-  if (!el) return;
-
+function initializeStoresForEl(el: Element, domId: string, railsContext: RailsContext): void {
   // Initialize only the stores this island declares, so rendering one island on demand cannot
   // touch — or be broken by — unrelated store elements elsewhere on the page (#4862). Islands
   // without the attribute keep the legacy initialize-every-store sweep; initializeStore's
@@ -593,6 +574,32 @@ export function renderComponent(domId: string): void {
   } else {
     forEachStore(railsContext);
   }
+}
+
+/**
+ * Render a single component by its DOM ID.
+ * This is the main entry point for rendering individual components.
+ * @public
+ */
+export function renderComponent(domId: string): void {
+  const railsContext = getRailsContext();
+
+  // If no react on rails context
+  if (!railsContext) return;
+
+  // Compare attribute values directly so valid DOM IDs do not need CSS-selector escaping.
+  let el: Element | null = null;
+  const componentElements = document.querySelectorAll('[data-dom-id]');
+  for (let index = 0; index < componentElements.length; index += 1) {
+    if (componentElements[index].getAttribute('data-dom-id') === domId) {
+      el = componentElements[index];
+      break;
+    }
+  }
+  // No store work when the requested island does not exist (matching the Pro renderer).
+  if (!el) return;
+
+  initializeStoresForEl(el, domId, railsContext);
 
   renderElement(el, railsContext);
 }
@@ -612,6 +619,23 @@ export function renderAllComponents(): void {
   const componentElements = document.querySelectorAll('.js-react-on-rails-component');
   for (let i = 0; i < componentElements.length; i += 1) {
     renderElement(componentElements[i], railsContext);
+  }
+}
+
+/**
+ * Render the components inside `container`, such as a Turbo Frame that just received new content.
+ * Each island initializes its stores as an on-demand render does: only its declared dependencies,
+ * or every store when it declares none. Stores that already exist keep their state.
+ */
+export function renderComponentsWithin(container: Element): void {
+  const railsContext = getRailsContext();
+  if (!railsContext) return;
+
+  const componentElements = container.querySelectorAll('.js-react-on-rails-component');
+  for (let i = 0; i < componentElements.length; i += 1) {
+    const el = componentElements[i];
+    initializeStoresForEl(el, domNodeIdForEl(el), railsContext);
+    renderElement(el, railsContext);
   }
 }
 
@@ -639,6 +663,37 @@ function unmountAllComponents(): void {
     }
   });
   renderedRoots.clear();
+}
+
+/**
+ * The DOM ids of the components currently mounted inside `container`, such as a Turbo Frame about
+ * to render new content.
+ */
+export function mountedComponentIdsWithin(container: Element): string[] {
+  const domNodeIds: string[] = [];
+  renderedRoots.forEach((entry, domNodeId) => {
+    if (container.contains(entry.domNode)) domNodeIds.push(domNodeId);
+  });
+  return domNodeIds;
+}
+
+/**
+ * Unmount the given components whose DOM nodes are no longer in the document, such as the old
+ * content of a Turbo Frame that was just replaced. A component still in the document stays mounted,
+ * and so does one whose id was mounted again on a new node.
+ */
+export function unmountDetachedComponents(domNodeIds: string[]): void {
+  domNodeIds.forEach((domNodeId) => {
+    const entry = renderedRoots.get(domNodeId);
+    if (!entry || entry.domNode.isConnected) return;
+
+    try {
+      teardownEntry(entry, domNodeId);
+    } catch (error) {
+      console.error(teardownErrorLabel(entry, domNodeId), error);
+    }
+    renderedRoots.delete(domNodeId);
+  });
 }
 
 /**

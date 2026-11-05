@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Pre-push gate. Flags pass through (--changed narrow, --all broad, --fast quick).
+set -euo pipefail
+root=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_PREFIX -u GIT_CEILING_DIRECTORIES git -C "$(dirname -- "$0")" rev-parse --show-toplevel) || exit $?
+cd "$root"
+exec bin/ci-local "$@"

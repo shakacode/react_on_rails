@@ -691,6 +691,80 @@ write_file_change() {
   commit_change "change $path"
 }
 
+# Exercise the actual detector against both sides of path changes. Rename
+# configuration must never hide a runtime source that was removed.
+assert_runtime_path_changes_select_suites() {
+  local mode="$1" base source suite operation renames out label destination
+  setup_repo
+  base="$(git rev-parse HEAD)"
+
+  for renames in default true false copies; do
+    if [ "$renames" = default ]; then
+      git config --unset-all diff.renames || true
+    else
+      git config diff.renames "$renames"
+    fi
+    git config diff.renameLimit 1
+    for source in packages/react-on-rails/src/example.ts react_on_rails/lib/react_on_rails/example.rb; do
+      case "$source" in
+        *.ts) suite=run_js_tests ;;
+        *.rb) suite=run_ruby_tests ;;
+      esac
+      for operation in add delete into_docs into_internal from_docs from_internal; do
+        git reset --hard "$base" >/dev/null
+        destination="docs/$(basename "$source")"
+        case "$operation" in
+          *internal) destination="internal/contributor-info/$(basename "$source")" ;;
+        esac
+        mkdir -p "$(dirname "$destination")"
+        case "$operation" in
+          add) cp "$source" "${source%.*}_added.${source##*.}" ;;
+          delete) git rm "$source" >/dev/null ;;
+          into_*) git mv "$source" "$destination" ;;
+          from_*)
+            git mv "$source" "$destination"
+            commit_change "prepare non-runtime source"
+            git mv "$destination" "$source"
+            ;;
+        esac
+        git add .
+        if [ "$mode" = committed ]; then
+          commit_change "$operation runtime path"
+          out="$(detector_output)"
+        else
+          out="$(env -u CI CI_JSON_OUTPUT=1 "$DETECTOR" HEAD HEAD)"
+        fi
+        label="$mode $operation $source diff.renames=$renames"
+        assert_contains "$out" '"docs_only": false' "$label"
+        assert_contains "$out" '"non_runtime_only": false' "$label"
+        assert_contains "$out" "\"$suite\": true" "$label"
+      done
+    done
+  done
+}
+
+test_committed_runtime_path_changes_select_suites() {
+  assert_runtime_path_changes_select_suites committed
+}
+
+test_staged_runtime_path_changes_select_suites() {
+  assert_runtime_path_changes_select_suites staged
+}
+
+test_non_runtime_rename_still_skips_suites() {
+  setup_repo
+  git config diff.renames true
+  mkdir -p internal/contributor-info
+  git mv docs/guide.md internal/contributor-info/guide.md
+  commit_change "move documentation"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "documentation rename"
+  assert_contains "$out" '"run_js_tests": false' "documentation rename"
+  assert_contains "$out" '"run_ruby_tests": false' "documentation rename"
+}
+
 test_docs_changes_are_non_runtime_only() {
   setup_repo
   printf '\nMore docs.\n' >> docs/guide.md
@@ -866,11 +940,24 @@ test_agent_tooling_changes_are_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "agent tooling output"
 }
 
-test_agent_bin_change_runs_ci_infrastructure_without_benchmarks() {
+test_agent_tool_change_runs_ci_infrastructure() {
   setup_repo
   mkdir -p .agents/bin
-  printf '#!/usr/bin/env ruby\nputs "validate"\n' > .agents/bin/validate
-  commit_change "update agent workflow binstub"
+  printf '#!/usr/bin/env bash\necho lint\n' > .agents/bin/lint
+  commit_change "update agent lint tool"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "agent tool output"
+  assert_contains "$out" '"run_lint": true' "agent tool output"
+  assert_contains "$out" '"run_core_benchmarks": false' "agent tool output"
+}
+
+test_shaka_command_change_runs_ci_infrastructure_without_benchmarks() {
+  setup_repo
+  mkdir -p .agents/shaka/bin
+  printf '#!/usr/bin/env ruby\nputs "validate"\n' > .agents/shaka/bin/validate
+  commit_change "update Shaka validate wrapper"
 
   local out
   out="$(detector_output)"
@@ -908,11 +995,11 @@ test_agent_bin_markdown_change_is_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "agent bin markdown output"
 }
 
-test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks() {
+test_shaka_config_change_runs_ci_infrastructure_without_benchmarks() {
   setup_repo
-  mkdir -p .agents
-  printf 'version: 1\n' > .agents/agent-workflow.yml
-  commit_change "update agent workflow seam config"
+  mkdir -p .agents/shaka
+  printf 'version: 1\n' > .agents/shaka/config.yml
+  commit_change "update Shaka config"
 
   local out
   out="$(detector_output)"
@@ -2129,6 +2216,9 @@ run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
 run_test test_release_tooling_shovel_operator_comment_only_change_stays_non_runtime
 run_test test_release_tooling_comment_only_change_outside_existing_heredoc_stays_non_runtime
 run_test test_changelog_only_change_is_non_runtime_only
+run_test test_committed_runtime_path_changes_select_suites
+run_test test_staged_runtime_path_changes_select_suites
+run_test test_non_runtime_rename_still_skips_suites
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
@@ -2138,9 +2228,10 @@ run_test test_docs_internal_non_markdown_file_is_non_runtime_only
 run_test test_docs_internal_image_only_is_non_runtime_only
 run_test test_docs_internal_doc_plus_runtime_source_still_runs_tests
 run_test test_agent_tooling_changes_are_non_runtime_only
-run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
+run_test test_agent_tool_change_runs_ci_infrastructure
+run_test test_shaka_command_change_runs_ci_infrastructure_without_benchmarks
 run_test test_agent_bin_markdown_change_is_non_runtime_only
-run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
+run_test test_shaka_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_local_fast_mode_keeps_generator_specs_out_of_unit_job
 run_test test_ci_local_builds_dummy_assets_before_rspec_with_dependencies_present
 run_test test_ci_local_installs_missing_dummy_node_modules_before_build_and_rspec
