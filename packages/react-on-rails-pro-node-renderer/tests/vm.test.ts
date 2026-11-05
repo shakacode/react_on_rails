@@ -511,6 +511,21 @@ describe('buildVM and runInVM', () => {
       });
     });
 
+    test('replaces injected timers with stubs when stubTimers is on (the production default)', async () => {
+      getConfig().supportModules = true;
+      getConfig().stubTimers = true;
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      // The stubs are bundle-realm declarations that do nothing and return undefined, unlike
+      // the host `setTimeout` injected by supportModules, which returns a Timeout object.
+      expect(await runInVM('setTimeout === global.setTimeout', bundlePath)).toBe('true');
+      expect(await runInVM('typeof setTimeout(function () {}, 0)', bundlePath)).toBe('undefined');
+      expect(await runInVM('typeof queueMicrotask(function () {})', bundlePath)).toBe('undefined');
+      expect(await runInVM('typeof Buffer', bundlePath)).toBe('function');
+    });
+
     test('accepts additionalContext keys that collide with non-configurable globals', async () => {
       getConfig().supportModules = false;
       getConfig().additionalContext = { NaN: 'shadowed', testString: 'a string' };
