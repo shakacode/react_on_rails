@@ -28,7 +28,9 @@ module ReactOnRails
       # Variables Bundler sets or rewrites when it loads, besides the BUNDLE_ and BUNDLER_
       # prefixes. These must not reach the unbundled child, or it would run inside the
       # parent's bundle again.
-      BUNDLER_MANAGED_ENV_KEYS = %w[PATH MANPATH RUBYOPT RUBYLIB GEM_HOME GEM_PATH RUBYGEMS_GEMDEPS].freeze
+      BUNDLER_MANAGED_ENV_KEYS = %w[
+        PATH MANPATH RUBYOPT RUBYLIB GEM_HOME GEM_PATH RB_USER_INSTALL RUBYGEMS_GEMDEPS
+      ].freeze
 
       class << self
         def generate(verbose: false)
@@ -192,8 +194,10 @@ module ReactOnRails
           end
         end
 
+        # Compare uppercased names: Windows treats them case-insensitively and stores PATH as `Path`.
         def bundler_managed_env_key?(key)
-          key.start_with?("BUNDLE_", "BUNDLER_") || BUNDLER_MANAGED_ENV_KEYS.include?(key)
+          name = key.upcase
+          name.start_with?("BUNDLE_", "BUNDLER_") || BUNDLER_MANAGED_ENV_KEYS.include?(name)
         end
 
         # DRY helper method for Bundler context switching with API compatibility

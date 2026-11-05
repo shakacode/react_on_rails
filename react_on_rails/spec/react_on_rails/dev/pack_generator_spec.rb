@@ -442,6 +442,13 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
       expect(changes.keys & described_class::BUNDLER_MANAGED_ENV_KEYS).to be_empty
     end
 
+    it "matches Bundler-managed names case-insensitively, as Windows does" do
+      %w[Path RubyOpt bundle_gemfile].each do |key|
+        expect(described_class.send(:bundler_managed_env_key?, key)).to be(true)
+      end
+      expect(described_class.send(:bundler_managed_env_key?, probe_key)).to be(false)
+    end
+
     # Mirrors the three rows of the issue's table with real Ruby processes: plain `ruby`
     # with the assignment after or before `require "bundler/setup"`, and `bundle exec`.
     describe "from a bin/dev-like script" do
