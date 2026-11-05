@@ -60,7 +60,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   reached the client. The value travels as JSON, so `Date`, `Error`, and `Map` values lose their types. The helper
   no longer calls custom `router.dehydrate()` or `router.hydrate()` methods.
   Fixes [Issue 5126](https://github.com/shakacode/react_on_rails/issues/5126).
-  [PR 5309](https://github.com/shakacode/react_on_rails/pull/5309) by [justin808](https://github.com/justin808).
+  [PR 5312](https://github.com/shakacode/react_on_rails/pull/5312) by [justin808](https://github.com/justin808).
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.
