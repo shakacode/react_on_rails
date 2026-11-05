@@ -53,8 +53,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **Single render results reject incomplete trailing records**: Ruby now raises `ParseError` when a complete
-  result is followed by a partial length-prefixed record instead of silently discarding the remainder.
+- **Single render results reject incomplete trailing records**: Server rendering now raises
+  `ReactOnRails::JsonParseError` when a complete result is followed by a partial length-prefixed record, instead
+  of silently discarding the remainder.
   Valid producer responses and warning-only streaming flush behavior are unchanged.
   [PR 5206](https://github.com/shakacode/react_on_rails/pull/5206) by [justin808](https://github.com/justin808).
 
