@@ -2045,6 +2045,13 @@ module ReactOnRails
       ReactOnRails::ExecJSRuntime.for_server_rendering.name
     end
 
+    # The Pro Node Renderer's ExecJS fallback renders through the same pool, so it uses the same runtime.
+    def report_execjs_fallback_runtime(execjs_name)
+      runtime_name = server_rendering_execjs_runtime_name(execjs_name)
+      checker.add_info("  ExecJS available as fallback: #{runtime_name}")
+      report_execjs_bun_runtime(execjs_name, runtime_name) if execjs_name == ReactOnRails::ExecJSRuntime::BUN_NAME
+    end
+
     # Bun cannot evaluate every server bundle (issue #5288). Explains which runtime React on
     # Rails server rendering uses after ExecJS selected Bun.
     def report_execjs_bun_runtime(bun_name, runtime_name)
@@ -2076,7 +2083,7 @@ module ReactOnRails
         if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
-            checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
+            report_execjs_fallback_runtime(ExecJS.runtime.name)
           elsif pro_execjs_fallback_enabled?
             checker.add_warning("  ⚠️  ExecJS fallback is enabled but ExecJS is not available")
             checker.add_info("  💡 Install mini_racer or set renderer_use_fallback_exec_js = false")

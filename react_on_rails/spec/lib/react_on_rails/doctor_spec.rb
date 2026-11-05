@@ -5142,6 +5142,16 @@ RSpec.describe ReactOnRails::Doctor do
         expect(info_messages).to include(a_string_including("Install Node.js"))
       end
 
+      it "reports Node.js as the Pro NodeRenderer fallback runtime when React on Rails switches to it" do
+        allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(node_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback: Node.js (V8)"))
+        expect(info_messages).to include(a_string_including("ExecJS autodetected Bun.sh"))
+      end
+
       it "suggests EXECJS_RUNTIME=Node when EXECJS_RUNTIME explicitly selects Bun" do
         ENV["EXECJS_RUNTIME"] = "Bun"
         allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(bun_runtime)
