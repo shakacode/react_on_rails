@@ -57,7 +57,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `registerServerComponent/client.js` and `registerServerComponent/server.js` in `react-on-rails-pro` shipped
   without the header because TypeScript dropped it with an unused import. CI now packs both Pro npm packages and
   fails if any packed `.js` file lacks the header. Fixes [Issue 5308](https://github.com/shakacode/react_on_rails/issues/5308).
-  [PR 5309](https://github.com/shakacode/react_on_rails/pull/5309) by [justin808](https://github.com/justin808).
+  [PR 5316](https://github.com/shakacode/react_on_rails/pull/5316) by [justin808](https://github.com/justin808).
 
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
