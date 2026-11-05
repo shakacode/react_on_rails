@@ -470,6 +470,57 @@ describe('buildVM and runInVM', () => {
       // Nothing escaped into the worker's own realm.
       expect(global.ReactOnRails).toBeUndefined();
     });
+
+    test('keeps host bridges non-enumerable and tamper-proof inside the bundle', async () => {
+      getConfig().supportModules = false;
+      // An application key may not replace a host bridge installed after it.
+      getConfig().additionalContext = { __reactOnRailsProBundleId: 'from-config' };
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      const probe = await runInVM(
+        `(function () {
+          var key = '__reactOnRailsProBundleId';
+          var before = globalThis[key];
+          try { globalThis[key] = 'overwritten'; } catch (e) {}
+          var redefined = true;
+          try { Object.defineProperty(globalThis, key, { value: 'redefined' }); } catch (e) { redefined = false; }
+          return JSON.stringify({
+            before: before,
+            after: globalThis[key],
+            redefined: redefined,
+            enumerable: Object.keys(globalThis).indexOf(key) !== -1,
+            storeScope: typeof globalThis.reactOnRailsHydratedStoreScope,
+            mismatchReporter: typeof globalThis.__reactOnRailsProReportBuildIdMismatch,
+          });
+        })()`,
+        bundlePath,
+      );
+
+      expect(JSON.parse(probe as string)).toEqual({
+        before: expectedBundleId,
+        after: expectedBundleId,
+        redefined: false,
+        enumerable: false,
+        storeScope: 'object',
+        mismatchReporter: 'function',
+      });
+    });
+
+    test('accepts additionalContext keys that collide with non-configurable globals', async () => {
+      getConfig().supportModules = false;
+      getConfig().additionalContext = { NaN: 'shadowed', testString: 'a string' };
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      const { context } = getVMContext(bundlePath)!;
+
+      // The ordinary global cannot take this key, so the build keeps the contextified sandbox.
+      expect(vm.runInContext('globalThis', context) === context).toBe(false);
+      expect(await runInVM('testString', bundlePath)).toBe('a string');
+    });
   });
 
   test('buildVM and runInVM', async () => {
