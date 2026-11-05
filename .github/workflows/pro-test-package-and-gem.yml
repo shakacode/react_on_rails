@@ -219,6 +219,15 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
+      # The source check above cannot see headers the compiler drops (#5308), so also
+      # check the packed .js files npm users receive from both Pro packages.
+      - name: Check Pro license headers in packed packages
+        working-directory: .
+        run: |
+          pnpm --filter react-on-rails-pro-node-renderer build
+          node --test script/check-pro-package-license-headers.test.mjs
+          node script/check-pro-package-license-headers.mjs
+
       - name: Install Ruby Gems for root lint tools
         uses: ./.github/actions/setup-bundle
         with:
