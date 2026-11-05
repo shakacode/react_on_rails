@@ -5439,6 +5439,32 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "classifies an accelerated run gh reports in progress with an empty conclusion as active" do
+      in_progress_run = {
+        "databaseId" => 910_010,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress",
+        "conclusion" => "",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/910010"
+      }
+      state = nil
+      expect do
+        state = accelerated_shakaperf_run_state!(
+          repo_slug: "shakacode/react_on_rails", run: in_progress_run, unordered: false
+        )
+      end.not_to raise_error
+      expect(state).to eq(:active)
+      expect(valid_accelerated_shakaperf_run_state_metadata?(in_progress_run.merge("conclusion" => "failure")))
+        .to be(false)
+    end
+
     it "dispatches an exact-head gate and returns its URL without watching it" do
       run = {
         "databaseId" => 123_456,
