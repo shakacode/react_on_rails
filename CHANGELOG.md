@@ -53,8 +53,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **[Pro]** **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
-  `react-on-rails-pro-node-renderer` and `create-react-on-rails-app` `.js` and `.d.ts` files, and the `.d.ts` files in
+- **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
+  `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in
   `react-on-rails` and `react-on-rails-pro`, ended with `//# sourceMappingURL=` comments for maps the packages never
   shipped. `node --enable-source-maps`, debuggers, and error trackers that followed them looked for a file that
   isn't there. The packages' `tsc` builds no longer emit source or declaration maps, and CI now packs all four

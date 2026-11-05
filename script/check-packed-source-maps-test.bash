@@ -58,6 +58,22 @@ expect inline-map 0 'no dangling sourceMappingURL pointers'
 make_tarball mention 'lib/index.js=const re = /\\/\\/# sourceMappingURL=(\\S+)/;\n'
 expect mention 0 'no dangling sourceMappingURL pointers'
 
+make_tarball legacy 'lib/index.js=export {};\n//@ sourceMappingURL=index.js.map\n'
+expect legacy 1 'lib/index.js -> index.js.map'
+
+make_tarball relative-map 'lib/sub/a.js=export {};\n//# sourceMappingURL=../maps/a.js.map\n' 'lib/maps/a.js.map={}\n'
+expect relative-map 0 'no dangling sourceMappingURL pointers'
+
+# One failing tarball fails the whole run, and the clean one is still reported.
+output="$(node "$CHECKER" "$WORK_DIR/clean.tgz" "$WORK_DIR/dangling-js.tgz" 2>&1)"
+status=$?
+if [[ "$status" -ne 1 || "$output" != *"OK $WORK_DIR/clean.tgz"* || "$output" != *"FAIL $WORK_DIR/dangling-js.tgz"* ]]; then
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+  echo "FAIL multiple-tarballs: got exit $status: $output" >&2
+else
+  echo "ok multiple-tarballs"
+fi
+
 if [[ "$TESTS_FAILED" -ne 0 ]]; then
   echo "$TESTS_FAILED test(s) failed" >&2
   exit 1
