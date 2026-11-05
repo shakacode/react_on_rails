@@ -1,0 +1,50 @@
+name: Node renderer fresh-install engines
+
+# A fresh install of react-on-rails-pro-node-renderer resolves the newest
+# matching transitive packages, not this repository's lockfile. When one of them
+# drops support for the renderer's lowest advertised Node version, nothing in
+# normal CI notices (issue #5305). That drift arrives from the npm registry
+# without a pull request, so this runs on a schedule as well as on changes to
+# the renderer's dependencies. It is not a required check.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  pull_request:
+    paths:
+      - 'packages/react-on-rails-pro-node-renderer/package.json'
+      - 'script/check-node-renderer-fresh-engines.mjs'
+      - 'script/check-node-renderer-fresh-engines.test.mjs'
+      - '.github/workflows/node-renderer-fresh-engines.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fresh-engines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.tool-versions.outputs.node-version }}
+
+      - name: Test the engines checker
+        run: node --test script/check-node-renderer-fresh-engines.test.mjs
+
+      - name: Check a fresh resolution against the renderer's engines.node
+        run: node script/check-node-renderer-fresh-engines.mjs
