@@ -60,7 +60,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   snapshot. An initializer that needed a variable set after `require "bundler/setup"`, or under
   `bundle exec bin/dev`, then failed at "Generating packs". Fixes
   [Issue 5297](https://github.com/shakacode/react_on_rails/issues/5297).
-  [PR 5309](https://github.com/shakacode/react_on_rails/pull/5309) by
+  [PR 5320](https://github.com/shakacode/react_on_rails/pull/5320) by
   [justin808](https://github.com/justin808).
 
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
