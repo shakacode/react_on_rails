@@ -430,7 +430,9 @@ describe('buildVM and runInVM', () => {
     beforeEach(() => {
       // `vm.constants` is frozen, but `vm`'s own `constants` property is writable, so swapping
       // the whole object forces the module down the older-Node fallback path.
-      if (!preferVanilla) {
+      // On Node versions without `vm.constants` the fallback runs naturally, and Jest cannot
+      // replace a property that does not exist.
+      if (!preferVanilla && Object.hasOwn(vm, 'constants')) {
         constantsOverride = jest.replaceProperty(
           vm,
           'constants',

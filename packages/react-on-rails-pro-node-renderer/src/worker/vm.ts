@@ -654,11 +654,15 @@ function createVMContext(contextObject: object): vm.Context {
 
   const context = vm.createContext(dontContextify);
   const descriptors = Object.getOwnPropertyDescriptors(contextObject);
-  const collides = Reflect.ownKeys(descriptors).some((key) => {
+  const collidingKey = Reflect.ownKeys(descriptors).find((key) => {
     const existing = Object.getOwnPropertyDescriptor(context, key);
     return existing !== undefined && !existing.configurable;
   });
-  if (collides) {
+  if (collidingKey !== undefined) {
+    log.debug(
+      'VM context key %s collides with a non-configurable global; using a contextified sandbox',
+      String(collidingKey),
+    );
     return vm.createContext(contextObject);
   }
   Object.defineProperties(context, descriptors);
