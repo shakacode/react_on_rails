@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "tmpdir"
 require "react_on_rails/dev/pack_generator"
 
 RSpec.describe ReactOnRails::Dev::PackGenerator do
@@ -379,6 +380,107 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
         expect(described_class).to have_received(:system)
           .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
                 "bundle", "exec", "rake", "react_on_rails:generate_packs")
+      end
+    end
+  end
+
+  # Regression coverage for https://github.com/shakacode/react_on_rails/issues/5297:
+  # bin/dev may set variables after Bundler loads, and the unbundled pack-generation
+  # child must still see them.
+  describe "environment passed to the bundle exec child" do
+    let(:probe_key) { "ROR_PACK_GENERATOR_SPEC_PROBE" }
+
+    around do |example|
+      original_value = ENV.fetch(probe_key, nil)
+      example.run
+    ensure
+      original_value.nil? ? ENV.delete(probe_key) : ENV[probe_key] = original_value
+    end
+
+    # Runs the real child inside the real Bundler.with_unbundled_env and reports what it saw.
+    def child_view_of(key, gemfile_key: "BUNDLE_GEMFILE")
+      seen = nil
+      allow(described_class).to receive(:system) do |env, *_command, **_options|
+        script = "puts [ENV[#{key.inspect}].inspect, ENV[#{gemfile_key.inspect}].inspect].join(' ')"
+        seen = IO.popen(env, [RbConfig.ruby, "-e", script], &:read).split
+        true
+      end
+      described_class.send(:run_via_bundle_exec, silent: true)
+      seen
+    end
+
+    it "passes a variable set after Bundler loads" do
+      ENV[probe_key] = "after"
+
+      expect(child_view_of(probe_key)).to eq(['"after"', "nil"])
+    end
+
+    it "keeps a variable set before Bundler loads without passing it again" do
+      ENV[probe_key] = "before"
+      allow(Bundler).to receive(:original_env).and_wrap_original do |original|
+        original.call.merge(probe_key => "before")
+      end
+
+      expect(described_class.send(:runtime_env_changes)).not_to have_key(probe_key)
+      expect(child_view_of(probe_key)).to eq(['"before"', "nil"])
+    end
+
+    it "unsets a variable deleted after Bundler loads" do
+      ENV.delete(probe_key)
+      allow(Bundler).to receive(:original_env).and_wrap_original do |original|
+        original.call.merge(probe_key => "stale")
+      end
+
+      expect(described_class.send(:runtime_env_changes)).to include(probe_key => nil)
+      expect(child_view_of(probe_key)).to eq(%w[nil nil])
+    end
+
+    it "leaves out the variables Bundler manages" do
+      changes = described_class.send(:runtime_env_changes)
+
+      expect(changes.keys.grep(/\ABUNDLER?_/)).to be_empty
+      expect(changes.keys & described_class::BUNDLER_MANAGED_ENV_KEYS).to be_empty
+    end
+
+    # Mirrors the three rows of the issue's table with real Ruby processes: plain `ruby`
+    # with the assignment after or before `require "bundler/setup"`, and `bundle exec`.
+    describe "from a bin/dev-like script" do
+      let(:gem_root) { File.expand_path("../../..", __dir__) }
+
+      def run_script(order, bundle_exec:)
+        Dir.mktmpdir do |dir|
+          script = File.join(dir, "bin_dev_probe.rb")
+          File.write(script, <<~RUBY)
+            ENV[#{probe_key.inspect}] ||= "true" if #{order.inspect} == "before"
+            require "bundler/setup"
+            ENV[#{probe_key.inspect}] ||= "true" if #{order.inspect} == "after"
+            require "react_on_rails/dev/pack_generator"
+
+            generator = ReactOnRails::Dev::PackGenerator
+            generator.define_singleton_method(:system) do |env, *_command, **_options|
+              Kernel.system(env, RbConfig.ruby, "-e",
+                            "exit(ENV['#{probe_key}'] == 'true' && ENV['BUNDLE_GEMFILE'].nil?)")
+            end
+            exit(generator.send(:run_via_bundle_exec, silent: true) ? 0 : 1)
+          RUBY
+
+          command = bundle_exec ? ["bundle", "exec", RbConfig.ruby, script] : [RbConfig.ruby, script]
+          env = { "BUNDLE_GEMFILE" => Bundler.default_gemfile.to_s, probe_key => nil }
+          Bundler.with_unbundled_env { system(env, *command, chdir: gem_root, out: File::NULL) }
+        end
+      end
+
+      it "passes the variable when bin/dev sets it after requiring bundler/setup" do
+        expect(run_script("after", bundle_exec: false)).to be(true)
+      end
+
+      it "passes the variable when bin/dev sets it before requiring bundler/setup" do
+        expect(run_script("before", bundle_exec: false)).to be(true)
+      end
+
+      it "passes the variable under bundle exec bin/dev in either order" do
+        expect(run_script("after", bundle_exec: true)).to be(true)
+        expect(run_script("before", bundle_exec: true)).to be(true)
       end
     end
   end

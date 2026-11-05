@@ -25,6 +25,11 @@ module ReactOnRails
     #    - Provides a clean API for bin/dev without exposing Rake internals
     #    - Handles hook detection, error handling, and output formatting
     class PackGenerator
+      # Variables Bundler sets or rewrites when it loads, besides the BUNDLE_ and BUNDLER_
+      # prefixes. These must not reach the unbundled child, or it would run inside the
+      # parent's bundle again.
+      BUNDLER_MANAGED_ENV_KEYS = %w[PATH MANPATH RUBYOPT RUBYLIB GEM_HOME GEM_PATH RUBYGEMS_GEMDEPS].freeze
+
       class << self
         def generate(verbose: false)
           # Skip if shakapacker has a precompile hook configured
@@ -152,9 +157,10 @@ module ReactOnRails
         end
 
         def run_via_bundle_exec(silent: false, verbose: false)
-          # Environment variable is already set in run_pack_generation, but we make it explicit here
-          # for clarity and to ensure it's passed to the subprocess
-          env = { "REACT_ON_RAILS_VERBOSE" => verbose ? "true" : "false" }
+          # with_unbundled_env resets ENV to Bundler's pre-load snapshot, so pass along every
+          # change made since Bundler loaded (e.g. `ENV["FOO"] ||= "1"` in bin/dev).
+          # REACT_ON_RAILS_VERBOSE is already set in run_pack_generation; keep it explicit here.
+          env = runtime_env_changes.merge("REACT_ON_RAILS_VERBOSE" => verbose ? "true" : "false")
 
           # Need to unbundle to prevent Bundler from intercepting our bundle exec call
           # when already running inside a Bundler context (e.g., from bin/dev)
@@ -169,6 +175,25 @@ module ReactOnRails
               system(env, "bundle", "exec", "rake", "react_on_rails:generate_packs")
             end
           end
+        end
+
+        # Variables that differ from Bundler's pre-load snapshot, as a `system` env hash.
+        # A variable deleted since then maps to nil so the child does not get it back.
+        # Bundler's own variables stay out, so the child still runs unbundled.
+        def runtime_env_changes
+          return {} unless defined?(Bundler) && Bundler.respond_to?(:original_env)
+
+          original = Bundler.original_env
+          (ENV.keys | original.keys).each_with_object({}) do |key, changes|
+            next if bundler_managed_env_key?(key)
+
+            value = ENV.fetch(key, nil)
+            changes[key] = value unless value == original[key]
+          end
+        end
+
+        def bundler_managed_env_key?(key)
+          key.start_with?("BUNDLE_", "BUNDLER_") || BUNDLER_MANAGED_ENV_KEYS.include?(key)
         end
 
         # DRY helper method for Bundler context switching with API compatibility
