@@ -272,7 +272,7 @@ ruby script/check-pro-license-headers --check
 (cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion)
 pnpm run lint
 pnpm start format.listDifferent
-.agents/bin/validate
+.agents/shaka/bin/validate
 git diff --check
 ```
 

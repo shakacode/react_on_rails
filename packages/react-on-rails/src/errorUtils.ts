@@ -2,7 +2,10 @@ import type { RenderingError } from './types/index.ts';
 
 // Must match SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY in
 // packages/react-on-rails-pro-node-renderer/src/worker/vmSourceMapSupport.ts.
+// Value-set parity is role-blind: swaps preserving the literal set still pass.
+// MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/vmSourceMapSupport.ts
 const SOURCE_MAPPED_STACK_REMAPPER_KEY = '__reactOnRailsProRemapStackTrace';
+// MIRROR VALUES END
 
 type SourceMappedStackRemapper = (stack: unknown) => string | undefined;
 

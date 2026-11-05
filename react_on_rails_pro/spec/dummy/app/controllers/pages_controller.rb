@@ -443,6 +443,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     }
   end
 
+  # Turbo Frame navigation page (issue #5128). Its layout runs @hotwired/turbo instead of Turbolinks.
+  def turbo_frame_navigation
+    render layout: "turbo_frame"
+  end
+
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render, :error_hub_config_value

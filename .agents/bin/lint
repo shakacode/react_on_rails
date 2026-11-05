@@ -7,10 +7,7 @@ rc=0
 if [ -d react_on_rails_pro ]; then
   ( cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion ) || rc=1
 fi
-BUNDLE_GEMFILE=Gemfile bundle exec rubocop \
-  .agents/bin/agent_workflow_drift_manifest_test_test.rb \
-  script/shaka_seam_check_test.rb || rc=1
-ruby .agents/bin/agent_workflow_drift_manifest_test_test.rb || rc=1
+BUNDLE_GEMFILE=Gemfile bundle exec rubocop script/shaka_seam_check_test.rb || rc=1
 if shaka_command=$(command -v shaka 2>/dev/null); then
   if "$shaka_command" seam check --help 2>&1 | grep -q -- '--ci-review-job'; then
     "$shaka_command" seam check --root . --local || rc=1

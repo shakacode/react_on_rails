@@ -10,13 +10,15 @@ class ReleaseForwardPort
   CHECK_ERROR_STATUS = 3
   VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
   CHANGELOG_FILE = "CHANGELOG.md"
+  # Matches `Bump version to ...` and the `Release: bump versions to ...` form.
+  VERSION_BUMP_PREFIX = /\A(?:release:\s+)?bump\s+versions?\s+to\s+v?/i
   # Project convention is `X.Y.Z.rc.N`, but a release branch can still contain a
   # bare `X.Y.Z.rc` bump. Treat both as release-only version bumps.
   RC_VERSION_BUMP_SUBJECT = /
-    \Abump\s+version\s+to\s+v?\d+\.\d+\.\d+[.-]rc(?:[.-]?\d+)?\b
+    #{VERSION_BUMP_PREFIX}\d+\.\d+\.\d+[.-]rc(?:[.-]?\d+)?\b
   /ix
   VERSION_BUMP_SUBJECT = /
-    \Abump\s+version\s+to\s+v?
+    #{VERSION_BUMP_PREFIX}
     (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?)?)\b
   /ix
   PRERELEASE_PACKAGE_PIN_SUBJECT = %r{
@@ -1563,8 +1565,10 @@ class ReleaseForwardPort
     body = git("show", "-s", "--format=%B", authoritative_sha)
     return true if body.lines.any? { |line| line.strip == exact_sentence }
 
-    # Squash merges re-wrap the PR body, so also compare whole paragraphs with whitespace collapsed.
-    body.split(/\n\s*\n/).any? { |paragraph| paragraph.split.join(" ") == exact_sentence }
+    # The merge queue re-wraps squash bodies at about 72 columns, which can split the sentence and join it to
+    # the preceding sentence. Collapse whitespace per paragraph and accept the sentence at a sentence boundary.
+    sentence_at_boundary = /(?:\A|[.!?]\s)#{Regexp.escape(exact_sentence)}(?:\s|\z)/
+    body.split(/\n\s*\n/).any? { |paragraph| paragraph.split.join(" ").match?(sentence_at_boundary) }
   end
 
   def validate_acknowledged_changelog_source!(source_changelog_sha)

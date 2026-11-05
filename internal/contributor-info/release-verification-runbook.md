@@ -578,8 +578,8 @@ leak that accumulates under normal traffic blocks promotion.
 ```text
 Audit release-notes completeness for react_on_rails {{RC_TAG}} against the real release diff.
 Inputs: Lane 0's BREAKING CHANGES and DEBUT FEATURES lists; the repo at {{RC_TAG}}. Use the
-repo-local react-on-rails-update-changelog skill for release-branch/RC changelog work, and
-post-merge-audit where it fits; this prompt is the acceptance bar.
+repo-local react-on-rails-update-changelog skill for release-branch/RC changelog work; this
+prompt is the acceptance bar.
 
 Check, with file/PR evidence for every claim:
 1. Every Lane 0 BREAKING CHANGE appears in the CHANGELOG release section AND in the upgrade

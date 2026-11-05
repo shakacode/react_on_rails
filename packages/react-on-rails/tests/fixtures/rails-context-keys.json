@@ -1,0 +1,31 @@
+{
+  "description": "Ruby helper output keys, including optional Pro/RSC, request, nonce, and observability fields. Server-only fields are added by JavaScript/Pro rendering, outside the Ruby helper. Application custom_context keys are intentionally excluded.",
+  "rubyKeys": [
+    "componentRegistryTimeout",
+    "railsEnv",
+    "inMailer",
+    "i18nLocale",
+    "i18nDefaultLocale",
+    "rorVersion",
+    "rorPro",
+    "rorProVersion",
+    "href",
+    "location",
+    "scheme",
+    "host",
+    "port",
+    "pathname",
+    "search",
+    "httpAcceptLanguage",
+    "rscPayloadGenerationUrlPath",
+    "cspNonce",
+    "rscStreamObservability",
+    "serverSide"
+  ],
+  "serverOnlyKeys": [
+    "serverSideRSCPayloadParameters",
+    "reactClientManifestFileName",
+    "reactServerClientManifestFileName",
+    "getRSCPayloadStream"
+  ]
+}

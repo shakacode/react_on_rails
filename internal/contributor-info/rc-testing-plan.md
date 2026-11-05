@@ -220,7 +220,12 @@ but it has no synthetic branch merge, per-target reachability, or tree-parity ev
 
 ### RC.10 Copy/Paste Demo-Fleet Prompts
 
-These prompts are filled for the current release and can be pasted without replacing placeholders.
+> **Historical:** these RC.10 prompts record how the 17.0 fleet ran. They invoke
+> the retired agent-workflows `$pr-batch` skill and its Sol/Terra model routing,
+> so they do not run in a Shaka-only install. For a new release, generate a
+> current fleet pack with the repo-local `$run-fleet-validation` skill.
+
+These prompts were filled for RC.10 and needed no placeholder replacement.
 They use the manifest for inventory while preserving this document as the authority for
 release-gate policy.
 

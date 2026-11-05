@@ -417,7 +417,7 @@ describe ReactOnRailsPro::Cache, :caching do
                )
              )).not_to eq(ActiveSupport::Cache.expand_cache_key(
                             described_class.react_component_cache_key(
-                              "Widget/csp-nonce", cache_key: "1", prerender: true
+                              "Widget/#{described_class::CSP_NONCE_CACHE_KEY_SEGMENT}", cache_key: "1", prerender: true
                             )
                           ))
     end

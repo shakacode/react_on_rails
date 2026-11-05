@@ -95,7 +95,8 @@ jobs:
 
   playwright:
     needs: detect-changes
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright's browser install rejects.
+    runs-on: ubuntu-24.04
     if: |
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_e2e_tests == 'true'

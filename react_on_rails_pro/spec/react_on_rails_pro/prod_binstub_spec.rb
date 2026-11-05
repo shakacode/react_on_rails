@@ -24,6 +24,17 @@ RSpec.describe "Pro dummy bin/prod" do
     File.expand_path("../dummy/bin/prod", __dir__)
   end
 
+  def write_fake_command(path)
+    File.write(
+      path,
+      <<~BASH
+        #!/usr/bin/env bash
+        printf 'PORT=%s RAILS_PORT=%s %s %s\\n' "$PORT" "$RAILS_PORT" "${0##*/}" "$*" > "$COMMAND_LOG_PATH"
+      BASH
+    )
+    FileUtils.chmod(0o755, path)
+  end
+
   def run_bin_prod(fake_commands:, port: nil)
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(
@@ -42,20 +53,13 @@ RSpec.describe "Pro dummy bin/prod" do
       command_log_path = File.join(dir, "command.log")
       FileUtils.mkdir_p(fake_bin_path)
 
-      fake_commands.each do |command|
-        path = File.join(fake_bin_path, command)
-        File.write(
-          path,
-          <<~BASH
-            #!/usr/bin/env bash
-            printf 'PORT=%s RAILS_PORT=%s %s %s\\n' "$PORT" "$RAILS_PORT" "${0##*/}" "$*" > "$COMMAND_LOG_PATH"
-          BASH
-        )
-        FileUtils.chmod(0o755, path)
-      end
+      fake_commands.each { |command| write_fake_command(File.join(fake_bin_path, command)) }
 
       stdout, stderr, status = Open3.capture3(
         {
+          # Bash sources BASH_ENV for non-interactive scripts; a developer's file can
+          # reorder PATH so the fake binaries below never run.
+          "BASH_ENV" => nil,
           "COMMAND_LOG_PATH" => command_log_path,
           "PATH" => "#{fake_bin_path}:/usr/bin:/bin:/usr/sbin:/sbin",
           "PORT" => port

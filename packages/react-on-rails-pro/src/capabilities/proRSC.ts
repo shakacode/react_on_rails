@@ -36,8 +36,15 @@ import { setManifestFileNames } from '../cache/manifestLoader.ts';
 import { getServerRenderer } from '../cache/manifestLoaderServer.ts';
 import { setBuildId } from '../cache/buildIdProvider.ts';
 
+// `use` must NOT be listed: it is legal in Server Components.
+// `useEffectEvent` is listed before its prefix `useEffect` only so the first
+// alternation attempt already matches the longer name — a clarity
+// micro-optimization, not a correctness requirement: with the required
+// " is not a function" suffix, JS regex backtracking produces the same match
+// either way. Whole-identifier gating is the lookbehind's job (below).
 const CLIENT_HOOK_NAMES = [
   'useState',
+  'useEffectEvent',
   'useEffect',
   'useReducer',
   'useCallback',
@@ -54,9 +61,17 @@ const CLIENT_HOOK_NAMES = [
   'useInsertionEffect',
   'useOptimistic',
   'useActionState',
+  // react-dom exports (not react): the react-server react-dom build omits
+  // them, so misuse in a server component fails with the same
+  // "... is not a function" shape as the react hooks above.
+  'useFormStatus',
+  'useFormState',
 ].join('|');
+// The (?<![\w$]) lookbehind keeps the diagnostic to whole-identifier hook
+// calls: app errors like `reuseState is not a function` or minified
+// `$useState is not a function` must surface raw, not as missing-'use client'.
 const CLIENT_HOOK_RUNTIME_ERROR_REGEX = new RegExp(
-  `(?:(?:React\\.)|\\(0\\s*,\\s*[\\w$]+\\.)?(${CLIENT_HOOK_NAMES})\\)? is not a function\\b`,
+  `(?:(?:React\\.)|\\(0\\s*,\\s*[\\w$]+\\.)?(?<![\\w$])(${CLIENT_HOOK_NAMES})\\)? is not a function\\b`,
 );
 
 const addRSCClientHookDiagnostic = (error: Error, componentName: string): Error => {

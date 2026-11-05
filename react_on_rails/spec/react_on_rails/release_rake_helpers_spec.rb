@@ -22511,6 +22511,36 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "rejects runtime-to-internal renames through the real detector for release promotion" do
+      repo_root = File.expand_path("../../..", __dir__)
+      Dir.mktmpdir("ror detector rename") do |repo|
+        expect(system("git", "init", "-q", repo)).to be(true)
+        expect(system("git", "-C", repo, "config", "user.email", "release@example.test")).to be(true)
+        expect(system("git", "-C", repo, "config", "user.name", "Release Test")).to be(true)
+        FileUtils.mkdir_p(File.join(repo, "script/lib"))
+        %w[script/ci-changes-detector script/lib/git-diff-base].each do |path|
+          FileUtils.cp(File.join(repo_root, path), File.join(repo, path))
+        end
+        runtime_path = "packages/react-on-rails/src/example.ts"
+        FileUtils.mkdir_p(File.join(repo, File.dirname(runtime_path)))
+        File.write(File.join(repo, runtime_path), "export const answer = 42;\n")
+        expect(system("git", "-C", repo, "add", ".")).to be(true)
+        expect(system("git", "-C", repo, "commit", "-qm", "Runtime source")).to be(true)
+        FileUtils.mkdir_p(File.join(repo, "internal/contributor-info"))
+        expect(system("git", "-C", repo, "mv", runtime_path, "internal/contributor-info/example.ts")).to be(true)
+        expect(system("git", "-C", repo, "commit", "-qm", "Move runtime source")).to be(true)
+        sha, status = Open3.capture2("git", "-C", repo, "rev-parse", "HEAD")
+        expect(status).to be_success
+
+        %w[true false copies].each do |renames|
+          expect(system("git", "-C", repo, "config", "diff.renames", renames)).to be(true)
+          expect(commit_non_runtime_only?(monorepo_root: repo, sha: sha.strip)).to be(false)
+          expect(ReleaseCommitClassifier.promotion_non_runtime_only?(monorepo_root: repo, sha: sha.strip))
+            .to be(false)
+        end
+      end
+    end
+
     it "returns false when the detector script is not executable" do
       with_detector(executable: false) do |root|
         expect(Open3).not_to receive(:capture2e)

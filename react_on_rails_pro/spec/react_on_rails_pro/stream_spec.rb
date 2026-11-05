@@ -393,30 +393,16 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(script).not_to include("react</script><script>")
     end
 
-    it "keeps the generated inline mark script body aligned with the TypeScript helper" do
+    it "keeps the generated inline mark script body aligned with the shared contract" do
       _queues, controller, _stream = setup_stream_test(component_count: 0)
-
-      script = controller.send(
-        :rsc_stream_observability_script,
-        "react-on-rails:rsc:contract",
-        { source: "react-on-rails-pro", phase: "stream-complete", bytes: 2048 }
+      contract_path = File.expand_path(
+        "../../../packages/react-on-rails-pro/tests/fixtures/browser-performance-mark-contract.json", __dir__
       )
-      expected_script_body = <<~JAVASCRIPT.delete("\n")
-        (function(){var detail={"source":"react-on-rails-pro","phase":"stream-complete","bytes":2048};
-        var entry={name:"react-on-rails:rsc:contract",detail:detail};var perf=self.performance;
-        var supportsDetail=typeof PerformanceMark!=="undefined"&&PerformanceMark.prototype&&
-        "detail" in PerformanceMark.prototype;
-        if(perf&&typeof perf.mark==="function"){if(supportsDetail){try{perf.mark("react-on-rails:rsc:contract",
-        {detail:detail});return;}catch(error){}}
-        try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
-        catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
-        else{entry.fallback="performance-mark-unavailable";}
-        var queue=self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[];
-        queue.push(entry);if(queue.length>200){queue.splice(0,queue.length-200);}
-        })()
-      JAVASCRIPT
+      contract = JSON.parse(File.read(contract_path))
 
-      expect(script).to eq("<script>#{expected_script_body}</script>")
+      script = controller.send(:rsc_stream_observability_script, contract.fetch("markName"), contract.fetch("detail"))
+
+      expect(script).to eq("<script>#{contract.fetch('scriptBody')}</script>")
     end
 
     it "does not insert opt-in browser performance marks inside split component markup" do

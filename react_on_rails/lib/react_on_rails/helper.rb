@@ -23,6 +23,7 @@ module ReactOnRails
     include ReactOnRails::FontHelper
 
     COMPONENT_HTML_KEY = "componentHtml"
+    CSP_NONCE_OVERRIDE_FIBER_KEY = :react_on_rails_csp_nonce_override
     IMMEDIATE_HYDRATION_WARNING_MUTEX = Mutex.new
 
     class << self
@@ -371,8 +372,6 @@ module ReactOnRails
           end
         end
 
-        add_csp_nonce_to_context(result)
-
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
@@ -408,6 +407,10 @@ module ReactOnRails
       end
 
       context = @rails_context.merge(serverSide: server_side)
+      # Added per call rather than memoized: a component rendered for the Pro component
+      # cache sees a placeholder nonce (see csp_nonce), and that must not leak into the
+      # context later renders of the same request use.
+      add_csp_nonce_to_context(context)
       add_rsc_stream_observability_to_context(context)
       context
     end
@@ -722,10 +725,21 @@ module ReactOnRails
       )
     end
 
+    # Returns the CSP script nonce that framework-emitted scripts carry. React on Rails Pro
+    # sets CSP_NONCE_OVERRIDE_FIBER_KEY while it renders a component whose HTML it will
+    # cache, so every framework script in that HTML carries a random placeholder only the
+    # framework knows. Pro then swaps the placeholder for the serving request's nonce on
+    # every response, which leaves app markup carrying the request nonce unpromoted
+    # (issue #5267). Fiber storage scopes the override to that render and the async tasks
+    # it starts, so concurrent renders of other components keep the request nonce.
+    def csp_nonce
+      Fiber[CSP_NONCE_OVERRIDE_FIBER_KEY] || request_csp_nonce
+    end
+
     # Returns the CSP script nonce for the current request, or nil if CSP is not enabled.
     # Rails 5.2-6.0 use content_security_policy_nonce with no arguments.
     # Rails 6.1+ accept an optional directive argument.
-    def csp_nonce
+    def request_csp_nonce
       return unless respond_to?(:content_security_policy_nonce)
 
       begin
