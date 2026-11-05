@@ -35,8 +35,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # npm prefers versions whose engines accept the Node running it. The newest
-      # release makes it pick the highest version in range, as pnpm and Yarn do.
+      # npm prefers versions whose engines accept the Node running it. On the
+      # newest release it picks the highest version in range, as pnpm and Yarn
+      # do, except for a package whose newest release excludes that Node.
       - name: Setup newest Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:

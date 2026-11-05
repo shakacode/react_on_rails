@@ -15,8 +15,10 @@
 // changes.
 //
 // npm prefers versions whose engines accept the Node that runs it, so run this
-// on the newest Node release. Then npm picks the highest version in range, as
-// pnpm and Yarn do, instead of hiding a newer release that needs newer Node.
+// on the newest Node release. npm then picks the highest version in range, as
+// pnpm and Yarn do, for every package whose newest release accepts that Node.
+// A newest release with a closed range that leaves it out (say `^20 || ^22`
+// on Node 24) is still skipped for an older one, and this check misses it.
 //
 // Usage:
 //   node script/check-node-renderer-fresh-engines.mjs            # resolve from the npm registry
