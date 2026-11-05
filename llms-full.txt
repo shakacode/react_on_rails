@@ -33476,9 +33476,6 @@ SOURCE: docs/oss/upgrading/release-notes/17.2.1.md
 Node Renderer serves concurrent server renders. It also carries security updates for React Server Components (RSC)
 apps and the Node Renderer.
 
-Until 17.2.1 final ships, use the exact matching gem and npm prerelease versions. For example, Ruby uses
-`17.2.1.rc.3`, while npm uses `17.2.1-rc.3`.
-
 For the complete list of changes, see the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md).
 
 ## Upgrading from 17.2.0 to 17.2.1

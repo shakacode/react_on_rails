@@ -24,7 +24,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-### [17.2.1.rc.3] - 2026-11-01
+### [17.2.1] - 2026-11-04
 
 #### Fixed
 
@@ -34,11 +34,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   check reported "could not check". Older Psych now parses the stream and safe-loads each document. Fixes
   [Issue 5300](https://github.com/shakacode/react_on_rails/issues/5300).
   [PR 5301](https://github.com/shakacode/react_on_rails/pull/5301) by [justin808](https://github.com/justin808).
-
-### [17.2.1.rc.2] - 2026-10-30
-
-#### Fixed
-
 - **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
   `serverWebpackConfig.js` removed client-only plugins by webpack class names only, so Rspack apps kept
   `rspack-manifest-plugin` and `CssExtractRspackPlugin` in the server compilation and in the RSC compilations
@@ -61,6 +56,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Only nonces the framework emitted are refreshed. A cached render gives framework scripts a random placeholder nonce, and every response swaps it for its own nonce. App markup that carries the request's nonce, such as stored HTML injected while the nonce generator is session-derived, keeps its stale nonce for CSP to block on cache hits.
   **Upgrade notes:** App code that needs a nonce inside a cached component should read `railsContext.cspNonce`; a nonce passed in through props or Rails helpers is not refreshed. Overrides of these private Pro helpers must accept and forward their new parameters: `normalize_cached_pro_attribution` and `normalize_cached_pro_attribution_html` (`cached_csp_nonce`), `append_cached_csp_nonce_marker` (`placeholder`), `consumer_stream_async` (`live_chunk_rewriter:` keyword), and `process_stream_chunks` (`live_chunk_rewriter`); `fetch_cache_entry` now returns a fourth value. Framework emitters read the nonce through `ReactOnRails::Helper#csp_nonce`, which returns the placeholder during cached renders; code that overrides or stubs it should use the new `request_csp_nonce` for the request's own nonce. Component cache keys use a new `csp-nonce-placeholder` partition segment, so nonce-rendered entries written before upgrading are not reused. See [CSP caching caveats](docs/pro/strict-csp.md#caching-caveats) for details.
   Fixes [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021) and [Issue 5267](https://github.com/shakacode/react_on_rails/issues/5267). [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by [AbanoubGhadban](https://github.com/AbanoubGhadban) and [PR 5270](https://github.com/shakacode/react_on_rails/pull/5270) by [justin808](https://github.com/justin808).
+- **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
+  `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
+  and prevents console replay from exposing server diagnostics that error metadata omits. Ruby diagnostics
+  now use JavaScript trim whitespace rules: NUL/NEL-only errors count as nonblank, while BOM-only errors do not.
+  Clean-chunk replay is unchanged. Backports [PR 5210](https://github.com/shakacode/react_on_rails/pull/5210)
+  by [justin808](https://github.com/justin808).
+- **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
+  and RSC Client Component providers now read only their request's stores in a shared Node Renderer
+  worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
+  APIs and page lifecycle behavior are unchanged. Set `isolateHydratedStores: false` or
+  `RENDERER_ISOLATE_HYDRATED_STORES=false` to restore the shared registry temporarily. Fixes [Issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
+  [PR 5133](https://github.com/shakacode/react_on_rails/pull/5133) by [justin808](https://github.com/justin808).
 
 #### Security
 
@@ -114,28 +121,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `react-on-rails-rsc` stays behind, pin it with npm `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`. Check with
   `pnpm why react-server-dom-webpack` (or the npm or Yarn equivalent).
   [PR 5276](https://github.com/shakacode/react_on_rails/pull/5276) by [justin808](https://github.com/justin808).
-
-### [17.2.1.rc.1] - 2026-10-28
-
-#### Fixed
-
-- **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
-  `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
-  and prevents console replay from exposing server diagnostics that error metadata omits. Ruby diagnostics
-  now use JavaScript trim whitespace rules: NUL/NEL-only errors count as nonblank, while BOM-only errors do not.
-  Clean-chunk replay is unchanged. Backports [PR 5210](https://github.com/shakacode/react_on_rails/pull/5210)
-  by [justin808](https://github.com/justin808).
-
-### [17.2.1.rc.0] - 2026-10-26
-
-#### Fixed
-
-- **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
-  and RSC Client Component providers now read only their request's stores in a shared Node Renderer
-  worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
-  APIs and page lifecycle behavior are unchanged. Set `isolateHydratedStores: false` or
-  `RENDERER_ISOLATE_HYDRATED_STORES=false` to restore the shared registry temporarily. Fixes [Issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
-  [PR 5133](https://github.com/shakacode/react_on_rails/pull/5133) by [justin808](https://github.com/justin808).
 
 ### [17.2.0] - 2026-10-13
 
@@ -3603,11 +3588,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.3...main
-[17.2.1.rc.3]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.2...v17.2.1.rc.3
-[17.2.1.rc.2]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.1...v17.2.1.rc.2
-[17.2.1.rc.1]: https://github.com/shakacode/react_on_rails/compare/v17.2.1.rc.0...v17.2.1.rc.1
-[17.2.1.rc.0]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...v17.2.1.rc.0
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.1...main
+[17.2.1]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...v17.2.1
 [17.2.0]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...v17.2.0
 [17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
