@@ -29,6 +29,13 @@ let reactObjectComponentTypes: Set<symbol> | undefined;
 let wrappedFunctionComponents: WeakMap<FunctionWithMetadata, ReactComponentCandidate> | undefined;
 let wrappedRenderFunctions: WeakMap<RenderFunction, RenderFunction> | undefined;
 let wrappedObjectComponents: WeakMap<ObjectComponent, ReactComponentCandidate> | undefined;
+const strictModeExclusions: WeakSet<object> = new WeakSet();
+
+// Registers a component unwrapped through every register path, including generated packs.
+const excludeFromStrictMode = <Component extends object>(component: Component): Component => {
+  strictModeExclusions.add(component);
+  return component;
+};
 
 const getReactObjectComponentTypes = () => {
   if (!reactObjectComponentTypes) {
@@ -220,7 +227,7 @@ const wrapRegisteredComponentsWithStrictMode = <Components extends ComponentRegi
 
   return Object.fromEntries(
     Object.entries(components).map(([name, component]) => {
-      if (isRendererFunction(component)) {
+      if (isRendererFunction(component) || strictModeExclusions.has(component as object)) {
         return [name, component];
       }
 
@@ -237,4 +244,4 @@ const wrapRegisteredComponentsWithStrictMode = <Components extends ComponentRegi
   ) as Components;
 };
 
-export { wrapElementInStrictMode, wrapRegisteredComponentsWithStrictMode };
+export { excludeFromStrictMode, wrapElementInStrictMode, wrapRegisteredComponentsWithStrictMode };
