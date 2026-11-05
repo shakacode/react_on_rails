@@ -34,11 +34,11 @@ const reactOnRailsWithStrictModeFlag = ReactOnRails as typeof ReactOnRails &
 // webpack compilation (e.g., a standalone bundle config) would get its own unpatched module
 // instance. When adding a pack like that, either fold it into this compilation or duplicate
 // this `STRICT_MODE_PATCHED` block at the top of the new pack before any `register` calls.
-if (useStrictMode && !reactOnRailsWithStrictModeFlag[STRICT_MODE_PATCHED]) {
-  const originalRegister = ReactOnRails.register.bind(ReactOnRails);
+const registerWithoutStrictMode = ReactOnRails.register.bind(ReactOnRails);
 
+if (useStrictMode && !reactOnRailsWithStrictModeFlag[STRICT_MODE_PATCHED]) {
   ReactOnRails.register = (components) =>
-    originalRegister(wrapRegisteredComponentsWithStrictMode(components));
+    registerWithoutStrictMode(wrapRegisteredComponentsWithStrictMode(components));
   Object.defineProperty(reactOnRailsWithStrictModeFlag, STRICT_MODE_PATCHED, { value: true });
 }
 
@@ -98,9 +98,14 @@ ReactOnRails.setOptions({
 
 ReactOnRails.register({
   HelloTurboStream,
-  HydrationSchedulingProbe,
   ManualRenderComponent,
 });
+
+// HydrationSchedulingProbe logs each real mount and unmount, and specs count those events.
+// React 18 replays effects (mount, unmount, mount) under the StrictMode wrapper above, which would
+// log a simulated unmount at page load. React 19 skips that replay because the wrapper component
+// itself is not strict. Registering the probe unwrapped keeps its counts the same on both. Refs #5266.
+registerWithoutStrictMode({ HydrationSchedulingProbe });
 
 ReactOnRails.registerStoreGenerators({
   SharedReduxStore,
