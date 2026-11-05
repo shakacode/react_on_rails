@@ -62,7 +62,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   rendering uses and warns when it is Bun. Pro apps that render through the Node Renderer change only on their ExecJS
   fallback path.
   Fixes [Issue 5288](https://github.com/shakacode/react_on_rails/issues/5288).
-  [PR 5311](https://github.com/shakacode/react_on_rails/pull/5311) by [justin808](https://github.com/justin808).
+  [PR 5319](https://github.com/shakacode/react_on_rails/pull/5319) by [justin808](https://github.com/justin808).
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.
