@@ -219,8 +219,9 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
-      # The source check above cannot see headers the compiler drops (#5308), so also
-      # check the packed .js files npm users receive from both Pro packages.
+      # The source check above cannot see headers the compiler drops
+      # (#5308), so also check the packed .js files npm users receive
+      # from both Pro packages.
       - name: Check Pro license headers in packed packages
         working-directory: .
         run: |
