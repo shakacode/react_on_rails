@@ -2059,9 +2059,9 @@ module ReactOnRails
         checker.add_warning("  ⚠️  Server rendering uses #{bun_name}, which fails on some server bundles " \
                             "(\"Expected CommonJS module to have a function wrapper\")")
         fix = if ENV["EXECJS_RUNTIME"].to_s.empty?
-                "Install Node.js; React on Rails then uses it instead of Bun"
+                "Put node on the PATH of the Rails process; React on Rails then uses it instead of Bun"
               else
-                "Set EXECJS_RUNTIME=Node, or unset EXECJS_RUNTIME"
+                "Set EXECJS_RUNTIME=Node"
               end
         checker.add_info("  💡 #{fix}")
       else

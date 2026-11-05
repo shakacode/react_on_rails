@@ -5139,7 +5139,7 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_server_rendering_engine)
 
         expect(warning_messages).to include(a_string_including("Server rendering uses Bun.sh"))
-        expect(info_messages).to include(a_string_including("Install Node.js"))
+        expect(info_messages).to include(a_string_including("Put node on the PATH"))
       end
 
       it "reports Node.js as the Pro NodeRenderer fallback runtime when React on Rails switches to it" do

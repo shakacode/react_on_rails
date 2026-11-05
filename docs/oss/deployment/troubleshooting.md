@@ -130,9 +130,9 @@ export EXECJS_RUNTIME=Node
 
 **Error:** Server rendering fails with this Bun error, or `bin/rails react_on_rails:doctor` warns that server rendering uses `Bun.sh`
 
-**Cause:** Bun cannot evaluate some server bundles. React on Rails already renders with Node.js when ExecJS autodetects Bun, so this error means Bun was chosen explicitly (`EXECJS_RUNTIME=Bun`) or Node.js is not installed.
+**Cause:** Bun cannot evaluate some server bundles. React on Rails already renders with Node.js when ExecJS autodetects Bun, so this error means Bun was chosen explicitly (`EXECJS_RUNTIME=Bun`) or the Rails server process cannot find `node` on its `PATH`.
 
-**Solution:** Install Node.js, and set `EXECJS_RUNTIME=Node` or unset `EXECJS_RUNTIME`.
+**Solution:** Make sure `node` is on the `PATH` of the process that runs Rails, then set `EXECJS_RUNTIME=Node`.
 
 ## ⚡ Runtime Issues
 
