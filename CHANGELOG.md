@@ -40,7 +40,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   lookups inside the bundle skip V8's sandbox interceptors. Renders of three real application
   bundles used about 20-25% less CPU in a local A/B. Rendered HTML and request isolation are
   unchanged, and older Node versions keep the previous context.
-  [PR 5309](https://github.com/shakacode/react_on_rails/pull/5309) by
+  [PR 5313](https://github.com/shakacode/react_on_rails/pull/5313) by
   [alexeyr-ci2](https://github.com/alexeyr-ci2) and [justin808](https://github.com/justin808).
 
 #### Changed
