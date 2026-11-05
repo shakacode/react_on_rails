@@ -93,7 +93,9 @@ React on Rails then:
 
 To send other state with the server render, such as a TanStack Query cache, pass `dehydrate` and `hydrate` to
 `createRouter`. The helper calls `dehydrate()` once on the server after `router.load()` finishes, and awaits it
-if it returns a promise. On the client, it passes that value to `hydrate()` before the first render.
+if it returns a promise. On the client, it calls `hydrate()` with that value during the first render. Fill caches
+synchronously in `hydrate`: the helper waits for a returned promise only before the first client-side
+`router.load()`, not before the first render, so data an async `hydrate` adds later can cause a hydration mismatch.
 
 ```tsx
 import { QueryClient, dehydrate, hydrate } from '@tanstack/react-query';
