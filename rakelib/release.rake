@@ -2352,7 +2352,8 @@ end
 def active_shakaperf_release_gate_run?(run)
   return false unless SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(run["status"].to_s)
 
-  unless run["conclusion"].nil?
+  # `gh run list --json conclusion` reports "" (not null) while a run is still going.
+  unless run["conclusion"].to_s.empty?
     abort "❌ Active ShakaPerf run has a terminal conclusion; refusing contradictory gate evidence."
   end
 
