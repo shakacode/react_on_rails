@@ -2397,8 +2397,8 @@ Ensure you're using a coordinated React line in your `package.json`. New apps us
 
 ```json
 "dependencies": {
-  "react": "19.3.0",
-  "react-dom": "19.3.0"
+  "react": "19.3.1",
+  "react-dom": "19.3.1"
 }
 ```
 
