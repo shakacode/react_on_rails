@@ -691,6 +691,46 @@ module ReactOnRails
           end
         end
       end
+
+      # Issue #5288: Bun, which ExecJS autodetects ahead of Node.js, fails to evaluate some
+      # server bundles, so the pool compiles with Node.js when ExecJS autodetected Bun.
+      describe ".create_js_context runtime selection" do
+        let(:bun) { instance_double(ExecJS::ExternalRuntime, name: "Bun.sh") }
+
+        around do |example|
+          original = ENV.fetch("EXECJS_RUNTIME", nil)
+          ENV.delete("EXECJS_RUNTIME")
+          example.run
+        ensure
+          original.nil? ? ENV.delete("EXECJS_RUNTIME") : ENV["EXECJS_RUNTIME"] = original
+        end
+
+        before do
+          allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("server-bundle.js")
+          allow(described_class).to receive(:read_bundle_js_code)
+            .and_return("var ReactOnRails = { renderedBy: 'bundle' };")
+          allow(ExecJS).to receive(:runtime).and_return(bun)
+        end
+
+        it "evaluates the server bundle with Node.js instead of the autodetected Bun" do
+          skip "Node.js is not on PATH" unless ExecJS::Runtimes::Node.available?
+          expect(bun).not_to receive(:compile)
+          expect(ExecJS::Runtimes::Node).to receive(:compile).and_call_original
+
+          context = described_class.create_js_context
+
+          expect(context.eval("ReactOnRails.renderedBy")).to eq("bundle")
+        end
+
+        it "compiles with Bun when EXECJS_RUNTIME explicitly selects it" do
+          ENV["EXECJS_RUNTIME"] = "Bun"
+          bun_context = instance_double(ExecJS::ExternalRuntime::Context)
+          allow(bun).to receive(:compile).and_return(bun_context)
+
+          expect(described_class.create_js_context).to equal(bun_context)
+          expect(bun).to have_received(:compile)
+        end
+      end
     end
   end
 end

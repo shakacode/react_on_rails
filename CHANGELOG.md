@@ -53,6 +53,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Server rendering works when Bun is installed**: ExecJS 2.9+ picks Bun ahead of Node.js, and Bun fails to
+  evaluate some server bundles ("Expected CommonJS module to have a function wrapper"), so a freshly generated
+  `--standard` app returned HTTP 500 on its server-rendered page. When ExecJS autodetects Bun and Node.js is
+  installed, React on Rails now renders with Node.js. `ExecJS.runtime` itself is unchanged for other ExecJS users,
+  and an explicit `EXECJS_RUNTIME` still wins. `react_on_rails:doctor` reports the runtime server rendering uses and
+  warns when it is Bun. Pro apps that render through the Node Renderer are unaffected.
+  Fixes [Issue 5288](https://github.com/shakacode/react_on_rails/issues/5288).
+  [PR 5311](https://github.com/shakacode/react_on_rails/pull/5311) by [justin808](https://github.com/justin808).
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.
