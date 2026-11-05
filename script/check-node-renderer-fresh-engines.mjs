@@ -47,7 +47,7 @@ function packageNameFromLockPath(lockPath) {
   return lockPath.slice(lockPath.lastIndexOf(marker) + marker.length);
 }
 
-// Returns { floor, mismatches, allowed, staleAllowlist } for an npm v2/v3 lockfile object.
+// Returns { floor, mismatches, allowed, unparseable, staleAllowlist } for an npm v2/v3 lockfile object.
 export function findEngineMismatches({ lock, enginesRange, semver, knownMismatches = KNOWN_MISMATCHES }) {
   const floor = semver.minVersion(enginesRange);
   if (!floor) throw new Error(`Cannot find a minimum Node version in engines.node "${enginesRange}"`);
@@ -56,29 +56,36 @@ export function findEngineMismatches({ lock, enginesRange, semver, knownMismatch
 
   const mismatches = [];
   const allowed = [];
+  const unparseable = [];
   const seenAllowlist = new Set();
 
-  const excluding = Object.entries(lock.packages).filter(([lockPath, entry]) => {
-    const required = entry.engines?.node;
-    // An empty path is the root project itself.
-    return lockPath !== '' && typeof required === 'string' && !semver.satisfies(floor, required);
-  });
+  // An empty path is the root project itself.
+  const withEngines = Object.entries(lock.packages).filter(
+    ([lockPath, entry]) => lockPath !== '' && typeof entry.engines?.node === 'string',
+  );
 
-  for (const [lockPath, entry] of excluding) {
+  for (const [lockPath, entry] of withEngines) {
     const required = entry.engines.node;
     const name = entry.name ?? packageNameFromLockPath(lockPath);
     const found = { name, version: entry.version, engines: required, path: lockPath };
-    const known = knownMismatches.find((item) => item.name === name && item.engines === required);
-    if (known) {
-      allowed.push({ ...found, issue: known.issue });
-      seenAllowlist.add(known);
+    // npm ignores an engines.node value it cannot parse, so it cannot reject the floor.
+    if (semver.validRange(required) === null) {
+      unparseable.push(found);
+    } else if (semver.satisfies(floor, required)) {
+      // This package accepts the advertised floor.
     } else {
-      mismatches.push(found);
+      const known = knownMismatches.find((item) => item.name === name && item.engines === required);
+      if (known) {
+        allowed.push({ ...found, issue: known.issue });
+        seenAllowlist.add(known);
+      } else {
+        mismatches.push(found);
+      }
     }
   }
 
   const staleAllowlist = knownMismatches.filter((item) => !seenAllowlist.has(item));
-  return { floor: floor.version, mismatches, allowed, staleAllowlist };
+  return { floor: floor.version, mismatches, allowed, unparseable, staleAllowlist };
 }
 
 export function loadSemver() {
@@ -127,6 +134,7 @@ function resolveFreshLockfile(dependencies) {
 
 function main(argv) {
   const lockfileIndex = argv.indexOf('--lockfile');
+  if (lockfileIndex !== -1 && !argv[lockfileIndex + 1]) throw new Error('--lockfile needs a path');
   const rendererPackage = JSON.parse(fs.readFileSync(RENDERER_PACKAGE_JSON, 'utf8'));
   const enginesRange = rendererPackage.engines?.node;
   if (!enginesRange) throw new Error(`${RENDERER_PACKAGE_JSON} has no engines.node`);
@@ -141,6 +149,11 @@ function main(argv) {
   console.log(`react-on-rails-pro-node-renderer engines.node: ${enginesRange} (lowest: ${result.floor})`);
   for (const item of result.allowed) {
     console.log(`  known: ${item.name}@${item.version} needs node ${item.engines} (${item.issue})`);
+  }
+  for (const item of result.unparseable) {
+    console.log(
+      `  ignored: ${item.name}@${item.version} has an engines.node npm cannot parse: "${item.engines}"`,
+    );
   }
   for (const item of result.staleAllowlist) {
     console.log(`  no longer resolved: ${item.name} node ${item.engines}; remove it from KNOWN_MISMATCHES`);

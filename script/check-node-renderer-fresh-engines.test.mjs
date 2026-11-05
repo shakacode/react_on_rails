@@ -1,7 +1,12 @@
 // Run with `node --test script/check-node-renderer-fresh-engines.test.mjs`.
 
-import { test } from 'node:test';
+import { after, describe, it, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { findEngineMismatches, loadSemver } from './check-node-renderer-fresh-engines.mjs';
 
 const semver = loadSemver();
@@ -76,4 +81,53 @@ test('derives package names from nested lockfile paths', () => {
   assert.ok(result.mismatches.some((item) => item.name === 'cookie'));
   const nested = findEngineMismatches({ lock, enginesRange: '>=9', semver, knownMismatches: [] });
   assert.ok(nested.mismatches.some((item) => item.name === 'semver' && item.path.includes('@scope/nested')));
+});
+
+test('ignores engines.node values that npm cannot parse', () => {
+  const odd = {
+    packages: { '': {}, 'node_modules/odd': { version: '1.0.0', engines: { node: 'node >= 14' } } },
+  };
+  const result = findEngineMismatches({ lock: odd, enginesRange: '>=18.19.0', semver, knownMismatches: [] });
+  assert.deepEqual(result.mismatches, []);
+  assert.deepEqual(
+    result.unparseable.map((item) => item.name),
+    ['odd'],
+  );
+});
+
+test('names top-level scoped packages by their full scope', () => {
+  const scoped = { packages: { 'node_modules/@fastify/x': { version: '1.0.0', engines: { node: '>=22' } } } };
+  const result = findEngineMismatches({ lock: scoped, enginesRange: '>=20', semver, knownMismatches: [] });
+  assert.equal(result.mismatches[0].name, '@fastify/x');
+});
+
+describe('command line', () => {
+  const checker = fileURLToPath(new URL('./check-node-renderer-fresh-engines.mjs', import.meta.url));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fresh-engines-test-'));
+  after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  function run(cookieEngines) {
+    const file = path.join(dir, `lock-${cookieEngines.replace(/\W/g, '')}.json`);
+    const fixture = {
+      packages: { '': {}, 'node_modules/cookie': { version: '9.0.0', engines: { node: cookieEngines } } },
+    };
+    fs.writeFileSync(file, JSON.stringify(fixture));
+    return spawnSync(process.execPath, [checker, '--lockfile', file], { encoding: 'utf8' });
+  }
+
+  it('exits 0 for a tracked mismatch', () => {
+    assert.equal(run('>=22').status, 0);
+  });
+
+  it('exits 1 and names the package for new drift', () => {
+    const result = run('>=24');
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /cookie@9\.0\.0 .* needs node >=24/);
+  });
+
+  it('exits 2 when --lockfile has no path', () => {
+    const result = spawnSync(process.execPath, [checker, '--lockfile'], { encoding: 'utf8' });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /--lockfile needs a path/);
+  });
 });
