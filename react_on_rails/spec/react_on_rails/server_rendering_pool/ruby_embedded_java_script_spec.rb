@@ -706,7 +706,7 @@ module ReactOnRails
         end
 
         before do
-          allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("server-bundle.js")
+          allow(ReactOnRails.configuration).to receive_messages(server_bundle_js_file: "server-bundle.js", trace: false)
           allow(described_class).to receive(:read_bundle_js_code)
             .and_return("var ReactOnRails = { renderedBy: 'bundle' };")
           allow(ExecJS).to receive(:runtime).and_return(bun)
