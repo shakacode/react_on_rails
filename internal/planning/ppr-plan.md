@@ -223,8 +223,9 @@ Facts the previous plans and #3571 do not reflect, re-verified against
    encryption) moves entirely to v2.
 
 2. **Fizz prerender/resume is no longer unproven.** The P6 spike (§1.3) shows
-   it works outside Next.js, across OS processes, on stable React, with a
-   working priority signal. Old Phase 6's risk discount is obsolete.
+   it works outside Next.js, across OS processes, on stable React. Old Phase
+   6's risk discount is obsolete. Its priority-signal result is unproven
+   (§1.3).
 
 3. **#4581 is closed** (fixed by #4722, merged 2026-07-18; verified closed
    2026-07-18T06:29Z). The "active Track-A caching risk" in earlier reviews is
