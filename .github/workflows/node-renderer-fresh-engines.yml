@@ -20,7 +20,6 @@ on:
       - 'script/check-node-renderer-fresh-engines.mjs'
       - 'script/check-node-renderer-fresh-engines.test.mjs'
       - '.github/workflows/node-renderer-fresh-engines.yml'
-      - '.tool-versions'
   workflow_dispatch:
 
 concurrency:
@@ -36,10 +35,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node
+      # npm prefers versions whose engines accept the Node running it. The newest
+      # release makes it pick the highest version in range, as pnpm and Yarn do.
+      - name: Setup newest Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version-file: .tool-versions
+          node-version: node
 
       - name: Test the engines checker
         run: node --test script/check-node-renderer-fresh-engines.test.mjs
@@ -62,10 +63,10 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          title='Node renderer fresh install resolves a package that rejects its advertised Node floor'
-          body="The scheduled fresh-resolution engines check failed: $RUN_URL
+          title='Node renderer fresh-install engines check is failing'
+          body="The scheduled fresh-install engines check failed: $RUN_URL
 
-          A fresh install of react-on-rails-pro-node-renderer now resolves a package whose engines.node excludes the renderer's lowest advertised Node version. See #5305 for background and options."
+          Read the run log first. A failed check step that lists ::error:: packages means a fresh install of react-on-rails-pro-node-renderer now resolves a package whose engines.node excludes the renderer's lowest advertised Node version; see #5305 for background and options. A failed test step or a registry error is a problem with the check itself."
           existing=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
             --jq "map(select(.title == \"$title\")) | .[0].number // empty")
           if [ -n "$existing" ]; then

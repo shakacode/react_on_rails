@@ -14,6 +14,10 @@
 // drift is visible. Remove an entry once the engines floor or the dependency
 // changes.
 //
+// npm prefers versions whose engines accept the Node that runs it, so run this
+// on the newest Node release. Then npm picks the highest version in range, as
+// pnpm and Yarn do, instead of hiding a newer release that needs newer Node.
+//
 // Usage:
 //   node script/check-node-renderer-fresh-engines.mjs            # resolve from the npm registry
 //   node script/check-node-renderer-fresh-engines.mjs --lockfile PATH   # check an existing npm lockfile
@@ -47,7 +51,7 @@ function packageNameFromLockPath(lockPath) {
   return lockPath.slice(lockPath.lastIndexOf(marker) + marker.length);
 }
 
-// Returns { floor, mismatches, allowed, unparseable, staleAllowlist } for an npm v2/v3 lockfile object.
+// Returns { floor, mismatches, allowed, staleAllowlist } for an npm v2/v3 lockfile object.
 export function findEngineMismatches({ lock, enginesRange, semver, knownMismatches = KNOWN_MISMATCHES }) {
   const floor = semver.minVersion(enginesRange);
   if (!floor) throw new Error(`Cannot find a minimum Node version in engines.node "${enginesRange}"`);
@@ -56,36 +60,29 @@ export function findEngineMismatches({ lock, enginesRange, semver, knownMismatch
 
   const mismatches = [];
   const allowed = [];
-  const unparseable = [];
   const seenAllowlist = new Set();
 
-  // An empty path is the root project itself.
-  const withEngines = Object.entries(lock.packages).filter(
-    ([lockPath, entry]) => lockPath !== '' && typeof entry.engines?.node === 'string',
-  );
+  // Same test as npm's engine check: an unparseable range rejects every version.
+  const excluding = Object.entries(lock.packages).filter(([lockPath, entry]) => {
+    const required = entry.engines?.node;
+    return lockPath !== '' && required && !semver.satisfies(floor, required, { includePrerelease: true });
+  });
 
-  for (const [lockPath, entry] of withEngines) {
+  for (const [lockPath, entry] of excluding) {
     const required = entry.engines.node;
     const name = entry.name ?? packageNameFromLockPath(lockPath);
     const found = { name, version: entry.version, engines: required, path: lockPath };
-    // npm ignores an engines.node value it cannot parse, so it cannot reject the floor.
-    if (semver.validRange(required) === null) {
-      unparseable.push(found);
-    } else if (semver.satisfies(floor, required)) {
-      // This package accepts the advertised floor.
+    const known = knownMismatches.find((item) => item.name === name && item.engines === required);
+    if (known) {
+      allowed.push({ ...found, issue: known.issue });
+      seenAllowlist.add(known);
     } else {
-      const known = knownMismatches.find((item) => item.name === name && item.engines === required);
-      if (known) {
-        allowed.push({ ...found, issue: known.issue });
-        seenAllowlist.add(known);
-      } else {
-        mismatches.push(found);
-      }
+      mismatches.push(found);
     }
   }
 
   const staleAllowlist = knownMismatches.filter((item) => !seenAllowlist.has(item));
-  return { floor: floor.version, mismatches, allowed, unparseable, staleAllowlist };
+  return { floor: floor.version, mismatches, allowed, staleAllowlist };
 }
 
 export function loadSemver() {
@@ -149,11 +146,6 @@ function main(argv) {
   console.log(`react-on-rails-pro-node-renderer engines.node: ${enginesRange} (lowest: ${result.floor})`);
   for (const item of result.allowed) {
     console.log(`  known: ${item.name}@${item.version} needs node ${item.engines} (${item.issue})`);
-  }
-  for (const item of result.unparseable) {
-    console.log(
-      `  ignored: ${item.name}@${item.version} has an engines.node npm cannot parse: "${item.engines}"`,
-    );
   }
   for (const item of result.staleAllowlist) {
     console.log(`  no longer resolved: ${item.name} node ${item.engines}; remove it from KNOWN_MISMATCHES`);

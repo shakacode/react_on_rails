@@ -83,14 +83,13 @@ test('derives package names from nested lockfile paths', () => {
   assert.ok(nested.mismatches.some((item) => item.name === 'semver' && item.path.includes('@scope/nested')));
 });
 
-test('ignores engines.node values that npm cannot parse', () => {
+test('counts an engines.node npm cannot parse as a mismatch, as npm does', () => {
   const odd = {
     packages: { '': {}, 'node_modules/odd': { version: '1.0.0', engines: { node: 'node >= 14' } } },
   };
   const result = findEngineMismatches({ lock: odd, enginesRange: '>=18.19.0', semver, knownMismatches: [] });
-  assert.deepEqual(result.mismatches, []);
   assert.deepEqual(
-    result.unparseable.map((item) => item.name),
+    result.mismatches.map((item) => item.name),
     ['odd'],
   );
 });
