@@ -126,36 +126,67 @@ test('the gate skips only when the filter succeeded and said the gate need not r
 });
 
 function gateRun(id, status, conclusion, overrides = {}) {
-  return { id, name: 'required-pr-gate', status, conclusion, app: { slug: 'github-actions' }, ...overrides };
+  return {
+    id,
+    name: 'required-pr-gate',
+    status,
+    conclusion,
+    started_at: `2026-11-05T10:00:${String(id).padStart(2, '0')}Z`,
+    app: { slug: 'github-actions' },
+    ...overrides,
+  };
 }
 
-async function decide(checkRuns) {
+function labelHistory(event, label, createdAt) {
+  return { event, label: { name: label }, created_at: createdAt };
+}
+
+async function decide(checkRuns, { events = [], author = 'justin808' } = {}) {
   const outputs = {};
   const requests = [];
   const github = {
-    rest: { checks: { listForRef: Symbol('listForRef') } },
+    rest: { checks: { listForRef: Symbol('listForRef') }, issues: { listEvents: Symbol('listEvents') } },
     paginate: async (method, params) => {
-      assert.equal(method, github.rest.checks.listForRef);
-      requests.push(params);
-      return checkRuns;
+      if (method === github.rest.checks.listForRef) {
+        requests.push(['checks', params]);
+        return checkRuns;
+      }
+      assert.equal(method, github.rest.issues.listEvents);
+      requests.push(['events', params]);
+      return events;
     },
   };
   const context = {
     repo: { owner: 'shakacode', repo: 'react_on_rails' },
-    payload: { label: { name: 'awaiting-merge-approval' }, pull_request: { head: { sha: 'head-sha' } } },
-  };
-  const core = { setOutput: (name, value) => (outputs[name] = value), info: () => {} };
-  await runFilterScript(github, context, core);
-  assert.deepEqual(requests, [
-    {
-      owner: 'shakacode',
-      repo: 'react_on_rails',
-      ref: 'head-sha',
-      check_name: 'required-pr-gate',
-      filter: 'all',
-      per_page: 100,
+    payload: {
+      label: { name: 'awaiting-merge-approval' },
+      pull_request: { number: 42, user: { login: author }, head: { sha: 'head-sha' } },
     },
-  ]);
+  };
+  const core = {
+    setOutput: (name, value) => {
+      outputs[name] = value;
+    },
+    info: () => {},
+  };
+  await runFilterScript(github, context, core);
+  if (requests.length > 0) {
+    assert.deepEqual(requests[0], [
+      'checks',
+      {
+        owner: 'shakacode',
+        repo: 'react_on_rails',
+        ref: 'head-sha',
+        check_name: 'required-pr-gate',
+        filter: 'all',
+        per_page: 100,
+      },
+    ]);
+  }
+  for (const [kind, params] of requests.slice(1)) {
+    assert.equal(kind, 'events');
+    assert.deepEqual(params, { owner: 'shakacode', repo: 'react_on_rails', issue_number: 42, per_page: 100 });
+  }
   return outputs.run_gate;
 }
 
@@ -170,6 +201,16 @@ test('the filter skips the gate after a passing gate on the same head', async ()
     await decide([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')]),
     'false',
     'the newest result decides',
+  );
+  assert.equal(
+    await decide([gateRun(5, 'completed', 'success')], {
+      events: [
+        labelHistory('unlabeled', 'ready-for-hosted-ci', '2026-11-05T09:59:00Z'),
+        labelHistory('labeled', 'awaiting-resume', '2026-11-05T10:30:00Z'),
+      ],
+    }),
+    'false',
+    'hosted-label changes before the pass and status-label changes after it do not matter',
   );
 });
 
@@ -203,4 +244,31 @@ test('the filter reruns the gate whenever the head has no settled pass', async (
     'true',
     'a same-named check from another app does not count',
   );
+  assert.equal(
+    await decide([gateRun(5, 'completed', 'success', { started_at: null })]),
+    'true',
+    'a pass with no start time cannot be compared with label history',
+  );
+});
+
+test('the filter reruns the gate when a hosted-CI label changed after the pass started', async () => {
+  const changes = [
+    ['unlabeled', 'ready-for-hosted-ci'],
+    ['labeled', 'ready-for-hosted-ci'],
+    ['unlabeled', 'force-full-hosted-ci'],
+  ];
+  const decisions = await Promise.all(
+    changes.map(([event, label]) =>
+      decide([gateRun(5, 'completed', 'success')], {
+        events: [labelHistory(event, label, '2026-11-05T10:00:05Z')],
+      }),
+    ),
+  );
+  changes.forEach(([event, label], index) => {
+    assert.equal(decisions[index], 'true', `${event} ${label} at the moment the gate started`);
+  });
+});
+
+test('the filter always reruns the gate on Dependabot pull requests', async () => {
+  assert.equal(await decide([gateRun(5, 'completed', 'success')], { author: 'dependabot[bot]' }), 'true');
 });

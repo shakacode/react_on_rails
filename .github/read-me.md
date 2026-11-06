@@ -268,12 +268,14 @@ dispatcher, and docs together:
    jobs the only required PR signal.
 2. Include `pull_request` events for normal PR updates and label changes:
    `opened`, `synchronize`, `reopened`, `ready_for_review`, `labeled`, and
-   `unlabeled`. In `ci-required.yml`, only the two hosted-CI labels can change
-   the gate's result. For any other label, the `label-event-filter` job skips
-   `required-pr-gate` when the newest gate that ran on that head passed and no
-   gate run is still in flight. Never skip the gate on the label name alone. A
-   skipped required job reports success, so a plain `if:` would turn a failed
-   gate green.
+   `unlabeled`. In `ci-required.yml`, the gate reads only the two hosted-CI
+   labels. For any other label, the `label-event-filter` job skips
+   `required-pr-gate` when three things hold: the newest gate that ran on that
+   head passed, no gate run is still in flight, and no hosted-CI label changed
+   since that gate started. That last check matters because the workflow token
+   can change those labels without firing an event. Never skip the gate on the
+   label name alone. A skipped required job reports success, so a plain `if:`
+   would turn a failed gate green.
 3. Include `push` to `main` and release branches, `merge_group`, and
    `workflow_dispatch` when the workflow is part of merge or release confidence.
 4. Avoid workflow-level `paths` or `paths-ignore` when branch protection or
