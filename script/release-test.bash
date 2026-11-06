@@ -393,8 +393,12 @@ fi
 elapsed=$(($(date +%s) - started_at))
 [ "${elapsed}" -lt 15 ] || fail "doctor took ${elapsed}s; the sign-in check timeout did not apply"
 assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
-if kill -0 "$(cat "${TEST_HUNG_CHILD_PID_FILE}")" 2>/dev/null; then
-  fail "the hung check's grandchild survived the timeout"
+[ -s "${TEST_HUNG_CHILD_PID_FILE}" ] || fail "the hung npm shim never recorded its grandchild PID"
+hung_child_pid="$(cat "${TEST_HUNG_CHILD_PID_FILE}")"
+# A killed grandchild can linger as a zombie where PID 1 reaps slowly, so check for a live process.
+hung_child_stat="$(ps -o stat= -p "${hung_child_pid}" 2>/dev/null || true)"
+if [ -n "${hung_child_stat}" ] && [[ "${hung_child_stat}" != Z* ]]; then
+  fail "the hung check's grandchild survived the timeout (state ${hung_child_stat})"
 fi
 unset TEST_HUNG_CHILD_PID_FILE
 pass "a hung sign-in check times out and its whole process group is killed"
