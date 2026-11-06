@@ -1109,28 +1109,52 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('<li<script');
   });
 
-  it('promotes split stylesheet links after a retained raw-text tail closes', async () => {
-    const mockRSC = createMockRSCStream(['{"test": "data"}']);
-    const mockHTML = createMockHTMLStream({
-      0: 'before<script>window.msg = 1;',
-      10: '</script><link rel="preload" as="style" href="/webpack/test/css/client1-',
-      20: '46072b81.css">after',
-    });
-    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+  // The RSC payload push script may flush at any boundary between complete HTML, so
+  // where it lands depends on when the RSC chunk arrives relative to the HTML chunks.
+  // Under machine load the 0ms and 10ms HTML timers can fire in one tick, which moves
+  // the payload from before the app <script> to between `</script>` and the held
+  // `<link` tail. Pin each arrival window explicitly and assert placement-independent
+  // invariants instead of adjacency that only one arrival order produces.
+  it.each([
+    ['before the retained raw-text tail closes', 5],
+    ['while the split link tail is held', 15],
+    ['after the HTML stream ends', 30],
+  ])(
+    'promotes split stylesheet links after a retained raw-text tail closes when RSC arrives %s',
+    async (_window, rscDelayMs) => {
+      const mockRSC = createMockRSCStream({ [rscDelayMs]: '{"test": "data"}' });
+      const mockHTML = createMockHTMLStream({
+        0: 'before<script>window.msg = 1;',
+        10: '</script><link rel="preload" as="style" href="/webpack/test/css/client1-',
+        20: '46072b81.css">after',
+      });
+      const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
-      rscClientChunkStylesheetHrefsByChunkName: new Map([
-        ['client1', ['/webpack/test/css/client1-46072b81.css']],
-      ]),
-    });
-    const resultStr = await collectStreamData(result);
+      const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+        rscClientChunkStylesheetHrefsByChunkName: new Map([
+          ['client1', ['/webpack/test/css/client1-46072b81.css']],
+        ]),
+      });
+      const resultStr = await collectStreamData(result);
+      // escapeScript turns any `</script` inside payload text into `<\/script`, so the
+      // first literal `</script>` after a payload marker closes that payload script.
+      const htmlWithoutPayloadScripts = resultStr.replace(
+        new RegExp(`<script ${rscPayloadScriptMarker}>.*?</script>`, 'g'),
+        '',
+      );
 
-    expect(resultStr).toContain(
-      '<script>window.msg = 1;</script><link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
-    );
-    expect(resultStr).not.toContain('rel="preload" as="style"');
-    expect(resultStr).not.toContain('client1-<script');
-  });
+      expect(resultStr.split(expectedPayloadPushScript('{"test": "data"}'))).toHaveLength(2);
+      expect(resultStr).toContain('<script>window.msg = 1;</script>');
+      expect(resultStr).toContain(
+        '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+      );
+      expect(htmlWithoutPayloadScripts).toBe(
+        'before<script>window.msg = 1;</script><link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+      );
+      expect(resultStr).not.toContain('rel="preload" as="style"');
+      expect(resultStr).not.toContain('client1-<script');
+    },
+  );
 
   it('does not hold non-link partial tags for stylesheet gating when observability is disabled', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
