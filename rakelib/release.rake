@@ -9082,7 +9082,7 @@ def check_release_changelog_date!(version:, changelog_path:, dry_run:, publicati
     return
   end
 
-  abort "❌ #{message}\nNo publication has started."
+  abort "❌ #{message}\nNo tag or package has been published yet."
 end
 
 def release_changelog_date_mismatch_message(version:, heading_date:, today_text:, override:)

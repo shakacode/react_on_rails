@@ -1061,7 +1061,7 @@ RSpec.describe "release.rake helper methods" do
           "`### [17.2.1]` is dated 2026-11-04, but today is 2026-11-05",
           "edit the heading to `### [17.2.1] - 2026-11-05`, commit, and rerun `script/release`",
           "RELEASE_CHANGELOG_DATE_OVERRIDE=2026-11-04",
-          "No publication has started."
+          "No tag or package has been published yet."
         )
       }
     end
@@ -1109,7 +1109,7 @@ RSpec.describe "release.rake helper methods" do
       end
 
       expect(output).to include("dated 2026-11-04, but today is 2026-11-05", "The v17.2.1 tag already exists")
-      expect(output).not_to include("No publication has started", "commit, and rerun")
+      expect(output).not_to include("No tag or package has been published yet", "commit, and rerun")
     end
 
     it "ignores an override that names a different date" do
@@ -1149,6 +1149,18 @@ RSpec.describe "release.rake helper methods" do
       expect do
         confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo", dry_run: true)
       end.to output(/is dated 2000-01-01.*A live release would stop here\./m).to_stdout
+    end
+
+    it "lets a live retry of an already tagged release reach confirmation despite a stale changelog date" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return("#### Fixed\n\n- Release fix")
+      allow(self).to receive(:changelog_section_heading_date).and_return("2000-01-01")
+      allow($stdin).to receive(:gets).and_return("y\n")
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo", publication_retry: true)
+      end.to output(/The v17\.0\.0 tag already exists.*Proceed with release\?/m).to_stdout
     end
 
     it "refuses a stable release with no changelog content before prompting even when input would confirm" do
