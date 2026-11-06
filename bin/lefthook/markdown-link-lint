@@ -76,7 +76,11 @@ if ! merge_base="$(git_diff_base_resolve "$base" HEAD lenient)"; then
   exit 1
 fi
 
-tmpdir="$(mktemp -d)"
+# Keep scratch files under the ignored tmp/ directory and pass lychee relative
+# paths, so exclude_path patterns see the original file's relative path and not
+# the system temporary directory's.
+mkdir -p tmp
+tmpdir="$(mktemp -d tmp/markdown-link-lint.XXXXXX)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 # Print the remote URLs lychee would check in a Markdown file, after the
@@ -90,8 +94,7 @@ for file in "${files_arr[@]}"; do
   base_urls="$tmpdir/base-urls"
   : > "$base_urls"
   # A file added or renamed on this branch has no base version, so all its
-  # remote URLs are new. A base copy keeps the file's relative path, so
-  # exclude_path patterns match it the same way.
+  # remote URLs are new.
   if [ "$(git cat-file -t "$merge_base:$file" 2>/dev/null || true)" = "blob" ]; then
     base_copy="$tmpdir/base/$file"
     mkdir -p "$(dirname "$base_copy")"
@@ -99,13 +102,18 @@ for file in "${files_arr[@]}"; do
     remote_urls "$base_copy" > "$base_urls"
   fi
 
-  new_links="$tmpdir/new/$file.new-links.txt"
-  mkdir -p "$(dirname "$new_links")"
-  remote_urls "$file" | LC_ALL=C comm -13 "$base_urls" - > "$new_links"
-  if [ -s "$new_links" ]; then
-    new_link_files+=("$new_links")
+  new_urls="$tmpdir/new-urls"
+  remote_urls "$file" | LC_ALL=C comm -13 "$base_urls" - > "$new_urls"
+  if [ -s "$new_urls" ]; then
     echo "🔗 New remote links in $file:"
-    sed 's/^/  /' "$new_links"
+    sed 's/^/  /' "$new_urls"
+    # Hand the URLs to lychee as HTML anchors: re-reading them as plain text
+    # or Markdown autolinks drops trailing punctuation such as "," or ".".
+    new_links="$tmpdir/new/$file.new-links.html"
+    mkdir -p "$(dirname "$new_links")"
+    perl -ne 'chomp; s/&/&amp;/g; s/"/&quot;/g; s/</&lt;/g; s/>/&gt;/g; print qq{<a href="$_"></a>\n}' \
+      "$new_urls" > "$new_links"
+    new_link_files+=("$new_links")
   fi
 done
 

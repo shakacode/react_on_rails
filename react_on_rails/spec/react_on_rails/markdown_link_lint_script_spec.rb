@@ -62,27 +62,32 @@ RSpec.describe "bin/lefthook/markdown-link-lint" do
       skip "lychee 0.23.0 is not installed" unless lychee_023_installed?
 
       Dir.mktmpdir do |tmpdir|
-        write_branch_fixture(tmpdir)
+        # The trailing comma is part of the Markdown link destination, so the
+        # online pass must check that exact URL.
+        write_branch_fixture(tmpdir, new_line: "[new](http://127.0.0.1:9/new,)")
 
         stdout, stderr, status = run_branch_hook(tmpdir)
 
         expect(status).not_to be_success
         output = stdout + stderr
-        expect(output).to include("http://127.0.0.1:9/new")
+        expect(output).to match(%r{\[ERROR\] http://127\.0\.0\.1:9/new, \|})
         expect(output).not_to include("http://127.0.0.1:9/old")
       end
     end
 
-    it "fails a new link to a missing local file with the real lychee" do
+    it "fails new links to missing local and self-repo files with the real lychee" do
       skip "lychee 0.23.0 is not installed" unless lychee_023_installed?
 
       Dir.mktmpdir do |tmpdir|
-        write_branch_fixture(tmpdir, new_line: "[gone](missing.md)")
+        self_repo_link = "https://github.com/shakacode/react_on_rails/blob/main/missing-self.md"
+        write_branch_fixture(tmpdir, new_line: "[gone](missing.md)\n[self](#{self_repo_link})")
 
         stdout, stderr, status = run_branch_hook(tmpdir)
 
         expect(status).not_to be_success
-        expect(stdout + stderr).to include("missing.md")
+        output = stdout + stderr
+        expect(output).to match(%r{\[ERROR\] file://\S*/missing\.md \|})
+        expect(output).to match(%r{\[ERROR\] file://\S*/missing-self\.md \|})
       end
     end
   end
@@ -97,14 +102,12 @@ RSpec.describe "bin/lefthook/markdown-link-lint" do
   # A Git repository whose origin/main has a broken remote link in README.md and
   # whose HEAD adds one more line to it.
   def write_branch_fixture(directory, new_line: "[new](http://127.0.0.1:9/new)")
-    hook_directory = File.join(directory, "bin/lefthook")
-    FileUtils.mkdir_p([hook_directory, File.join(directory, "script/lib"), File.join(directory, "fake-bin")])
-    %w[markdown-link-lint get-changed-files].each do |name|
-      FileUtils.cp(File.join(repo_root, "bin/lefthook", name), hook_directory)
-    end
-    FileUtils.cp(File.join(repo_root, "script/lib/git-diff-base"), File.join(directory, "script/lib"))
-    File.write(File.join(hook_directory, "ensure-mise"), ":\n")
-    File.write(File.join(directory, ".lychee.toml"), "max_retries = 0\ntimeout = 2\n")
+    copy_hook_scripts(directory)
+    File.write(File.join(directory, ".gitignore"), "tmp/\n")
+    File.write(
+      File.join(directory, ".lychee.toml"),
+      "max_retries = 0\ntimeout = 2\npreprocess = { command = \"bin/lychee-self-repo-links\" }\n"
+    )
     File.write(File.join(directory, "README.md"), "# Fixture\n\n[old](http://127.0.0.1:9/old)\n")
     git(directory, "init", "-q", "-b", "main")
     git(directory, "add", ".")
@@ -112,6 +115,17 @@ RSpec.describe "bin/lefthook/markdown-link-lint" do
     git(directory, "update-ref", "refs/remotes/origin/main", "HEAD")
     File.write(File.join(directory, "README.md"), "#{new_line}\n", mode: "a")
     git(directory, "commit", "-q", "-am", "add a link")
+  end
+
+  def copy_hook_scripts(directory)
+    hook_directory = File.join(directory, "bin/lefthook")
+    FileUtils.mkdir_p([hook_directory, File.join(directory, "script/lib"), File.join(directory, "fake-bin")])
+    %w[markdown-link-lint get-changed-files].each do |name|
+      FileUtils.cp(File.join(repo_root, "bin/lefthook", name), hook_directory)
+    end
+    FileUtils.cp(File.join(repo_root, "script/lib/git-diff-base"), File.join(directory, "script/lib"))
+    FileUtils.cp(File.join(repo_root, "bin/lychee-self-repo-links"), File.join(directory, "bin"))
+    File.write(File.join(hook_directory, "ensure-mise"), ":\n")
   end
 
   def git(directory, *args)
