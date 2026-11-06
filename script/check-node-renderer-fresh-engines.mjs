@@ -37,15 +37,9 @@ const RENDERER_PACKAGE_JSON = fileURLToPath(
 
 // Each entry matches one package name and its exact `engines.node` string.
 // A new version that keeps the same range stays allowed; a stricter range fails.
+// cookie 2.x arrives through light-my-request 6.8+, which Fastify loads only for inject().
 export const KNOWN_MISMATCHES = [
   { name: 'cookie', engines: '>=22', issue: 'https://github.com/shakacode/react_on_rails/issues/5305' },
-  { name: 'find-my-way', engines: '>=20', issue: 'https://github.com/shakacode/react_on_rails/issues/5305' },
-  {
-    name: 'thread-stream',
-    engines: '>=20',
-    issue: 'https://github.com/shakacode/react_on_rails/issues/5305',
-  },
-  { name: 'toad-cache', engines: '>=20', issue: 'https://github.com/shakacode/react_on_rails/issues/5305' },
 ];
 
 function packageNameFromLockPath(lockPath) {
@@ -65,9 +59,17 @@ export function findEngineMismatches({ lock, enginesRange, semver, knownMismatch
   const seenAllowlist = new Set();
 
   // Same test as npm's engine check: an unparseable range rejects every version.
+  // Dev-only entries, present when --lockfile names a project's own lockfile, are not installed
+  // for production.
   const excluding = Object.entries(lock.packages).filter(([lockPath, entry]) => {
     const required = entry.engines?.node;
-    return lockPath !== '' && required && !semver.satisfies(floor, required, { includePrerelease: true });
+    const devOnly = entry.dev === true || entry.devOptional === true;
+    return (
+      lockPath !== '' &&
+      !devOnly &&
+      required &&
+      !semver.satisfies(floor, required, { includePrerelease: true })
+    );
   });
 
   for (const [lockPath, entry] of excluding) {
@@ -150,7 +152,9 @@ function main(argv) {
     console.log(`  known: ${item.name}@${item.version} needs node ${item.engines} (${item.issue})`);
   }
   for (const item of result.staleAllowlist) {
-    console.log(`  no longer resolved: ${item.name} node ${item.engines}; remove it from KNOWN_MISMATCHES`);
+    console.log(
+      `  not seen with this range: ${item.name} node ${item.engines}; remove the entry, or update its range if the package now needs a different one`,
+    );
   }
   if (result.mismatches.length === 0) {
     console.log('No new engines.node mismatches in the fresh resolution.');

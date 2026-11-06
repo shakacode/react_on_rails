@@ -94,6 +94,21 @@ test('counts an engines.node npm cannot parse as a mismatch, as npm does', () =>
   );
 });
 
+test('skips dev-only lockfile entries, which production installs omit', () => {
+  const withDev = {
+    packages: {
+      'node_modules/dev-tool': { version: '1.0.0', dev: true, engines: { node: '>=24' } },
+      'node_modules/dev-optional': { version: '1.0.0', devOptional: true, engines: { node: '>=24' } },
+      'node_modules/runtime': { version: '1.0.0', engines: { node: '>=24' } },
+    },
+  };
+  const result = findEngineMismatches({ lock: withDev, enginesRange: '>=20', semver, knownMismatches: [] });
+  assert.deepEqual(
+    result.mismatches.map((item) => item.name),
+    ['runtime'],
+  );
+});
+
 test('names top-level scoped packages by their full scope', () => {
   const scoped = { packages: { 'node_modules/@fastify/x': { version: '1.0.0', engines: { node: '>=22' } } } };
   const result = findEngineMismatches({ lock: scoped, enginesRange: '>=20', semver, knownMismatches: [] });
