@@ -75,6 +75,21 @@ RSpec.describe "bin/lefthook/markdown-link-lint" do
       end
     end
 
+    it "fails a new broken remote link in a top-level spec/ file with the real lychee" do
+      skip "lychee 0.23.0 is not installed" unless lychee_023_installed?
+
+      Dir.mktmpdir do |tmpdir|
+        # spec/notes.md does not match the fixture's '.*/spec/.*' exclude_path,
+        # so the hook must not let a scratch-file path make it match.
+        write_branch_fixture(tmpdir, path: "spec/notes.md")
+
+        stdout, stderr, status = run_branch_hook(tmpdir)
+
+        expect(status).not_to be_success
+        expect(stdout + stderr).to match(%r{\[ERROR\] http://127\.0\.0\.1:9/new \|})
+      end
+    end
+
     it "fails new links to missing local and self-repo files with the real lychee" do
       skip "lychee 0.23.0 is not installed" unless lychee_023_installed?
 
@@ -99,21 +114,24 @@ RSpec.describe "bin/lefthook/markdown-link-lint" do
     false
   end
 
-  # A Git repository whose origin/main has a broken remote link in README.md and
-  # whose HEAD adds one more line to it.
-  def write_branch_fixture(directory, new_line: "[new](http://127.0.0.1:9/new)")
+  # A Git repository whose origin/main has a broken remote link in the Markdown
+  # file at path and whose HEAD adds one more line to it.
+  def write_branch_fixture(directory, new_line: "[new](http://127.0.0.1:9/new)", path: "README.md")
     copy_hook_scripts(directory)
     File.write(File.join(directory, ".gitignore"), "tmp/\n")
     File.write(
       File.join(directory, ".lychee.toml"),
-      "max_retries = 0\ntimeout = 2\npreprocess = { command = \"bin/lychee-self-repo-links\" }\n"
+      "max_retries = 0\ntimeout = 2\nexclude_path = ['.*/spec/.*']\n" \
+      "preprocess = { command = \"bin/lychee-self-repo-links\" }\n"
     )
-    File.write(File.join(directory, "README.md"), "# Fixture\n\n[old](http://127.0.0.1:9/old)\n")
+    markdown_file = File.join(directory, path)
+    FileUtils.mkdir_p(File.dirname(markdown_file))
+    File.write(markdown_file, "# Fixture\n\n[old](http://127.0.0.1:9/old)\n")
     git(directory, "init", "-q", "-b", "main")
     git(directory, "add", ".")
     git(directory, "commit", "-q", "-m", "base")
     git(directory, "update-ref", "refs/remotes/origin/main", "HEAD")
-    File.write(File.join(directory, "README.md"), "#{new_line}\n", mode: "a")
+    File.write(markdown_file, "#{new_line}\n", mode: "a")
     git(directory, "commit", "-q", "-am", "add a link")
   end
 
