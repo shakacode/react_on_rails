@@ -109,7 +109,14 @@ jobs:
                     head_sha: pr.head.sha,
                     per_page: 20
                   });
-                  const latest = [...data.workflow_runs].sort((left, right) => right.id - left.id)[0];
+                  // Another PR can share this head commit; only this PR's runs count for it.
+                  const ownRuns = data.workflow_runs.filter((run) =>
+                    run.pull_requests?.some((runPullRequest) => runPullRequest.number === pr.number)
+                  );
+                  if (ownRuns.length === 0 && data.workflow_runs.length > 0) {
+                    throw new Error('no ci-required run for this head belongs to this PR');
+                  }
+                  const latest = ownRuns.sort((left, right) => right.id - left.id)[0];
                   if (!latest) {
                     return { ok: true, summary: 'No ci-required run exists for this head yet; its first run reads the current labels.' };
                   }

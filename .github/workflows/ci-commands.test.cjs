@@ -81,7 +81,7 @@ async function runCommand({
   runs = [],
   serializationRunListError,
   workflowRunReadFailures = {},
-  requiredGateRuns = [{ id: 501, status: 'completed' }],
+  requiredGateRuns = [{ id: 501, status: 'completed', pull_requests: [{ number: 42 }] }],
   requiredGateRerunError,
 }) {
   const calls = {
@@ -1656,9 +1656,9 @@ test('the newest pull_request run of the gate is rerun after it finishes', async
   const calls = await runCommand({
     body: '+ci-stop-hosted',
     requiredGateRuns: [
-      { id: 501, status: 'completed' },
-      { id: 503, status: 'completed' },
-      { id: 502, status: 'completed' },
+      { id: 501, status: 'completed', pull_requests: [{ number: 42 }] },
+      { id: 503, status: 'completed', pull_requests: [{ number: 42 }] },
+      { id: 502, status: 'completed', pull_requests: [{ number: 42 }] },
     ],
   });
 
@@ -1683,16 +1683,36 @@ test('a hosted-CI label change fails visibly when the gate cannot be rerun', asy
 
   const stuck = await runCommand({
     body: '+ci-run-hosted',
-    requiredGateRuns: [{ id: 501, status: 'in_progress' }],
+    requiredGateRuns: [{ id: 501, status: 'in_progress', pull_requests: [{ number: 42 }] }],
   });
   assert.deepEqual(stuck.requiredGateReruns, []);
   assert.equal(stuck.failures.length, 1);
 });
 
-test('+ci-stop-hosted on a fork PR still reruns its gate', async () => {
+test('+ci-stop-hosted on a fork PR skips the gate rerun', async () => {
   const pullRequest = defaultPullRequest();
   pullRequest.head.repo.full_name = 'someone/react_on_rails';
   const calls = await runCommand({ body: '+ci-stop-hosted', pullRequest });
 
+  assert.deepEqual(calls.requiredGateRunQueries, []);
+  assert.deepEqual(calls.requiredGateReruns, []);
+  assert.match(calls.comments.at(-1), /Skipped the `ci-required` rerun on a fork PR/);
+});
+
+test('a gate run that belongs to another PR on the same head is never rerun', async () => {
+  const calls = await runCommand({
+    body: '+ci-stop-hosted',
+    requiredGateRuns: [
+      { id: 501, status: 'completed', pull_requests: [{ number: 42 }] },
+      { id: 509, status: 'completed', pull_requests: [{ number: 77 }] },
+    ],
+  });
   assert.deepEqual(calls.requiredGateReruns, gateRerun);
+
+  const foreign = await runCommand({
+    body: '+ci-stop-hosted',
+    requiredGateRuns: [{ id: 509, status: 'completed', pull_requests: [{ number: 77 }] }],
+  });
+  assert.deepEqual(foreign.requiredGateReruns, []);
+  assert.equal(foreign.failures.length, 1);
 });

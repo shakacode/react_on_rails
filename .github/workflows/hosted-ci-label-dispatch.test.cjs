@@ -23,7 +23,7 @@ const runWorkflow = new AsyncFunction('github', 'context', 'core', workflowScrip
 
 const repo = { owner: 'shakacode', repo: 'react_on_rails' };
 const hostedWorkflowCount = 9;
-const completedGateRun = { id: 501, status: 'completed' };
+const completedGateRun = { id: 501, status: 'completed', pull_requests: [{ number: 42 }] };
 
 async function labelEvent({
   action,
@@ -170,8 +170,8 @@ test('the newest pull_request run is rerun once it finishes', async () => {
     label: 'ready-for-hosted-ci',
     labelsAfter: [],
     gateRunSnapshots: [
-      [completedGateRun, { id: 502, status: 'in_progress' }],
-      [completedGateRun, { id: 502, status: 'completed' }],
+      [completedGateRun, { id: 502, status: 'in_progress', pull_requests: [{ number: 42 }] }],
+      [completedGateRun, { id: 502, status: 'completed', pull_requests: [{ number: 42 }] }],
     ],
   });
   assert.equal(calls.gateRunQueries.length, 2);
@@ -235,7 +235,7 @@ test('a failed or timed-out rerun fails the job', async () => {
     action: 'unlabeled',
     label: 'ready-for-hosted-ci',
     labelsAfter: [],
-    gateRunSnapshots: [[{ id: 502, status: 'in_progress' }]],
+    gateRunSnapshots: [[{ id: 502, status: 'in_progress', pull_requests: [{ number: 42 }] }]],
   });
   assert.deepEqual(stuck.reruns, []);
   assert.equal(stuck.failed.length, 1);
@@ -279,4 +279,23 @@ test('ready-for-hosted-ci added beside force-full-hosted-ci leaves dispatch to t
   });
   assert.deepEqual(calls.dispatches, []);
   assert.deepEqual(calls.reruns, []);
+});
+
+test('a gate run that belongs to another PR on the same head is never rerun', async () => {
+  const shared = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    gateRunSnapshots: [[completedGateRun, { id: 509, status: 'completed', pull_requests: [{ number: 77 }] }]],
+  });
+  assert.deepEqual(shared.reruns, rerunOf(501));
+
+  const foreign = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    gateRunSnapshots: [[{ id: 509, status: 'completed', pull_requests: [{ number: 77 }] }]],
+  });
+  assert.deepEqual(foreign.reruns, []);
+  assert.equal(foreign.failed.length, 1);
 });

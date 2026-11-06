@@ -585,6 +585,12 @@ jobs:
             // labels, rerun the head's latest pull_request run of ci-required: the rerun
             // re-reads the live labels for the commit it already checked.
             async function rerunRequiredGate(pr) {
+              // A fork PR's gate never reads hosted-CI labels, and rerunning its run would
+              // skip the approval GitHub requires before fork code runs.
+              if (!isSameRepositoryPullRequest(pr)) {
+                return 'Skipped the `ci-required` rerun on a fork PR; its gate never reads hosted CI labels.';
+              }
+
               try {
                 for (let attempt = 1; attempt <= requiredGateRerunAttempts; attempt += 1) {
                   const { data } = await github.rest.actions.listWorkflowRuns({
@@ -595,7 +601,14 @@ jobs:
                     head_sha: pr.head.sha,
                     per_page: 20
                   });
-                  const latest = [...data.workflow_runs].sort((left, right) => right.id - left.id)[0];
+                  // Another PR can share this head commit; only this PR's runs count for it.
+                  const ownRuns = data.workflow_runs.filter((run) =>
+                    run.pull_requests?.some((runPullRequest) => runPullRequest.number === issueNumber)
+                  );
+                  if (ownRuns.length === 0 && data.workflow_runs.length > 0) {
+                    throw new Error('no ci-required run for this head belongs to this PR');
+                  }
+                  const latest = ownRuns.sort((left, right) => right.id - left.id)[0];
                   if (!latest) {
                     return 'No `ci-required` run exists for this head yet; its first run reads the current labels.';
                   }
