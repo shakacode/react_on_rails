@@ -1105,6 +1105,8 @@ and the final:
 script/release
 ```
 
+The release pre-flight checks that the `### [X.Y.Z] - YYYY-MM-DD` heading carries today's local date and stops a live release before any write when it does not; edit the heading and commit, or set `RELEASE_CHANGELOG_DATE_OVERRIDE=YYYY-MM-DD` to the heading date when it is intentional.
+
 > **Run the stable promotion from `release/X.Y.Z` itself.** `rakelib/release.rake` allows a stable
 > (non-prerelease) `release[X.Y.Z]` from `main` **or** from the matching `release/X.Y.Z` branch (the
 > `stable_release_branch_allowed?` guard); the branch name must match the target version exactly, so you
