@@ -38,6 +38,10 @@ module ReactOnRails
         raise ParseError,
               "Malformed render result: expected exactly one length-prefixed chunk but found #{results.size}"
       end
+      unless parser.complete?
+        raise ParseError, "Malformed render result: incomplete length-prefixed chunk after complete result"
+      end
+
       results.first
     end
 
@@ -84,6 +88,11 @@ module ReactOnRails
         "[react_on_rails] Incomplete length-prefixed stream: " \
         "#{@buf.bytesize} bytes remaining in state :#{@state}"
       )
+    end
+
+    # True when no partial header or content remains buffered.
+    def complete?
+      @state == :header && @buf.empty?
     end
 
     # True if the parser encountered a protocol error.

@@ -76,6 +76,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   packages and fails on any dangling pointer. Fixes [Issue 5307](https://github.com/shakacode/react_on_rails/issues/5307).
   [PR 5321](https://github.com/shakacode/react_on_rails/pull/5321) by [justin808](https://github.com/justin808).
 
+- **Single render results reject incomplete trailing records**: Server rendering now raises
+  `ReactOnRails::JsonParseError` when a complete result is followed by a partial length-prefixed record, instead
+  of silently discarding the remainder.
+  Valid producer responses and warning-only streaming flush behavior are unchanged.
+  [PR 5206](https://github.com/shakacode/react_on_rails/pull/5206) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **Streams reject non-object metadata**: The TypeScript length-prefixed parser now rejects JSON
+  null, arrays, and scalar metadata before yielding a chunk, matching Ruby's existing object requirement.
+  Valid object metadata, control frames, and blank or CRLF separators retain their behavior.
+  [PR 5206](https://github.com/shakacode/react_on_rails/pull/5206) by [justin808](https://github.com/justin808).
+
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.
