@@ -6,6 +6,7 @@ require "io/wait"
 require "open3"
 require "optparse"
 require "rubygems/version"
+require "yaml"
 require_relative "../rakelib/release_changelog_selector"
 require_relative "../rakelib/release_lease_guard"
 
@@ -23,6 +24,7 @@ class ReleaseSupervisor
   RELEASE_START = "S"
   PR_SET_CHILD_SUBREAPER = 36
   NPM_REGISTRY = "https://registry.npmjs.org/"
+  SIGN_IN_CHECK_TIMEOUT = 20.0
 
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
   TerminalHandoff = Data.define(:fd, :supervisor_pgid, :release_pgid)
@@ -72,7 +74,7 @@ class ReleaseSupervisor
 
   def run_live(scope)
     doctor_tools!
-    doctor_publishing_auth!
+    doctor_publishing_auth!(publishing: !@options.fetch(:reconcile_accelerated_rc))
     verify_live_terminal_foreground!
     intervals = supervisor_intervals
 
@@ -174,47 +176,80 @@ class ReleaseSupervisor
   end
 
   # Without this, a live release stops mid-pre-flight at an interactive npm login, or later at a
-  # missing RubyGems key. Check every publishing sign-in up front and name each fix.
-  def doctor_publishing_auth!
+  # missing RubyGems key. Check the sign-ins this run needs up front and name each fix.
+  # Accelerated RC reconciliation only writes GitHub tracker records, so it needs only gh.
+  def doctor_publishing_auth!(publishing: true)
     missing = []
-    missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
-    missing << "GitHub CLI: run `gh auth login`" unless command_succeeds?("gh", "auth", "status")
-    missing << "RubyGems: run `gem signin`" unless rubygems_credentials?
+    missing << "GitHub CLI: run `gh auth login --hostname github.com`" unless gh_signed_in?
+    if publishing
+      missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
+      missing << "RubyGems: run `gem signin`" unless rubygems_credentials?
+    end
     return if missing.empty?
 
-    raise UsageError, "sign in before releasing:\n  #{missing.join("\n  ")}"
+    raise SupervisorError, "sign in before releasing:\n  #{missing.join("\n  ")}"
+  end
+
+  def gh_signed_in?
+    command_succeeds?("gh", "auth", "status", "--hostname", "github.com")
   end
 
   def npm_signed_in?
     command_succeeds?("npm", "whoami", "--registry", NPM_REGISTRY)
   end
 
+  # No stdin, so a prompt cannot block, and a bounded wait, so a hung registry fails the check.
   def command_succeeds?(*command)
-    _output, status = Open3.capture2e(*command)
-    status.success?
+    pid = Process.spawn(*command, in: File::NULL, out: File::NULL, err: File::NULL)
+    deadline = monotonic_now + SIGN_IN_CHECK_TIMEOUT
+    loop do
+      _pid, status = Process.wait2(pid, Process::WNOHANG)
+      return status.success? if status
+      break if monotonic_now >= deadline
+
+      sleep(POLL_INTERVAL)
+    end
+    Process.kill("KILL", pid)
+    Process.wait(pid)
+    false
   rescue SystemCallError
     false
+  end
+
+  def monotonic_now
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end
 
   def rubygems_credentials?
     return true unless @env.fetch("GEM_HOST_API_KEY", "").strip.empty?
 
-    rubygems_credential_paths.any? do |path|
-      File.file?(path) && File.read(path).match?(/^:?rubygems_api_key:\s*\S/)
-    end
+    path = rubygems_credentials_path
+    return false unless File.file?(path)
+
+    credentials = YAML.safe_load_file(path, permitted_classes: [Symbol])
+    return false unless credentials.is_a?(Hash)
+
+    key = credentials[:rubygems_api_key] || credentials["rubygems_api_key"]
+    key.is_a?(String) && !key.strip.empty?
+  rescue Psych::Exception, SystemCallError
+    false
   end
 
-  def rubygems_credential_paths
+  # RubyGems reads the legacy file whenever it exists and only falls back to the XDG location.
+  def rubygems_credentials_path
     home = @env.fetch("HOME", "")
+    legacy = File.join(home, ".gem", "credentials")
+    return legacy if File.exist?(legacy)
+
     data_home = @env.fetch("XDG_DATA_HOME", "")
     data_home = File.join(home, ".local", "share") if data_home.empty?
-    [File.join(home, ".gem", "credentials"), File.join(data_home, "gem", "credentials")]
+    File.join(data_home, "gem", "credentials")
   end
 
   def print_doctor_success
     @stdout.puts "Release machine doctor: PASS"
     @stdout.puts "  local release tools: ready"
-    @stdout.puts "  publishing sign-in: npm, GitHub CLI, RubyGems ready"
+    @stdout.puts "  publishing sign-in: npm and GitHub CLI signed in, RubyGems API key present"
     @stdout.puts "  publication supervision: local process guard ready"
   end
 

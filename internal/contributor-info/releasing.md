@@ -656,7 +656,7 @@ The `rake release` task automatically:
 
 1. **Validates release prerequisites**:
    - Checks for uncommitted changes (will abort if found)
-   - Verifies NPM authentication (will run `npm login` if needed)
+   - Verifies NPM authentication; `script/release` has already stopped before this point if npm is not signed in
    - Verifies the exact pinned pnpm version, frozen installed lock state, and lifecycle-enabled builds for all npm
      release packages before registry checks or any release mutation
    - Requires a non-empty matching CHANGELOG.md section for stable targets; prereleases without one emit a warning,
@@ -820,13 +820,14 @@ Before running the release command, verify:
    changes" and "Action-required placement".
 
 2. **Local release setup**: Run `script/release --doctor`. It validates the
-   publishing tools used by the locally supervised release; no coordination
+   publishing tools used by the locally supervised release and the publishing
+   sign-ins (npm, the GitHub CLI for github.com, and a RubyGems API key); no coordination
    backend credentials are required.
 
 3. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
 
 4. **NPM authentication**: Run `npm whoami` to confirm you're logged in
-   - If not logged in, the release script will automatically run `npm login` for you
+   - If not logged in, `script/release` stops before doing anything and prints the `npm login` command to run
 
 5. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
 
@@ -904,7 +905,7 @@ If you see errors like "Access token expired" or "E404 Not Found" during NPM pub
 2. Run `npm login` to refresh your credentials
 3. Retry the release
 
-The release script now checks NPM authentication at the start and will automatically run `npm login` if needed, so this issue will be caught and handled before any changes are made.
+`script/release` and `script/release --doctor` check npm, GitHub CLI, and RubyGems sign-in before anything runs, and print the command for each missing one. A token that expires during a long release can still fail at publish time.
 
 ### NPM Release Readiness Issues
 

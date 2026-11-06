@@ -255,14 +255,14 @@ if run_release --doctor; then
 fi
 assert_contains "${output_log}" "sign in before releasing:"
 assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
-assert_contains "${output_log}" "GitHub CLI: run \`gh auth login\`"
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth login --hostname github.com\`"
 assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
 pass "doctor names every missing publishing sign-in"
 
 setup_case doctor-rubygems-env-key
 rm "${HOME}/.gem/credentials"
 GEM_HOST_API_KEY=rubygems_test_key run_release --doctor || fail "doctor rejected GEM_HOST_API_KEY"
-assert_contains "${output_log}" "publishing sign-in: npm, GitHub CLI, RubyGems ready"
+assert_contains "${output_log}" "publishing sign-in: npm and GitHub CLI signed in, RubyGems API key present"
 pass "doctor accepts a RubyGems key from GEM_HOST_API_KEY"
 
 setup_case live-missing-signin
@@ -274,6 +274,50 @@ fi
 assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
 assert_not_contains "${bundle_log}" "args:"
 pass "live release stops before publishing when npm sign-in is missing"
+
+setup_case live-missing-gh-signin
+rm "${fake_bin}/gh"
+ln -s /usr/bin/false "${fake_bin}/gh"
+if run_release; then
+  fail "live release started without GitHub CLI sign-in"
+fi
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth login --hostname github.com\`"
+assert_not_contains "${bundle_log}" "args:"
+pass "live release stops before publishing when GitHub CLI sign-in is missing"
+
+setup_case doctor-rubygems-empty-key
+printf -- '---\n:rubygems_api_key:\n:other: value\n' >"${HOME}/.gem/credentials"
+if GEM_HOST_API_KEY="   " run_release --doctor; then
+  fail "doctor accepted an empty RubyGems key and a whitespace-only GEM_HOST_API_KEY"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor rejects an empty RubyGems key"
+
+setup_case doctor-rubygems-xdg-key
+rm "${HOME}/.gem/credentials"
+rmdir "${HOME}/.gem"
+mkdir -p "${HOME}/.local/share/gem"
+printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.local/share/gem/credentials"
+run_release --doctor || fail "doctor rejected the XDG RubyGems credentials file"
+pass "doctor reads the XDG RubyGems credentials file when no legacy file exists"
+
+setup_case doctor-rubygems-legacy-file-wins
+printf -- '---\n:other: value\n' >"${HOME}/.gem/credentials"
+mkdir -p "${HOME}/.local/share/gem"
+printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.local/share/gem/credentials"
+if run_release --doctor; then
+  fail "doctor read the XDG key although RubyGems uses the legacy file"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor checks the credentials file RubyGems actually reads"
+
+setup_case reconcile-needs-only-gh-signin
+rm "${fake_bin}/npm" "${HOME}/.gem/credentials"
+ln -s /usr/bin/false "${fake_bin}/npm"
+run_release --reconcile-accelerated-rc || true
+assert_not_contains "${output_log}" "npm: run"
+assert_not_contains "${output_log}" "RubyGems: run"
+pass "accelerated RC reconciliation does not require npm or RubyGems sign-in"
 
 setup_case changelog-selected-dry-run
 run_release --dry-run || fail "argumentless dry-run failed"
