@@ -2,6 +2,7 @@
 
 require "bundler"
 require "cgi"
+require "date"
 require "digest"
 require "English"
 require "json"
@@ -2352,7 +2353,8 @@ end
 def active_shakaperf_release_gate_run?(run)
   return false unless SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(run["status"].to_s)
 
-  unless run["conclusion"].nil?
+  # gh's run JSON reports conclusion "" (not null) while a run is still going.
+  unless run["conclusion"].to_s.empty?
     abort "❌ Active ShakaPerf run has a terminal conclusion; refusing contradictory gate evidence."
   end
 
@@ -3065,7 +3067,7 @@ def valid_accelerated_shakaperf_run_state_metadata?(run)
   conclusion = run["conclusion"]
   return SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS.include?(conclusion) if status == "completed"
 
-  SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(status) && conclusion.nil?
+  SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(status) && (conclusion.nil? || conclusion == "")
 end
 
 def valid_accelerated_shakaperf_run_timestamp_metadata?(run)
@@ -9036,7 +9038,71 @@ def report_github_release_notes_preflight!(version:, changelog_notes:)
        "(#{changelog_notes.length} → #{github_notes.length} characters)"
 end
 
-def confirm_release!(version:, monorepo_root:, dry_run: false)
+def preflight_release_changelog_section!(version:, changelog_path:, changelog_notes:, dry_run:, publication_retry:)
+  return unless changelog_notes
+
+  report_github_release_notes_preflight!(version:, changelog_notes:)
+  check_release_changelog_date!(version:, changelog_path:, dry_run:, publication_retry:)
+end
+
+RELEASE_CHANGELOG_DATE_OVERRIDE_ENV = "RELEASE_CHANGELOG_DATE_OVERRIDE"
+
+def changelog_section_heading_date(changelog_path:, version:)
+  section_header = /^### \[#{Regexp.escape(version)}\]/
+  heading = File.foreach(changelog_path).find { |line| line.match?(section_header) }
+  heading&.match(/\A### \[[^\]]+\]\s*-\s*(\d{4}-\d{2}-\d{2})\s*\z/)&.[](1)
+end
+
+# `update_changelog[release]` stamps the heading with the day it runs, and the
+# 17.2.1 heading kept the previous day's date because nothing compared it with
+# the publication day. Live releases stop here, before any write. A retry of a
+# release whose tag already exists only warns: changing the heading would move
+# HEAD off the tag, which the recovery runbook forbids.
+def check_release_changelog_date!(version:, changelog_path:, dry_run:, publication_retry: false, today: Date.today)
+  heading_date = changelog_section_heading_date(changelog_path:, version:)
+  today_text = today.strftime("%Y-%m-%d")
+  return if heading_date == today_text
+
+  override = ENV.fetch(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV, "").strip
+  if heading_date && override == heading_date
+    puts "⚠️ CHANGELOG DATE OVERRIDE enabled: publishing #{version} with heading date " \
+         "#{heading_date} although today is #{today_text}."
+    return
+  end
+
+  message = release_changelog_date_mismatch_message(
+    version:, heading_date:, today_text:, override:
+  )
+  if publication_retry
+    puts "⚠️ #{message.lines.first.chomp}\nThe v#{version} tag already exists, so this retry keeps the " \
+         "tagged heading and continues. Correct the date in a later CHANGELOG.md PR if needed."
+    return
+  end
+  if dry_run
+    puts "⚠️ #{message}\nA live release would stop here."
+    return
+  end
+
+  abort "❌ #{message}\nNo tag or package has been published yet."
+end
+
+def release_changelog_date_mismatch_message(version:, heading_date:, today_text:, override:)
+  dated = heading_date ? "is dated #{heading_date}" : "has no YYYY-MM-DD date"
+  lines = [
+    "CHANGELOG.md heading `### [#{version}]` #{dated}, but today is #{today_text}.",
+    "Fix: edit the heading to `### [#{version}] - #{today_text}`, commit, and rerun `script/release`.",
+    "Rerunning `rake \"update_changelog[release]\"` does not restamp a version already in CHANGELOG.md."
+  ]
+  if heading_date
+    lines << "If #{heading_date} is intentional, rerun with #{RELEASE_CHANGELOG_DATE_OVERRIDE_ENV}=#{heading_date}."
+  end
+  unless override.empty?
+    lines << "#{RELEASE_CHANGELOG_DATE_OVERRIDE_ENV}=#{override} does not match the heading date, so it was ignored."
+  end
+  lines.join("\n")
+end
+
+def confirm_release!(version:, monorepo_root:, dry_run: false, publication_retry: false)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   has_changelog = extract_changelog_section(changelog_path:, version:)
 
@@ -9052,7 +9118,9 @@ def confirm_release!(version:, monorepo_root:, dry_run: false)
     ERROR
   end
 
-  report_github_release_notes_preflight!(version:, changelog_notes: has_changelog)
+  preflight_release_changelog_section!(
+    version:, changelog_path:, changelog_notes: has_changelog, dry_run:, publication_retry:
+  )
 
   return report_release_dry_run_changelog(version:, has_changelog:) if dry_run
 
@@ -10525,7 +10593,12 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       )
     end
 
-    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root, dry_run: is_dry_run)
+    confirm_release!(
+      version: resolved_target_gem_version,
+      monorepo_root: release_root,
+      dry_run: is_dry_run,
+      publication_retry: target_tag_at_head
+    )
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")

@@ -64,6 +64,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
   [Justin Gordon](https://github.com/justin808).
 
+- **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
+  `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in
+  `react-on-rails` and `react-on-rails-pro`, ended with `//# sourceMappingURL=` comments for maps the packages never
+  shipped. `node --enable-source-maps`, debuggers, and error trackers that followed them looked for a file that
+  isn't there. The packages' `tsc` builds no longer emit source or declaration maps, and CI now packs all four
+  packages and fails on any dangling pointer. Fixes [Issue 5307](https://github.com/shakacode/react_on_rails/issues/5307).
+  [PR 5321](https://github.com/shakacode/react_on_rails/pull/5321) by [justin808](https://github.com/justin808).
+
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
   in the new frame content. Components outside the frame stay mounted.

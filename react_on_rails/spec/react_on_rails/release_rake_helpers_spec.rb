@@ -997,7 +997,185 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#changelog_section_heading_date" do
+    it "reads the date from the selected version heading only" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        ### [17.2.1] - 2026-11-04
+        #### Fixed
+        - Fix
+
+        ### [17.2.0] - 2026-10-13
+      CHANGELOG
+
+      Dir.mktmpdir do |dir|
+        changelog_path = File.join(dir, "CHANGELOG.md")
+        File.write(changelog_path, changelog)
+
+        expect(changelog_section_heading_date(changelog_path:, version: "17.2.1")).to eq("2026-11-04")
+        expect(changelog_section_heading_date(changelog_path:, version: "17.2.0")).to eq("2026-10-13")
+      end
+    end
+
+    it "returns nil when the heading has no date" do
+      Dir.mktmpdir do |dir|
+        changelog_path = File.join(dir, "CHANGELOG.md")
+        File.write(changelog_path, "### [17.2.1]\n#### Fixed\n- Fix\n")
+
+        expect(changelog_section_heading_date(changelog_path:, version: "17.2.1")).to be_nil
+      end
+    end
+  end
+
+  describe "#check_release_changelog_date!" do
+    let(:changelog_path) { "/tmp/repo/CHANGELOG.md" }
+    let(:today) { Date.new(2026, 11, 5) }
+
+    around do |example|
+      original = ENV.fetch(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV, nil)
+      ENV.delete(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV)
+      example.run
+    ensure
+      if original.nil?
+        ENV.delete(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV)
+      else
+        ENV[RELEASE_CHANGELOG_DATE_OVERRIDE_ENV] =
+          original
+      end
+    end
+
+    def stub_heading_date(date)
+      allow(self).to receive(:changelog_section_heading_date)
+        .with(changelog_path:, version: "17.2.1")
+        .and_return(date)
+    end
+
+    it "stops a live release when the heading date is not today, naming both dates and the fix" do
+      stub_heading_date("2026-11-04")
+
+      expect do
+        check_release_changelog_date!(version: "17.2.1", changelog_path:, dry_run: false, today:)
+      end.to raise_error(SystemExit) { |error|
+        expect(error.message).to include(
+          "`### [17.2.1]` is dated 2026-11-04, but today is 2026-11-05",
+          "edit the heading to `### [17.2.1] - 2026-11-05`, commit, and rerun `script/release`",
+          "RELEASE_CHANGELOG_DATE_OVERRIDE=2026-11-04",
+          "No tag or package has been published yet."
+        )
+      }
+    end
+
+    it "stops a live release when the heading has no date" do
+      stub_heading_date(nil)
+
+      expect do
+        check_release_changelog_date!(version: "17.2.1", changelog_path:, dry_run: false, today:)
+      end.to raise_error(SystemExit, /has no YYYY-MM-DD date, but today is 2026-11-05/)
+    end
+
+    it "reports a mismatch during a dry run without failing" do
+      stub_heading_date("2026-11-04")
+
+      expect do
+        check_release_changelog_date!(version: "17.2.1", changelog_path:, dry_run: true, today:)
+      end.to output(/⚠️ CHANGELOG\.md heading .*dated 2026-11-04.*A live release would stop here\./m).to_stdout
+    end
+
+    it "passes silently when the heading date is today" do
+      stub_heading_date("2026-11-05")
+
+      expect do
+        check_release_changelog_date!(version: "17.2.1", changelog_path:, dry_run: false, today:)
+      end.not_to output.to_stdout
+    end
+
+    it "continues with a notice when the override names the heading date" do
+      stub_heading_date("2026-11-04")
+      ENV[RELEASE_CHANGELOG_DATE_OVERRIDE_ENV] = "2026-11-04"
+
+      expect do
+        check_release_changelog_date!(version: "17.2.1", changelog_path:, dry_run: false, today:)
+      end.to output(/CHANGELOG DATE OVERRIDE enabled: publishing 17\.2\.1 with heading date 2026-11-04/).to_stdout
+    end
+
+    it "warns and continues on a retry whose tag already exists, without advising a new commit" do
+      stub_heading_date("2026-11-04")
+
+      output = capture_stdout do
+        check_release_changelog_date!(
+          version: "17.2.1", changelog_path:, dry_run: false, publication_retry: true, today:
+        )
+      end
+
+      expect(output).to include("dated 2026-11-04, but today is 2026-11-05", "The v17.2.1 tag already exists")
+      expect(output).not_to include("No tag or package has been published yet", "commit, and rerun")
+    end
+
+    it "ignores an override that names a different date" do
+      stub_heading_date("2026-11-04")
+      ENV[RELEASE_CHANGELOG_DATE_OVERRIDE_ENV] = "2026-11-03"
+
+      expect do
+        check_release_changelog_date!(version: "17.2.1", changelog_path:, dry_run: false, today:)
+      end.to raise_error(SystemExit, /RELEASE_CHANGELOG_DATE_OVERRIDE=2026-11-03 does not match the heading date/)
+    end
+  end
+
   describe "#confirm_release!" do
+    around do |example|
+      original = ENV.fetch(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV, nil)
+      ENV.delete(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV)
+      example.run
+    ensure
+      if original.nil?
+        ENV.delete(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV)
+      else
+        ENV[RELEASE_CHANGELOG_DATE_OVERRIDE_ENV] =
+          original
+      end
+    end
+
+    before do
+      allow(self).to receive(:changelog_section_heading_date).and_return(Date.today.strftime("%Y-%m-%d"))
+    end
+
+    it "stops on a stale changelog date before prompting" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return("#### Fixed\n\n- Release fix")
+      allow(self).to receive(:changelog_section_heading_date).and_return("2000-01-01")
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
+      end.to raise_error(SystemExit, /is dated 2000-01-01, but today is/)
+    end
+
+    it "reports a stale changelog date during a dry run and still finishes the preview" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return("#### Fixed\n\n- Release fix")
+      allow(self).to receive(:changelog_section_heading_date).and_return("2000-01-01")
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo", dry_run: true)
+      end.to output(/is dated 2000-01-01.*A live release would stop here\./m).to_stdout
+    end
+
+    it "lets a live retry of an already tagged release reach confirmation despite a stale changelog date" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return("#### Fixed\n\n- Release fix")
+      allow(self).to receive(:changelog_section_heading_date).and_return("2000-01-01")
+      allow($stdin).to receive(:gets).and_return("y\n")
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo", publication_retry: true)
+      end.to output(/The v17\.0\.0 tag already exists.*Proceed with release\?/m).to_stdout
+    end
+
     it "refuses a stable release with no changelog content before prompting even when input would confirm" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
@@ -4420,84 +4598,87 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_shakaperf_release_gate_evidence).with(repo_slug:, run: matching_prerun)
     end
 
-    it "waits for an in-progress pre-run before reusing its evidence" do
-      candidate_sha = "feedface" * 5
-      in_progress_prerun = run.merge(
-        "displayTitle" => shakaperf_release_gate_display_title(
-          ref: "release-branch", head_sha: candidate_sha, target_version:
-        ),
-        "headSha" => candidate_sha,
-        "status" => "in_progress",
-        "conclusion" => nil,
-        "updatedAt" => "2026-07-14T12:00:30Z"
-      )
-      completed_prerun = in_progress_prerun.merge(
-        "status" => "completed",
-        "conclusion" => "success",
-        "updatedAt" => "2026-07-14T13:30:00Z"
-      )
-      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug:, ref: "release-branch")
-        .and_return([in_progress_prerun])
-      allow(self).to receive(:capture_gh_output_with_timeout)
-        .with(
-          "run", "watch", "123456", "--repo", repo_slug,
-          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+    # gh run list reports "" for a running run's conclusion; nil covers other observation paths.
+    [nil, ""].each do |in_progress_conclusion|
+      it "waits for an in-progress pre-run (conclusion #{in_progress_conclusion.inspect}) before reusing evidence" do
+        candidate_sha = "feedface" * 5
+        in_progress_prerun = run.merge(
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref: "release-branch", head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => "in_progress",
+          "conclusion" => in_progress_conclusion,
+          "updatedAt" => "2026-07-14T12:00:30Z"
         )
-        .and_return(["", success_status, false])
-      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
-        .with(repo_slug:, run: in_progress_prerun).and_return(completed_prerun)
-      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
-        .with(repo_slug:, run: in_progress_prerun)
-      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
-        .with(repo_slug:, run: completed_prerun).and_return({ "candidate_sha" => candidate_sha })
-      allow(self).to receive(:shakaperf_release_gate_evidence_rejection).with(
-        monorepo_root:,
-        ref: "release-branch",
-        head_sha:,
-        target_version:,
-        run: completed_prerun,
-        evidence: { "candidate_sha" => candidate_sha },
-        release_started_at:,
-        validation_time: kind_of(Time),
-        require_prerun: true,
-        allow_prerun_completion_after_release_start: true
-      ).and_return(nil)
-      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
-
-      validated_run = nil
-      expect do
-        validated_run = run_shakaperf_release_gate!(
+        completed_prerun = in_progress_prerun.merge(
+          "status" => "completed",
+          "conclusion" => "success",
+          "updatedAt" => "2026-07-14T13:30:00Z"
+        )
+        allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+          .with(repo_slug:, ref: "release-branch")
+          .and_return([in_progress_prerun])
+        allow(self).to receive(:capture_gh_output_with_timeout)
+          .with(
+            "run", "watch", "123456", "--repo", repo_slug,
+            timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+          )
+          .and_return(["", success_status, false])
+        allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+          .with(repo_slug:, run: in_progress_prerun).and_return(completed_prerun)
+        expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
+          .with(repo_slug:, run: in_progress_prerun)
+        allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+          .with(repo_slug:, run: completed_prerun).and_return({ "candidate_sha" => candidate_sha })
+        allow(self).to receive(:shakaperf_release_gate_evidence_rejection).with(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
           target_version:,
+          run: completed_prerun,
+          evidence: { "candidate_sha" => candidate_sha },
           release_started_at:,
-          allow_override: false,
-          dry_run: false
+          validation_time: kind_of(Time),
+          require_prerun: true,
+          allow_prerun_completion_after_release_start: true
+        ).and_return(nil)
+        expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+        validated_run = nil
+        expect do
+          validated_run = run_shakaperf_release_gate!(
+            monorepo_root:,
+            ref: "release-branch",
+            head_sha:,
+            target_version:,
+            release_started_at:,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/watching it before deciding whether to dispatch.*Reusing successful ShakaPerf pre-run/m)
+          .to_stdout
+        expect(self).to have_received(:shakaperf_release_gate_evidence_rejection).with(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version:,
+          run: completed_prerun,
+          evidence: { "candidate_sha" => candidate_sha },
+          release_started_at:,
+          validation_time: kind_of(Time),
+          require_prerun: true,
+          allow_prerun_completion_after_release_start: true
         )
-      end.to output(/watching it before deciding whether to dispatch.*Reusing successful ShakaPerf pre-run/m)
-        .to_stdout
-      expect(self).to have_received(:shakaperf_release_gate_evidence_rejection).with(
-        monorepo_root:,
-        ref: "release-branch",
-        head_sha:,
-        target_version:,
-        run: completed_prerun,
-        evidence: { "candidate_sha" => candidate_sha },
-        release_started_at:,
-        validation_time: kind_of(Time),
-        require_prerun: true,
-        allow_prerun_completion_after_release_start: true
-      )
-      expect(validated_run).to eq(completed_prerun)
-      expect(validated_run).to include(
-        "databaseId" => 123_456,
-        "attempt" => 1,
-        "headSha" => candidate_sha,
-        "status" => "completed",
-        "conclusion" => "success"
-      )
+        expect(validated_run).to eq(completed_prerun)
+        expect(validated_run).to include(
+          "databaseId" => 123_456,
+          "attempt" => 1,
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => "success"
+        )
+      end
     end
 
     it "dispatches an exact-head gate when the active pre-run attempt changes while waiting" do
@@ -5411,17 +5592,55 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
-    it "rejects every active status when its conclusion is non-nil" do
-      non_nil_conclusions = ["failure", ""]
+    it "rejects every active status when its conclusion is a terminal value" do
       aggregate_failures do
         SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.each do |status|
-          non_nil_conclusions.each do |conclusion|
+          expect do
+            active_shakaperf_release_gate_run?("status" => status, "conclusion" => "failure")
+          end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+        end
+      end
+    end
+
+    it "treats the empty conclusion gh run list reports for a running run as no conclusion" do
+      no_conclusions = [nil, ""]
+      aggregate_failures do
+        SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.each do |status|
+          no_conclusions.each do |conclusion|
+            active = nil
             expect do
-              active_shakaperf_release_gate_run?("status" => status, "conclusion" => conclusion)
-            end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+              active = active_shakaperf_release_gate_run?("status" => status, "conclusion" => conclusion)
+            end.not_to raise_error
+            expect(active).to be(true)
           end
         end
       end
+    end
+
+    it "classifies an accelerated run gh reports in progress with an empty conclusion as active" do
+      in_progress_run = {
+        "databaseId" => 910_010,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress",
+        "conclusion" => "",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/910010"
+      }
+      state = nil
+      expect do
+        state = accelerated_shakaperf_run_state!(
+          repo_slug: "shakacode/react_on_rails", run: in_progress_run, unordered: false
+        )
+      end.not_to raise_error
+      expect(state).to eq(:active)
+      expect(valid_accelerated_shakaperf_run_state_metadata?(in_progress_run.merge("conclusion" => "failure")))
+        .to be(false)
     end
 
     it "dispatches an exact-head gate and returns its URL without watching it" do
