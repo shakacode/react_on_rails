@@ -126,6 +126,8 @@ test('the gate skips only when the filter succeeded and said the gate need not r
 });
 
 const pad = (id) => String(id).padStart(2, '0');
+const currentRunId = 777;
+const currentSuiteId = 7770;
 
 // Each gate check run belongs to a workflow run triggered one minute before the job started.
 function gateRun(id, status, conclusion, overrides = {}) {
@@ -142,32 +144,60 @@ function gateRun(id, status, conclusion, overrides = {}) {
 }
 
 function workflowRunFor(checkRun) {
-  return { check_suite_id: checkRun.check_suite?.id, created_at: `2026-11-05T09:59:${pad(checkRun.id)}Z` };
+  return {
+    id: checkRun.id,
+    check_suite_id: checkRun.check_suite?.id,
+    created_at: `2026-11-05T09:59:${pad(checkRun.id)}Z`,
+  };
 }
 
-function prEvent(event, createdAt, label) {
-  return { event, created_at: createdAt, ...(label ? { label: { name: label } } : {}) };
+const currentWorkflowRun = {
+  id: currentRunId,
+  check_suite_id: currentSuiteId,
+  created_at: '2026-11-05T11:00:00Z',
+};
+// The current run's own gate, queued while it waits on the filter.
+const ownQueuedGate = gateRun(99, 'queued', null, { check_suite: { id: currentSuiteId } });
+
+function timelineItem(typename, createdAt, label) {
+  return { __typename: typename, createdAt, ...(label ? { label: { name: label } } : {}) };
 }
 
 const repo = { owner: 'shakacode', repo: 'react_on_rails' };
 
-async function decide(checkRuns, { events = [], author = 'justin808', workflowRuns } = {}) {
+async function decide(checkRuns, { timeline = [], author = 'justin808', workflowRuns, pageSize = 100 } = {}) {
   const outputs = {};
-  const requests = {};
+  const requests = { graphql: [] };
+  const runs = workflowRuns ?? [...checkRuns.map(workflowRunFor), currentWorkflowRun];
   const github = {
-    rest: {
-      checks: { listForRef: 'checks' },
-      actions: { listWorkflowRuns: 'workflowRuns' },
-      issues: { listEvents: 'events' },
-    },
+    rest: { checks: { listForRef: 'checks' }, actions: { listWorkflowRuns: 'workflowRuns' } },
     paginate: async (kind, params) => {
       assert.equal(requests[kind], undefined, `${kind} requested twice`);
       requests[kind] = params;
-      return { checks: checkRuns, workflowRuns: workflowRuns ?? checkRuns.map(workflowRunFor), events }[kind];
+      return { checks: checkRuns, workflowRuns: runs }[kind];
+    },
+    graphql: async (query, variables) => {
+      assert.match(query, /itemTypes: \[LABELED_EVENT, UNLABELED_EVENT, BASE_REF_CHANGED_EVENT\]/);
+      requests.graphql.push(variables);
+      // Like GitHub, return only items at or after `since`, a page at a time.
+      const visible = timeline.filter((item) => Date.parse(item.createdAt) >= Date.parse(variables.since));
+      const start = variables.after ? Number(variables.after) : 0;
+      const end = start + pageSize;
+      return {
+        repository: {
+          pullRequest: {
+            timelineItems: {
+              nodes: visible.slice(start, end),
+              pageInfo: { hasNextPage: end < visible.length, endCursor: String(end) },
+            },
+          },
+        },
+      };
     },
   };
   const context = {
     repo,
+    runId: currentRunId,
     payload: {
       label: { name: 'awaiting-merge-approval' },
       pull_request: { number: 42, user: { login: author }, head: { sha: 'head-sha' } },
@@ -180,108 +210,149 @@ async function decide(checkRuns, { events = [], author = 'justin808', workflowRu
     info: () => {},
   };
   await runFilterScript(github, context, core);
-  const expected = {
-    checks: { ...repo, ref: 'head-sha', check_name: 'required-pr-gate', filter: 'all', per_page: 100 },
-    workflowRuns: { ...repo, workflow_id: 'ci-required.yml', head_sha: 'head-sha', per_page: 100 },
-    events: { ...repo, issue_number: 42, per_page: 100 },
-  };
-  for (const [kind, params] of Object.entries(requests)) {
-    assert.deepEqual(params, expected[kind], `${kind} request`);
+  if (requests.checks) {
+    assert.deepEqual(requests.checks, {
+      ...repo,
+      ref: 'head-sha',
+      check_name: 'required-pr-gate',
+      filter: 'all',
+      per_page: 100,
+    });
+    assert.deepEqual(requests.workflowRuns, {
+      ...repo,
+      workflow_id: 'ci-required.yml',
+      head_sha: 'head-sha',
+      per_page: 100,
+    });
   }
-  return outputs.run_gate;
+  for (const variables of requests.graphql) {
+    assert.equal(variables.number, 42);
+    assert.equal(variables.owner, 'shakacode');
+  }
+  return { runGate: outputs.run_gate, graphql: requests.graphql };
+}
+
+async function runGate(checkRuns, options) {
+  return (await decide(checkRuns, options)).runGate;
 }
 
 test('the filter skips the gate after a passing gate on the same head', async () => {
-  assert.equal(await decide([gateRun(5, 'completed', 'success')]), 'false');
+  assert.equal(await runGate([gateRun(5, 'completed', 'success')]), 'false');
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success'), gateRun(9, 'completed', 'skipped')]),
+    await runGate([gateRun(5, 'completed', 'success'), ownQueuedGate]),
+    'false',
+    "this run's own queued gate is not an earlier result",
+  );
+  assert.equal(
+    await runGate([gateRun(5, 'completed', 'success'), gateRun(9, 'completed', 'skipped')]),
     'false',
     'an earlier skip rests on the same passing run',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')]),
+    await runGate([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')]),
     'false',
     'the newest result decides',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success')], {
-      events: [
-        prEvent('unlabeled', '2026-11-05T09:58:00Z', 'ready-for-hosted-ci'),
-        prEvent('base_ref_changed', '2026-11-05T09:58:30Z'),
-        prEvent('labeled', '2026-11-05T10:30:00Z', 'awaiting-resume'),
-        prEvent('renamed', '2026-11-05T10:31:00Z'),
+    await runGate([gateRun(5, 'completed', 'success')], {
+      timeline: [
+        timelineItem('UnlabeledEvent', '2026-11-05T09:56:00Z', 'ready-for-hosted-ci'),
+        timelineItem('BaseRefChangedEvent', '2026-11-05T09:56:30Z'),
+        timelineItem('LabeledEvent', '2026-11-05T10:30:00Z', 'awaiting-resume'),
       ],
     }),
     'false',
-    'gate-input changes before the trigger and other changes after it do not matter',
+    'gate-input changes well before the trigger and status-label changes after it do not matter',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')], {
-      events: [prEvent('base_ref_changed', '2026-11-05T09:59:06Z')],
+    await runGate([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')], {
+      timeline: [timelineItem('BaseRefChangedEvent', '2026-11-05T09:56:30Z')],
     }),
     'false',
     'the change is measured from the passing run, not an older one',
   );
 });
 
+test('the filter measures history from two minutes before the passing run was created', async () => {
+  const { graphql } = await decide([gateRun(5, 'completed', 'success')]);
+  assert.deepEqual(
+    graphql.map((variables) => variables.since),
+    ['2026-11-05T09:57:05.000Z'],
+  );
+});
+
 test('the filter reruns the gate whenever the head has no settled pass', async () => {
-  assert.equal(await decide([]), 'true', 'no earlier result');
-  assert.equal(await decide([gateRun(5, 'completed', 'failure')]), 'true', 'a failed gate');
-  assert.equal(await decide([gateRun(5, 'completed', 'cancelled')]), 'true', 'a cancelled gate');
+  assert.equal(await runGate([]), 'true', 'no earlier result');
+  assert.equal(await runGate([ownQueuedGate]), 'true', 'only this run’s own gate');
+  assert.equal(await runGate([gateRun(5, 'completed', 'failure')]), 'true', 'a failed gate');
+  assert.equal(await runGate([gateRun(5, 'completed', 'cancelled')]), 'true', 'a cancelled gate');
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success'), gateRun(7, 'completed', 'failure')]),
+    await runGate([gateRun(5, 'completed', 'success'), gateRun(7, 'completed', 'failure')]),
     'true',
     'a newer failure beats an older pass',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success'), gateRun(7, 'in_progress', null)]),
+    await runGate([gateRun(5, 'completed', 'success'), gateRun(7, 'in_progress', null)]),
     'true',
     'a gate still running',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success'), gateRun(7, 'queued', null)]),
+    await runGate([gateRun(5, 'completed', 'success'), gateRun(7, 'queued', null)]),
     'true',
-    'a gate still queued',
+    'another run’s gate still queued',
   );
   assert.equal(
-    await decide([gateRun(5, 'in_progress', null), gateRun(7, 'completed', 'success')]),
+    await runGate([gateRun(5, 'in_progress', null), gateRun(7, 'completed', 'success')]),
     'true',
     'an older gate still running behind a newer pass',
   );
-  assert.equal(await decide([gateRun(9, 'completed', 'skipped')]), 'true', 'a skip with no pass behind it');
+  assert.equal(await runGate([gateRun(9, 'completed', 'skipped')]), 'true', 'a skip with no pass behind it');
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success', { app: { slug: 'some-other-app' } })]),
+    await runGate([gateRun(5, 'completed', 'success', { app: { slug: 'some-other-app' } })]),
     'true',
     'a same-named check from another app does not count',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success')], { workflowRuns: [] }),
+    await runGate([gateRun(5, 'completed', 'success')], { workflowRuns: [currentWorkflowRun] }),
     'true',
     'a pass whose workflow run cannot be found',
   );
+  assert.equal(
+    await runGate([gateRun(5, 'completed', 'success')], { workflowRuns: [workflowRunFor(gateRun(5))] }),
+    'true',
+    'the current run cannot be found, so its own gate cannot be told apart',
+  );
 });
 
-test('the filter reruns the gate when a gate input changed after the passing gate was triggered', async () => {
+test('the filter reruns the gate when a gate input changed around or after the passing run', async () => {
   const changes = [
-    prEvent('unlabeled', '2026-11-05T09:59:05Z', 'ready-for-hosted-ci'),
-    prEvent('labeled', '2026-11-05T10:20:00Z', 'ready-for-hosted-ci'),
-    prEvent('unlabeled', '2026-11-05T10:20:00Z', 'force-full-hosted-ci'),
-    prEvent('base_ref_changed', '2026-11-05T10:20:00Z'),
-    // Between the triggering event and the job start: the run's payload still holds the old base.
-    prEvent('base_ref_changed', '2026-11-05T09:59:30Z'),
+    timelineItem('UnlabeledEvent', '2026-11-05T09:59:05Z', 'ready-for-hosted-ci'),
+    timelineItem('LabeledEvent', '2026-11-05T10:20:00Z', 'ready-for-hosted-ci'),
+    timelineItem('UnlabeledEvent', '2026-11-05T10:20:00Z', 'force-full-hosted-ci'),
+    timelineItem('BaseRefChangedEvent', '2026-11-05T10:20:00Z'),
+    // After the triggering event but before the workflow run was created.
+    timelineItem('BaseRefChangedEvent', '2026-11-05T09:58:30Z'),
   ];
   const decisions = await Promise.all(
-    changes.map((change) => decide([gateRun(5, 'completed', 'success')], { events: [change] })),
+    changes.map((change) => runGate([gateRun(5, 'completed', 'success')], { timeline: [change] })),
   );
   changes.forEach((change, index) => {
-    assert.equal(
-      decisions[index],
-      'true',
-      `${change.event} ${change.label?.name ?? ''} at ${change.created_at}`,
-    );
+    assert.equal(decisions[index], 'true', `change ${index}: ${JSON.stringify(change)}`);
   });
+  assert.equal(
+    await runGate([gateRun(5, 'completed', 'success')], {
+      pageSize: 1,
+      timeline: [
+        timelineItem('LabeledEvent', '2026-11-05T10:10:00Z', 'awaiting-resume'),
+        timelineItem('UnlabeledEvent', '2026-11-05T10:11:00Z', 'awaiting-resume'),
+        timelineItem('UnlabeledEvent', '2026-11-05T10:12:00Z', 'ready-for-hosted-ci'),
+      ],
+    }),
+    'true',
+    'a hosted-label change on a later timeline page',
+  );
 });
 
 test('the filter always reruns the gate on Dependabot pull requests', async () => {
-  assert.equal(await decide([gateRun(5, 'completed', 'success')], { author: 'dependabot[bot]' }), 'true');
+  assert.equal(await runGate([gateRun(5, 'completed', 'success')], { author: 'dependabot[bot]' }), 'true');
 });

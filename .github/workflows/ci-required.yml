@@ -65,6 +65,10 @@ jobs:
       github.event.label.name != 'force-full-hosted-ci'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+      pull-requests: read
     outputs:
       run_gate: ${{ steps.decide.outputs.run_gate }}
     steps:
@@ -74,65 +78,89 @@ jobs:
         with:
           script: |
             const hostedLabels = new Set(['ready-for-hosted-ci', 'force-full-hosted-ci']);
+            // A run's base comes from its triggering event, a little before the run exists.
+            const triggerMarginMs = 2 * 60 * 1000;
+            const { owner, repo } = context.repo;
             const pullRequest = context.payload.pull_request;
             const headSha = pullRequest.head.sha;
-            const checkRuns = await github.paginate(github.rest.checks.listForRef, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: headSha,
-              check_name: 'required-pr-gate',
-              filter: 'all',
-              per_page: 100
-            });
-            const gateRuns = checkRuns
-              .filter((run) => run.app?.slug === 'github-actions')
-              .sort((left, right) => right.id - left.id);
-            // Earlier skips rest on the run behind them, so judge the newest gate that ran.
-            const newestRan = gateRuns.find((run) => run.conclusion !== 'skipped');
-
-            // The passing run's base comes from its triggering event, so measure from
-            // when that workflow run was created, not when its gate job started.
-            async function passingRunCreatedAt() {
-              const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+            const [checkRuns, workflowRuns] = await Promise.all([
+              github.paginate(github.rest.checks.listForRef, {
+                owner,
+                repo,
+                ref: headSha,
+                check_name: 'required-pr-gate',
+                filter: 'all',
+                per_page: 100
+              }),
+              github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner,
+                repo,
                 workflow_id: 'ci-required.yml',
                 head_sha: headSha,
                 per_page: 100
-              });
-              return workflowRuns.find((run) => run.check_suite_id === newestRan.check_suite?.id)?.created_at;
-            }
+              })
+            ]);
+            // This run's own gate may already exist as a queued check; it is not an earlier result.
+            const currentSuiteId = workflowRuns.find((run) => run.id === context.runId)?.check_suite_id;
+            const gateRuns = checkRuns
+              .filter((run) => run.app?.slug === 'github-actions' && run.check_suite?.id !== currentSuiteId)
+              .sort((left, right) => right.id - left.id);
+            // Earlier skips rest on the run behind them, so judge the newest gate that ran.
+            const newestRan = gateRuns.find((run) => run.conclusion !== 'skipped');
+            const passingRunCreatedAt = workflowRuns.find(
+              (run) => newestRan && run.check_suite_id === newestRan.check_suite?.id
+            )?.created_at;
 
+            // REST issue events omit base changes, so read the GraphQL timeline.
             async function gateInputChangedSince(since) {
-              const events = await github.paginate(github.rest.issues.listEvents, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pullRequest.number,
-                per_page: 100
-              });
-              return events.some(
-                (event) =>
-                  Date.parse(event.created_at) >= Date.parse(since) &&
-                  (event.event === 'base_ref_changed' ||
-                    ((event.event === 'labeled' || event.event === 'unlabeled') &&
-                      hostedLabels.has(event.label?.name)))
-              );
+              const query = `query($owner: String!, $repo: String!, $number: Int!, $since: DateTime!, $after: String) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    timelineItems(first: 100, after: $after, since: $since,
+                      itemTypes: [LABELED_EVENT, UNLABELED_EVENT, BASE_REF_CHANGED_EVENT]) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        __typename
+                        ... on LabeledEvent { createdAt label { name } }
+                        ... on UnlabeledEvent { createdAt label { name } }
+                        ... on BaseRefChangedEvent { createdAt }
+                      }
+                    }
+                  }
+                }
+              }`;
+              let after = null;
+              do {
+                const result = await github.graphql(query, { owner, repo, number: pullRequest.number, since, after });
+                const items = result.repository.pullRequest.timelineItems;
+                const changed = items.nodes.some(
+                  (item) => item.__typename === 'BaseRefChangedEvent' || hostedLabels.has(item.label?.name)
+                );
+                if (changed) {
+                  return true;
+                }
+                after = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
+              } while (after);
+              return false;
             }
 
             let reason = '';
-            let since;
             if (pullRequest.user?.login === 'dependabot[bot]') {
               reason = 'Dependabot gates also read +ci-* comments';
+            } else if (!currentSuiteId) {
+              reason = 'this workflow run was not found, so its own gate cannot be told apart';
             } else if (gateRuns.some((run) => run.status !== 'completed')) {
-              reason = 'a gate run for this head is still in progress';
+              reason = 'an earlier gate run for this head is still in progress';
             } else if (!newestRan) {
               reason = 'no gate has run on this head';
             } else if (newestRan.conclusion !== 'success') {
               reason = `the newest gate result for this head is ${newestRan.conclusion}`;
-            } else if (!(since = await passingRunCreatedAt())) {
+            } else if (!passingRunCreatedAt) {
               reason = 'the workflow run behind the newest passing gate was not found';
-            } else if (await gateInputChangedSince(since)) {
-              reason = 'a hosted-CI label or the base branch changed after the newest passing gate was triggered';
+            } else if (
+              await gateInputChangedSince(new Date(Date.parse(passingRunCreatedAt) - triggerMarginMs).toISOString())
+            ) {
+              reason = 'a hosted-CI label or the base branch changed around or after the newest passing gate';
             }
 
             const runGate = reason !== '';
