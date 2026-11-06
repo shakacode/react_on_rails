@@ -36,6 +36,8 @@ async function labelEvent({
   failingWorkflow,
   gateRunSnapshots = [[completedGateRun]],
   rerunError,
+  headShaNow = 'abcdef1234567890',
+  gateRunStatusAfterRefusal = 'completed',
 }) {
   const calls = {
     dispatches: [],
@@ -60,6 +62,9 @@ async function labelEvent({
             gateRunSnapshots[Math.min(calls.gateRunQueries.length - 1, gateRunSnapshots.length - 1)];
           return { data: { workflow_runs: snapshot } };
         },
+        getWorkflowRun: async ({ run_id: runId }) => ({
+          data: { id: runId, status: gateRunStatusAfterRefusal },
+        }),
         reRunWorkflow: async (options) => {
           if (rerunError) throw rerunError;
           calls.reruns.push(options);
@@ -73,6 +78,9 @@ async function labelEvent({
         createComment: async ({ body }) => {
           calls.comments.push(body);
         },
+      },
+      pulls: {
+        get: async () => ({ data: { head: { sha: headShaNow } } }),
       },
       repos: {
         getCollaboratorPermissionLevel: async () => ({ data: { permission } }),
@@ -179,11 +187,15 @@ test('the newest pull_request run is rerun once it finishes', async () => {
 });
 
 test('removing the last hosted-CI label reruns the required gate', async () => {
-  const calls = await Promise.all(
-    ['ready-for-hosted-ci', 'force-full-hosted-ci'].map((label) =>
-      labelEvent({ action: 'unlabeled', label, labelsAfter: ['awaiting-resume'] }),
-    ),
-  );
+  // One at a time: each labelEvent patches and restores the global setTimeout.
+  const calls = [
+    await labelEvent({ action: 'unlabeled', label: 'ready-for-hosted-ci', labelsAfter: ['awaiting-resume'] }),
+    await labelEvent({
+      action: 'unlabeled',
+      label: 'force-full-hosted-ci',
+      labelsAfter: ['awaiting-resume'],
+    }),
+  ];
   for (const result of calls) {
     assert.deepEqual(result.reruns, rerunOf(501));
     assert.deepEqual(result.failed, []);
@@ -298,4 +310,26 @@ test('a gate run that belongs to another PR on the same head is never rerun', as
   });
   assert.deepEqual(foreign.reruns, []);
   assert.equal(foreign.failed.length, 1);
+});
+
+test('a moved PR head skips the rerun, because the new head runs its own gate', async () => {
+  const calls = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    headShaNow: 'newer-head-sha',
+  });
+  assert.deepEqual(calls.reruns, []);
+  assert.deepEqual(calls.failed, []);
+});
+
+test('a rerun refused because another workflow just reran the run still succeeds', async () => {
+  const calls = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    rerunError: Object.assign(new Error('already running'), { status: 403 }),
+    gateRunStatusAfterRefusal: 'in_progress',
+  });
+  assert.deepEqual(calls.failed, []);
 });

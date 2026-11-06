@@ -121,7 +121,21 @@ jobs:
                     return { ok: true, summary: 'No ci-required run exists for this head yet; its first run reads the current labels.' };
                   }
                   if (latest.status === 'completed') {
-                    await github.rest.actions.reRunWorkflow({ owner, repo, run_id: latest.id });
+                    // A newer head has its own run, which reads the current labels; rerunning
+                    // the old head's run would cancel it in the shared concurrency group.
+                    const { data: current } = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+                    if (current.head.sha !== pr.head.sha) {
+                      return { ok: true, summary: 'The PR head moved, so ci-required was not rerun; the run for the new head reads the current labels.' };
+                    }
+                    try {
+                      await github.rest.actions.reRunWorkflow({ owner, repo, run_id: latest.id });
+                    } catch (error) {
+                      // Another workflow may have just rerun the same run; that rerun reads the labels too.
+                      const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: latest.id });
+                      if (!['queued', 'in_progress', 'pending', 'requested', 'waiting'].includes(run?.status)) {
+                        throw error;
+                      }
+                    }
                     return { ok: true, summary: 'Reran ci-required so the required gate reads the current hosted CI labels.' };
                   }
                   await sleep(requiredGateRerunPollMs);

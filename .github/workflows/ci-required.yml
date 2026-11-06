@@ -12,15 +12,15 @@ on:
   workflow_dispatch:
     inputs:
       pull_request_base_ref:
-        description: PR base branch for hosted-label rechecks.
+        description: PR base branch for hosted-label cleanup rechecks.
         required: false
         type: string
       pull_request_base_sha:
-        description: PR base SHA for hosted-label rechecks.
+        description: PR base SHA for hosted-label cleanup rechecks.
         required: false
         type: string
       force_required_hosted_ci_recheck:
-        description: Re-run the required gate after hosted-CI labels were removed, with hosted CI treated as not requested.
+        description: Re-run the required gate after hosted-label cleanup with hosted CI treated as not requested.
         required: false
         type: boolean
         default: false

@@ -83,12 +83,14 @@ async function runCommand({
   workflowRunReadFailures = {},
   requiredGateRuns = [{ id: 501, status: 'completed', pull_requests: [{ number: 42 }] }],
   requiredGateRerunError,
+  requiredGateRunStatusAfterRefusal = 'completed',
 }) {
   const calls = {
     comments: [],
     commentUpdates: [],
     dispatches: [],
     failures: [],
+    infos: [],
     requiredGateRunQueries: [],
     requiredGateReruns: [],
     labels: [],
@@ -153,6 +155,8 @@ async function runCommand({
       return { data: { workflow_run_id: runId }, status: 200 };
     },
     getWorkflowRun: async ({ run_id: runId }) => {
+      const gateRun = requiredGateRuns.find((run) => run.id === runId);
+      if (gateRun) return { data: { ...gateRun, status: requiredGateRunStatusAfterRefusal } };
       calls.workflowRunReads.push(runId);
       const workflowFile = dispatchedRuns.get(runId)?.path?.split('/').at(-1);
       const readIndex = workflowRunReadIndexes.get(runId) || 0;
@@ -178,6 +182,7 @@ async function runCommand({
     reRunWorkflow: async (options) => {
       if (requiredGateRerunError) throw requiredGateRerunError;
       calls.requiredGateReruns.push(options);
+      calls.commentWritesBeforeRerun = calls.comments.length + calls.commentUpdates.length;
     },
     listWorkflowRunsForRepo: async () => {},
     removeLabel: async () => {},
@@ -264,6 +269,7 @@ async function runCommand({
     runId: 100,
   };
   const core = {
+    info: (message) => calls.infos.push(message),
     setFailed: (message) => calls.failures.push(message),
     warning: () => {},
   };
@@ -1613,16 +1619,18 @@ const gateRunQuery = {
 };
 const gateRerun = [{ owner: 'shakacode', repo: 'react_on_rails', run_id: 501 }];
 
-test('+ci-run-hosted reruns the required gate after adding the hosted CI label', async () => {
+test('+ci-run-hosted reruns the required gate after saving its result comment', async () => {
   const calls = await runCommand({ body: '+ci-run-hosted' });
 
   assert.ok(calls.labels.includes('ready-for-hosted-ci'));
   assert.deepEqual(calls.requiredGateRunQueries, [gateRunQuery]);
   assert.deepEqual(calls.requiredGateReruns, gateRerun);
-  assert.match(
-    calls.comments.at(-1),
-    /Reran `ci-required` so the required gate reads the current hosted CI labels/,
+  assert.equal(
+    calls.commentWritesBeforeRerun,
+    calls.comments.length + calls.commentUpdates.length,
+    'Dependabot gates read the result comment, so it must exist before the rerun',
   );
+  assert.ok(calls.infos.some((message) => /Reran `ci-required`/.test(message)));
 });
 
 test('+ci-run-hosted does not rerun the required gate when the labels were not added', async () => {
@@ -1715,4 +1723,24 @@ test('a gate run that belongs to another PR on the same head is never rerun', as
   });
   assert.deepEqual(foreign.requiredGateReruns, []);
   assert.equal(foreign.failures.length, 1);
+});
+
+test('a moved PR head skips the rerun, because the new head runs its own gate', async () => {
+  const moved = defaultPullRequest();
+  moved.head.sha = 'newer-head-sha';
+  const calls = await runCommand({ body: '+ci-stop-hosted', pullRequests: [defaultPullRequest(), moved] });
+
+  assert.deepEqual(calls.requiredGateReruns, []);
+  assert.deepEqual(calls.failures, []);
+  assert.match(calls.comments.at(-1), /The PR head moved, so `ci-required` was not rerun/);
+});
+
+test('a rerun refused because another workflow just reran the run still succeeds', async () => {
+  const raced = await runCommand({
+    body: '+ci-stop-hosted',
+    requiredGateRerunError: Object.assign(new Error('already running'), { status: 403 }),
+    requiredGateRunStatusAfterRefusal: 'queued',
+  });
+  assert.deepEqual(raced.failures, []);
+  assert.match(raced.comments.at(-1), /Reran `ci-required`/);
 });
