@@ -271,12 +271,12 @@ dispatcher, and docs together:
    `unlabeled`. The exception is `ci-required.yml`: it skips label events,
    because any running `ci-required` run blocks the PR and status labels such as
    `awaiting-merge-approval` change often. Only the hosted-CI labels can change
-   its result. `hosted-ci-label-dispatch.yml` and the `+ci-*` commands dispatch
-   `ci-required` when they change one: a plain run after a trusted hosted-CI
-   request, and a `force_required_hosted_ci_recheck` run after the last
-   hosted-CI label is removed. Never skip `required-pr-gate` with a job `if:`
-   instead. A skipped required job reports success, so it would turn a failed
-   gate green.
+   its result. When one changes, `hosted-ci-label-dispatch.yml` or the `+ci-*`
+   commands rerun the head's latest `pull_request` run of `ci-required`, which
+   re-reads the current labels. Do not dispatch `ci-required` for this: checks
+   from `workflow_dispatch` runs do not count toward a PR's required checks.
+   Never skip `required-pr-gate` with a job `if:` either. A skipped required job
+   reports success, so it would turn a failed gate green.
 3. Include `push` to `main` and release branches, `merge_group`, and
    `workflow_dispatch` when the workflow is part of merge or release confidence.
 4. Avoid workflow-level `paths` or `paths-ignore` when branch protection or

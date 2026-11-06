@@ -23,6 +23,7 @@ const runWorkflow = new AsyncFunction('github', 'context', 'core', workflowScrip
 
 const repo = { owner: 'shakacode', repo: 'react_on_rails' };
 const hostedWorkflowCount = 9;
+const completedGateRun = { id: 501, status: 'completed' };
 
 async function labelEvent({
   action,
@@ -33,8 +34,17 @@ async function labelEvent({
   fork = false,
   author = 'maintainer',
   failingWorkflow,
+  gateRunSnapshots = [[completedGateRun]],
+  rerunError,
 }) {
-  const calls = { dispatches: [], removedLabels: [], comments: [], failed: [] };
+  const calls = {
+    dispatches: [],
+    gateRunQueries: [],
+    reruns: [],
+    removedLabels: [],
+    comments: [],
+    failed: [],
+  };
   const github = {
     rest: {
       actions: {
@@ -43,6 +53,16 @@ async function labelEvent({
             throw Object.assign(new Error('dispatch refused'), { status: 500 });
           }
           calls.dispatches.push(options);
+        },
+        listWorkflowRuns: async (options) => {
+          calls.gateRunQueries.push(options);
+          const snapshot =
+            gateRunSnapshots[Math.min(calls.gateRunQueries.length - 1, gateRunSnapshots.length - 1)];
+          return { data: { workflow_runs: snapshot } };
+        },
+        reRunWorkflow: async (options) => {
+          if (rerunError) throw rerunError;
+          calls.reruns.push(options);
         },
       },
       issues: {
@@ -82,22 +102,31 @@ async function labelEvent({
     warning: () => {},
     setFailed: (message) => calls.failed.push(message),
   };
-  await runWorkflow(github, context, core);
-  calls.requiredGate = calls.dispatches.filter((dispatch) => dispatch.workflow_id === 'ci-required.yml');
-  calls.hosted = calls.dispatches.filter((dispatch) => dispatch.workflow_id !== 'ci-required.yml');
+  const originalSetTimeout = global.setTimeout;
+  global.setTimeout = (callback) => originalSetTimeout(callback, 0);
+  try {
+    await runWorkflow(github, context, core);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+  }
+  for (const query of calls.gateRunQueries) {
+    assert.deepEqual(query, {
+      ...repo,
+      workflow_id: 'ci-required.yml',
+      event: 'pull_request',
+      head_sha: 'abcdef1234567890',
+      per_page: 20,
+    });
+  }
+  assert.equal(
+    calls.dispatches.filter((dispatch) => dispatch.workflow_id === 'ci-required.yml').length,
+    0,
+    'dispatched ci-required runs do not count for a PR, so the gate is rerun instead',
+  );
   return calls;
 }
 
-const plainGate = {
-  ...repo,
-  workflow_id: 'ci-required.yml',
-  ref: 'feature',
-  inputs: { pull_request_base_ref: 'main', pull_request_base_sha: 'base-sha' },
-};
-const forcedGate = {
-  ...plainGate,
-  inputs: { ...plainGate.inputs, force_required_hosted_ci_recheck: 'true' },
-};
+const rerunOf = (runId) => [{ ...repo, run_id: runId }];
 
 function evaluate(expression, github) {
   return vm.runInNewContext(expression.replace(/^\s*\$\{\{|\}\}\s*$/g, ''), { github });
@@ -124,28 +153,40 @@ test('only hosted-CI control labels start the dispatch job', () => {
   }
 });
 
-test('adding a hosted-CI label dispatches hosted CI and then a plain required-gate run', async () => {
+test('adding a hosted-CI label dispatches hosted CI and then reruns the required gate', async () => {
   const calls = await labelEvent({
     action: 'labeled',
     label: 'ready-for-hosted-ci',
     labelsAfter: ['ready-for-hosted-ci'],
   });
-  assert.equal(calls.hosted.length, hostedWorkflowCount);
-  assert.deepEqual(calls.requiredGate, [plainGate]);
-  assert.equal(
-    calls.dispatches.at(-1).workflow_id,
-    'ci-required.yml',
-    'the gate reruns after hosted CI is dispatched',
-  );
+  assert.equal(calls.dispatches.length, hostedWorkflowCount);
+  assert.deepEqual(calls.reruns, rerunOf(501));
   assert.deepEqual(calls.failed, []);
 });
 
-test('removing the last hosted-CI label dispatches a forced required-gate recheck', async () => {
-  for (const label of ['ready-for-hosted-ci', 'force-full-hosted-ci']) {
-    // eslint-disable-next-line no-await-in-loop
-    const calls = await labelEvent({ action: 'unlabeled', label, labelsAfter: ['awaiting-resume'] });
-    assert.deepEqual(calls.dispatches, [forcedGate], label);
-    assert.deepEqual(calls.failed, [], label);
+test('the newest pull_request run is rerun once it finishes', async () => {
+  const calls = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    gateRunSnapshots: [
+      [completedGateRun, { id: 502, status: 'in_progress' }],
+      [completedGateRun, { id: 502, status: 'completed' }],
+    ],
+  });
+  assert.equal(calls.gateRunQueries.length, 2);
+  assert.deepEqual(calls.reruns, rerunOf(502));
+});
+
+test('removing the last hosted-CI label reruns the required gate', async () => {
+  const calls = await Promise.all(
+    ['ready-for-hosted-ci', 'force-full-hosted-ci'].map((label) =>
+      labelEvent({ action: 'unlabeled', label, labelsAfter: ['awaiting-resume'] }),
+    ),
+  );
+  for (const result of calls) {
+    assert.deepEqual(result.reruns, rerunOf(501));
+    assert.deepEqual(result.failed, []);
   }
 });
 
@@ -155,39 +196,61 @@ test('removing one hosted-CI label while another remains leaves the gate alone',
     label: 'force-full-hosted-ci',
     labelsAfter: ['ready-for-hosted-ci'],
   });
-  assert.deepEqual(calls.dispatches, []);
+  assert.deepEqual(calls.reruns, []);
   assert.deepEqual(calls.failed, []);
 });
 
-test('hosted-CI label removal on a fork dispatches nothing', async () => {
+test('hosted-CI label removal on a fork reruns nothing', async () => {
   const calls = await labelEvent({
     action: 'unlabeled',
     label: 'ready-for-hosted-ci',
     labelsAfter: [],
     fork: true,
   });
-  assert.deepEqual(calls.dispatches, []);
+  assert.deepEqual(calls.reruns, []);
+  assert.deepEqual(calls.gateRunQueries, []);
 });
 
-test('a failed required-gate recheck after removal fails the job', async () => {
+test('a head with no pull_request run yet needs no rerun', async () => {
   const calls = await labelEvent({
     action: 'unlabeled',
     label: 'ready-for-hosted-ci',
     labelsAfter: [],
-    failingWorkflow: 'ci-required.yml',
+    gateRunSnapshots: [[]],
   });
-  assert.equal(calls.failed.length, 1);
+  assert.deepEqual(calls.reruns, []);
+  assert.deepEqual(calls.failed, []);
 });
 
-test('untrusted, Dependabot, and failed hosted requests never send a plain gate run', async () => {
+test('a failed or timed-out rerun fails the job', async () => {
+  const refused = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    rerunError: Object.assign(new Error('forbidden'), { status: 403 }),
+  });
+  assert.equal(refused.failed.length, 1);
+
+  const stuck = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    gateRunSnapshots: [[{ id: 502, status: 'in_progress' }]],
+  });
+  assert.deepEqual(stuck.reruns, []);
+  assert.equal(stuck.failed.length, 1);
+});
+
+test('untrusted, Dependabot, and failed hosted requests rerun the gate after removing the label', async () => {
   const untrusted = await labelEvent({
     action: 'labeled',
     label: 'ready-for-hosted-ci',
     labelsAfter: ['ready-for-hosted-ci'],
     permission: 'read',
   });
-  assert.deepEqual(untrusted.dispatches, [forcedGate]);
+  assert.deepEqual(untrusted.dispatches, []);
   assert.deepEqual(untrusted.removedLabels, ['ready-for-hosted-ci']);
+  assert.deepEqual(untrusted.reruns, rerunOf(501));
 
   const dependabot = await labelEvent({
     action: 'labeled',
@@ -195,7 +258,8 @@ test('untrusted, Dependabot, and failed hosted requests never send a plain gate 
     labelsAfter: ['ready-for-hosted-ci'],
     author: 'dependabot[bot]',
   });
-  assert.deepEqual(dependabot.dispatches, [forcedGate]);
+  assert.deepEqual(dependabot.dispatches, []);
+  assert.deepEqual(dependabot.reruns, rerunOf(501));
 
   const hostedFailure = await labelEvent({
     action: 'labeled',
@@ -203,5 +267,16 @@ test('untrusted, Dependabot, and failed hosted requests never send a plain gate 
     labelsAfter: ['ready-for-hosted-ci'],
     failingWorkflow: 'gem-tests.yml',
   });
-  assert.deepEqual(hostedFailure.requiredGate, [forcedGate]);
+  assert.deepEqual(hostedFailure.reruns, rerunOf(501));
+  assert.deepEqual(hostedFailure.removedLabels, ['ready-for-hosted-ci', 'force-full-hosted-ci']);
+});
+
+test('ready-for-hosted-ci added beside force-full-hosted-ci leaves dispatch to the force-full event', async () => {
+  const calls = await labelEvent({
+    action: 'labeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: ['ready-for-hosted-ci', 'force-full-hosted-ci'],
+  });
+  assert.deepEqual(calls.dispatches, []);
+  assert.deepEqual(calls.reruns, []);
 });

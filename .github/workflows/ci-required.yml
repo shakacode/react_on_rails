@@ -2,9 +2,10 @@ name: ci-required
 
 on:
   # No labeled/unlabeled: any running ci-required run blocks the PR, and only the
-  # two hosted-CI labels can change this gate. Their changes dispatch this workflow
-  # instead (hosted-ci-label-dispatch.yml and ci-commands.yml), so status labels
-  # such as awaiting-merge-approval never rerun or block the gate.
+  # two hosted-CI labels can change this gate. When one changes,
+  # hosted-ci-label-dispatch.yml or ci-commands.yml reruns the head's latest
+  # pull_request run (dispatched runs do not count for a PR), so status labels such
+  # as awaiting-merge-approval never rerun or block the gate.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:

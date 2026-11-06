@@ -238,9 +238,9 @@ assertMatches(
   /currentLabelNames\.includes\(forceFullHostedCiLabel\)/,
 );
 assertMatches(
-  'required gate cleanup recheck',
+  'required gate rerun after hosted-label changes',
   labelDispatchWorkflow,
-  /createWorkflowDispatch\({[\s\S]*workflow_id: 'ci-required\.yml'[\s\S]*force_required_hosted_ci_recheck: 'true'/,
+  /workflow_id: 'ci-required\.yml',\s+event: 'pull_request'[\s\S]*reRunWorkflow\(\{ owner, repo, run_id: latest\.id \}\)/,
 );
 assertMatches('ci-required check-run read permission', requiredWorkflow, /checks: read/);
 assertMatches('ci-required actions-run read permission', requiredWorkflow, /actions: read/);

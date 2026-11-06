@@ -21,9 +21,9 @@ CI should give fast feedback during review without weakening merge safety:
 
 `.github/workflows/ci-required.yml` is the branch-protection-friendly gate. It
 always starts for PR updates, merge queue, and manual dispatch. Label events do
-not start it: hosted-CI label changes dispatch it from
-`hosted-ci-label-dispatch.yml` or the `+ci-*` commands, so status labels never
-rerun or block the gate.
+not start it: when a hosted-CI label changes, `hosted-ci-label-dispatch.yml` or
+the `+ci-*` commands rerun the head's latest `pull_request` run, so status labels
+never rerun or block the gate.
 
 The `required-pr-gate` job intentionally stays lightweight:
 

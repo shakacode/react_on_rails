@@ -84,35 +84,46 @@ jobs:
               return [await removeLabelIfPresent(labelName)];
             }
 
-            // A plain dispatch passes the gate's hosted-CI check, so send it only after a
-            // trusted hosted-CI request; a forced recheck treats hosted CI as not requested.
-            async function dispatchRequiredGate({ forceRecheck }) {
+            const requiredGateRerunAttempts = 40;
+            const requiredGateRerunPollMs = 15000;
+
+            function sleep(ms) {
+              return new Promise((resolve) => setTimeout(resolve, ms));
+            }
+
+            // Only checks from pull_request-event runs count for a PR, and ci-required skips label
+            // events, so rerun the head's latest pull_request run of ci-required after a hosted-CI
+            // label change. The rerun re-reads the live labels for the commit it already checked.
+            async function rerunRequiredGate() {
               if (headRepoFullName !== repoFullName) {
-                core.info('Skipping ci-required dispatch because fork PR heads cannot be workflow-dispatched.');
-                return { dispatched: false, skipped: true };
+                return { ok: true, summary: 'Skipped the ci-required rerun on a fork PR; its gate never reads hosted CI labels.' };
               }
 
               try {
-                await github.rest.actions.createWorkflowDispatch({
-                  owner,
-                  repo,
-                  workflow_id: 'ci-required.yml',
-                  ref: pr.head.ref,
-                  inputs: {
-                    pull_request_base_ref: pr.base.ref,
-                    pull_request_base_sha: pr.base.sha,
-                    ...(forceRecheck ? { force_required_hosted_ci_recheck: 'true' } : {})
+                for (let attempt = 1; attempt <= requiredGateRerunAttempts; attempt += 1) {
+                  const { data } = await github.rest.actions.listWorkflowRuns({
+                    owner,
+                    repo,
+                    workflow_id: 'ci-required.yml',
+                    event: 'pull_request',
+                    head_sha: pr.head.sha,
+                    per_page: 20
+                  });
+                  const latest = [...data.workflow_runs].sort((left, right) => right.id - left.id)[0];
+                  if (!latest) {
+                    return { ok: true, summary: 'No ci-required run exists for this head yet; its first run reads the current labels.' };
                   }
-                });
-                return { dispatched: true };
+                  if (latest.status === 'completed') {
+                    await github.rest.actions.reRunWorkflow({ owner, repo, run_id: latest.id });
+                    return { ok: true, summary: 'Reran ci-required so the required gate reads the current hosted CI labels.' };
+                  }
+                  await sleep(requiredGateRerunPollMs);
+                }
+                throw new Error('the current ci-required run did not finish in time');
               } catch (error) {
-                core.warning(`Unable to dispatch ci-required: ${error.message || error}`);
-                return { dispatched: false, error };
+                core.warning(`Unable to rerun ci-required: ${error.message || error}`);
+                return { ok: false, summary: 'Failed to rerun ci-required; push a commit or rerun its latest pull_request run.' };
               }
-            }
-
-            function dispatchRequiredGateRecheck() {
-              return dispatchRequiredGate({ forceRecheck: true });
             }
 
             function cleanupSummary(cleanupResults) {
@@ -123,18 +134,6 @@ jobs:
               return removedControlLabels.length > 0
                 ? ` Removed hosted CI control label(s): ${removedControlLabels.join(', ')}.`
                 : '';
-            }
-
-            function requiredGateRecheckSummary(requiredGateRecheck) {
-              if (requiredGateRecheck.dispatched) {
-                return ' Dispatched ci-required to re-evaluate after label cleanup.';
-              }
-
-              if (requiredGateRecheck.skipped) {
-                return ' Skipped ci-required workflow_dispatch recheck because the PR head is outside this repository.';
-              }
-
-              return ' Failed to dispatch ci-required after label cleanup.';
             }
 
             async function hasWriteAccessFor(username) {
@@ -181,23 +180,23 @@ jobs:
                 return;
               }
 
-              const requiredGateRecheck = await dispatchRequiredGateRecheck();
-              if (!requiredGateRecheck.dispatched) {
-                core.setFailed(`Removed ${labelName}, but the ci-required recheck could not be dispatched.`);
+              const requiredGateRerun = await rerunRequiredGate();
+              if (!requiredGateRerun.ok) {
+                core.setFailed(`Removed ${labelName}, but ${requiredGateRerun.summary}`);
                 return;
               }
-              core.info(`Removed ${labelName}; dispatched ci-required with hosted CI treated as not requested.`);
+              core.info(`Removed ${labelName}. ${requiredGateRerun.summary}`);
               return;
             }
 
             if (!headRepoFullName || headRepoFullName !== repoFullName) {
               const cleanupResults = await removeTriggeredControlLabel();
-              const requiredGateRecheck = await dispatchRequiredGateRecheck();
+              const requiredGateRerun = await rerunRequiredGate();
               core.setFailed(
                 'Unable to dispatch hosted CI from this label event because the PR branch is not in this repository. ' +
                   'A maintainer should push the branch to this repository or trigger the required workflows manually.' +
                   cleanupSummary(cleanupResults) +
-                  requiredGateRecheckSummary(requiredGateRecheck)
+                  ` ${requiredGateRerun.summary}`
               );
               return;
             }
@@ -223,12 +222,12 @@ jobs:
 
             if (!(await hasWriteAccessFor(context.actor))) {
               const cleanupResults = await removeTriggeredControlLabel();
-              const requiredGateRecheck = await dispatchRequiredGateRecheck();
+              const requiredGateRerun = await rerunRequiredGate();
               core.setFailed(
                 `Unable to dispatch hosted CI from this label event because ${context.actor} does not have write/admin repository permission. ` +
                   'Use `+ci-run-hosted` or ask a write/admin maintainer to add the hosted CI label.' +
                   cleanupSummary(cleanupResults) +
-                  requiredGateRecheckSummary(requiredGateRecheck)
+                  ` ${requiredGateRerun.summary}`
               );
               return;
             }
@@ -236,7 +235,7 @@ jobs:
             const isDependabotPr = pr.user?.login === 'dependabot[bot]';
             if (isDependabotPr) {
               const cleanupResults = await removeTriggeredControlLabel();
-              const requiredGateRecheck = await dispatchRequiredGateRecheck();
+              const requiredGateRerun = await rerunRequiredGate();
               await github.rest.issues.createComment({
                 owner,
                 repo,
@@ -250,7 +249,7 @@ jobs:
                   'Dependabot PRs require the `+ci-run-hosted` command path so the required gate can verify trusted current-head dispatch proof before honoring hosted-CI labels.',
                   'A write/admin maintainer should comment `+ci-run-hosted` or `+ci-force-full` instead.',
                   cleanupSummary(cleanupResults).trim(),
-                  requiredGateRecheckSummary(requiredGateRecheck).trim()
+                  requiredGateRerun.summary
                 ].join('\n')
               });
               core.setFailed('Dependabot hosted CI label dispatch requires the +ci-run-hosted command path.');
@@ -346,7 +345,7 @@ jobs:
 
             if (failed.length > 0) {
               const cleanupResults = await removeHostedCiControlLabels();
-              const requiredGateRecheck = await dispatchRequiredGateRecheck();
+              const requiredGateRerun = await rerunRequiredGate();
               const removedControlLabels = cleanupResults
                 .filter((result) => result.removed)
                 .map((result) => result.name);
@@ -354,9 +353,7 @@ jobs:
               const cleanupMessage = removedControlLabels.length > 0
                 ? [
                     `Removed hosted CI control label(s): ${removedControlLabels.map((name) => `\`${name}\``).join(', ')}`,
-                    requiredGateRecheck.dispatched ?
-                      'Dispatched ci-required to re-evaluate without the failed hosted-CI request.' :
-                      'Unable to dispatch ci-required after removing the failed hosted-CI request.'
+                    requiredGateRerun.summary
                   ]
                 : ['No hosted CI control labels were removed.'];
 
@@ -384,7 +381,7 @@ jobs:
               core.setFailed(
                 `Failed to dispatch: ${failed.map((failure) => failure.workflow).join(', ')}` +
                   (cleanupFailures.length > 0 ? '; hosted CI label cleanup also failed' : '') +
-                  (requiredGateRecheck.error ? '; ci-required recheck dispatch also failed' : '')
+                  (requiredGateRerun.ok ? '' : '; the ci-required rerun also failed')
               );
             } else {
               const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;
@@ -397,10 +394,8 @@ jobs:
                 `Dispatched ${workflows.length} hosted CI workflow(s) for ${pr.head.sha.slice(0, 12)}.`
               );
 
-              const requiredGate = await dispatchRequiredGate({ forceRecheck: false });
-              if (!requiredGate.dispatched) {
-                core.setFailed(
-                  'Hosted CI was dispatched, but ci-required could not be rerun; it will pass on the next push.'
-                );
+              const requiredGateRerun = await rerunRequiredGate();
+              if (!requiredGateRerun.ok) {
+                core.setFailed(`Hosted CI was dispatched, but ${requiredGateRerun.summary}`);
               }
             }
