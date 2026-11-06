@@ -1099,6 +1099,19 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/CHANGELOG DATE OVERRIDE enabled: publishing 17\.2\.1 with heading date 2026-11-04/).to_stdout
     end
 
+    it "warns and continues on a retry whose tag already exists, without advising a new commit" do
+      stub_heading_date("2026-11-04")
+
+      output = capture_stdout do
+        check_release_changelog_date!(
+          version: "17.2.1", changelog_path:, dry_run: false, publication_retry: true, today:
+        )
+      end
+
+      expect(output).to include("dated 2026-11-04, but today is 2026-11-05", "The v17.2.1 tag already exists")
+      expect(output).not_to include("No publication has started", "commit, and rerun")
+    end
+
     it "ignores an override that names a different date" do
       stub_heading_date("2026-11-04")
       ENV[RELEASE_CHANGELOG_DATE_OVERRIDE_ENV] = "2026-11-03"

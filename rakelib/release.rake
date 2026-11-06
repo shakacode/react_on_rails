@@ -9037,11 +9037,11 @@ def report_github_release_notes_preflight!(version:, changelog_notes:)
        "(#{changelog_notes.length} → #{github_notes.length} characters)"
 end
 
-def preflight_release_changelog_section!(version:, changelog_path:, changelog_notes:, dry_run:)
+def preflight_release_changelog_section!(version:, changelog_path:, changelog_notes:, dry_run:, publication_retry:)
   return unless changelog_notes
 
   report_github_release_notes_preflight!(version:, changelog_notes:)
-  check_release_changelog_date!(version:, changelog_path:, dry_run:)
+  check_release_changelog_date!(version:, changelog_path:, dry_run:, publication_retry:)
 end
 
 RELEASE_CHANGELOG_DATE_OVERRIDE_ENV = "RELEASE_CHANGELOG_DATE_OVERRIDE"
@@ -9054,8 +9054,10 @@ end
 
 # `update_changelog[release]` stamps the heading with the day it runs, and the
 # 17.2.1 heading kept the previous day's date because nothing compared it with
-# the publication day. Live releases stop here, before any write.
-def check_release_changelog_date!(version:, changelog_path:, dry_run:, today: Date.today)
+# the publication day. Live releases stop here, before any write. A retry of a
+# release whose tag already exists only warns: changing the heading would move
+# HEAD off the tag, which the recovery runbook forbids.
+def check_release_changelog_date!(version:, changelog_path:, dry_run:, publication_retry: false, today: Date.today)
   heading_date = changelog_section_heading_date(changelog_path:, version:)
   today_text = today.strftime("%Y-%m-%d")
   return if heading_date == today_text
@@ -9070,6 +9072,11 @@ def check_release_changelog_date!(version:, changelog_path:, dry_run:, today: Da
   message = release_changelog_date_mismatch_message(
     version:, heading_date:, today_text:, override:
   )
+  if publication_retry
+    puts "⚠️ #{message.lines.first.chomp}\nThe v#{version} tag already exists, so this retry keeps the " \
+         "tagged heading and continues. Correct the date in a later CHANGELOG.md PR if needed."
+    return
+  end
   if dry_run
     puts "⚠️ #{message}\nA live release would stop here."
     return
@@ -9094,7 +9101,7 @@ def release_changelog_date_mismatch_message(version:, heading_date:, today_text:
   lines.join("\n")
 end
 
-def confirm_release!(version:, monorepo_root:, dry_run: false)
+def confirm_release!(version:, monorepo_root:, dry_run: false, publication_retry: false)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   has_changelog = extract_changelog_section(changelog_path:, version:)
 
@@ -9110,7 +9117,9 @@ def confirm_release!(version:, monorepo_root:, dry_run: false)
     ERROR
   end
 
-  preflight_release_changelog_section!(version:, changelog_path:, changelog_notes: has_changelog, dry_run:)
+  preflight_release_changelog_section!(
+    version:, changelog_path:, changelog_notes: has_changelog, dry_run:, publication_retry:
+  )
 
   return report_release_dry_run_changelog(version:, has_changelog:) if dry_run
 
@@ -10583,7 +10592,12 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       )
     end
 
-    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root, dry_run: is_dry_run)
+    confirm_release!(
+      version: resolved_target_gem_version,
+      monorepo_root: release_root,
+      dry_run: is_dry_run,
+      publication_retry: target_tag_at_head
+    )
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")
