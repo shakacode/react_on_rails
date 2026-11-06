@@ -125,39 +125,49 @@ test('the gate skips only when the filter succeeded and said the gate need not r
   );
 });
 
+const pad = (id) => String(id).padStart(2, '0');
+
+// Each gate check run belongs to a workflow run triggered one minute before the job started.
 function gateRun(id, status, conclusion, overrides = {}) {
   return {
     id,
     name: 'required-pr-gate',
     status,
     conclusion,
-    started_at: `2026-11-05T10:00:${String(id).padStart(2, '0')}Z`,
+    started_at: `2026-11-05T10:00:${pad(id)}Z`,
+    check_suite: { id: 1000 + id },
     app: { slug: 'github-actions' },
     ...overrides,
   };
 }
 
-function labelHistory(event, label, createdAt) {
-  return { event, label: { name: label }, created_at: createdAt };
+function workflowRunFor(checkRun) {
+  return { check_suite_id: checkRun.check_suite?.id, created_at: `2026-11-05T09:59:${pad(checkRun.id)}Z` };
 }
 
-async function decide(checkRuns, { events = [], author = 'justin808' } = {}) {
+function prEvent(event, createdAt, label) {
+  return { event, created_at: createdAt, ...(label ? { label: { name: label } } : {}) };
+}
+
+const repo = { owner: 'shakacode', repo: 'react_on_rails' };
+
+async function decide(checkRuns, { events = [], author = 'justin808', workflowRuns } = {}) {
   const outputs = {};
-  const requests = [];
+  const requests = {};
   const github = {
-    rest: { checks: { listForRef: Symbol('listForRef') }, issues: { listEvents: Symbol('listEvents') } },
-    paginate: async (method, params) => {
-      if (method === github.rest.checks.listForRef) {
-        requests.push(['checks', params]);
-        return checkRuns;
-      }
-      assert.equal(method, github.rest.issues.listEvents);
-      requests.push(['events', params]);
-      return events;
+    rest: {
+      checks: { listForRef: 'checks' },
+      actions: { listWorkflowRuns: 'workflowRuns' },
+      issues: { listEvents: 'events' },
+    },
+    paginate: async (kind, params) => {
+      assert.equal(requests[kind], undefined, `${kind} requested twice`);
+      requests[kind] = params;
+      return { checks: checkRuns, workflowRuns: workflowRuns ?? checkRuns.map(workflowRunFor), events }[kind];
     },
   };
   const context = {
-    repo: { owner: 'shakacode', repo: 'react_on_rails' },
+    repo,
     payload: {
       label: { name: 'awaiting-merge-approval' },
       pull_request: { number: 42, user: { login: author }, head: { sha: 'head-sha' } },
@@ -170,22 +180,13 @@ async function decide(checkRuns, { events = [], author = 'justin808' } = {}) {
     info: () => {},
   };
   await runFilterScript(github, context, core);
-  if (requests.length > 0) {
-    assert.deepEqual(requests[0], [
-      'checks',
-      {
-        owner: 'shakacode',
-        repo: 'react_on_rails',
-        ref: 'head-sha',
-        check_name: 'required-pr-gate',
-        filter: 'all',
-        per_page: 100,
-      },
-    ]);
-  }
-  for (const [kind, params] of requests.slice(1)) {
-    assert.equal(kind, 'events');
-    assert.deepEqual(params, { owner: 'shakacode', repo: 'react_on_rails', issue_number: 42, per_page: 100 });
+  const expected = {
+    checks: { ...repo, ref: 'head-sha', check_name: 'required-pr-gate', filter: 'all', per_page: 100 },
+    workflowRuns: { ...repo, workflow_id: 'ci-required.yml', head_sha: 'head-sha', per_page: 100 },
+    events: { ...repo, issue_number: 42, per_page: 100 },
+  };
+  for (const [kind, params] of Object.entries(requests)) {
+    assert.deepEqual(params, expected[kind], `${kind} request`);
   }
   return outputs.run_gate;
 }
@@ -205,12 +206,21 @@ test('the filter skips the gate after a passing gate on the same head', async ()
   assert.equal(
     await decide([gateRun(5, 'completed', 'success')], {
       events: [
-        labelHistory('unlabeled', 'ready-for-hosted-ci', '2026-11-05T09:59:00Z'),
-        labelHistory('labeled', 'awaiting-resume', '2026-11-05T10:30:00Z'),
+        prEvent('unlabeled', '2026-11-05T09:58:00Z', 'ready-for-hosted-ci'),
+        prEvent('base_ref_changed', '2026-11-05T09:58:30Z'),
+        prEvent('labeled', '2026-11-05T10:30:00Z', 'awaiting-resume'),
+        prEvent('renamed', '2026-11-05T10:31:00Z'),
       ],
     }),
     'false',
-    'hosted-label changes before the pass and status-label changes after it do not matter',
+    'gate-input changes before the trigger and other changes after it do not matter',
+  );
+  assert.equal(
+    await decide([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')], {
+      events: [prEvent('base_ref_changed', '2026-11-05T09:59:06Z')],
+    }),
+    'false',
+    'the change is measured from the passing run, not an older one',
   );
 });
 
@@ -245,27 +255,30 @@ test('the filter reruns the gate whenever the head has no settled pass', async (
     'a same-named check from another app does not count',
   );
   assert.equal(
-    await decide([gateRun(5, 'completed', 'success', { started_at: null })]),
+    await decide([gateRun(5, 'completed', 'success')], { workflowRuns: [] }),
     'true',
-    'a pass with no start time cannot be compared with label history',
+    'a pass whose workflow run cannot be found',
   );
 });
 
-test('the filter reruns the gate when a hosted-CI label changed after the pass started', async () => {
+test('the filter reruns the gate when a gate input changed after the passing gate was triggered', async () => {
   const changes = [
-    ['unlabeled', 'ready-for-hosted-ci'],
-    ['labeled', 'ready-for-hosted-ci'],
-    ['unlabeled', 'force-full-hosted-ci'],
+    prEvent('unlabeled', '2026-11-05T09:59:05Z', 'ready-for-hosted-ci'),
+    prEvent('labeled', '2026-11-05T10:20:00Z', 'ready-for-hosted-ci'),
+    prEvent('unlabeled', '2026-11-05T10:20:00Z', 'force-full-hosted-ci'),
+    prEvent('base_ref_changed', '2026-11-05T10:20:00Z'),
+    // Between the triggering event and the job start: the run's payload still holds the old base.
+    prEvent('base_ref_changed', '2026-11-05T09:59:30Z'),
   ];
   const decisions = await Promise.all(
-    changes.map(([event, label]) =>
-      decide([gateRun(5, 'completed', 'success')], {
-        events: [labelHistory(event, label, '2026-11-05T10:00:05Z')],
-      }),
-    ),
+    changes.map((change) => decide([gateRun(5, 'completed', 'success')], { events: [change] })),
   );
-  changes.forEach(([event, label], index) => {
-    assert.equal(decisions[index], 'true', `${event} ${label} at the moment the gate started`);
+  changes.forEach((change, index) => {
+    assert.equal(
+      decisions[index],
+      'true',
+      `${change.event} ${change.label?.name ?? ''} at ${change.created_at}`,
+    );
   });
 });
 

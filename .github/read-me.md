@@ -271,11 +271,13 @@ dispatcher, and docs together:
    `unlabeled`. In `ci-required.yml`, the gate reads only the two hosted-CI
    labels. For any other label, the `label-event-filter` job skips
    `required-pr-gate` when three things hold: the newest gate that ran on that
-   head passed, no gate run is still in flight, and no hosted-CI label changed
-   since that gate started. That last check matters because the workflow token
-   can change those labels without firing an event. Never skip the gate on the
-   label name alone. A skipped required job reports success, so a plain `if:`
-   would turn a failed gate green.
+   head passed, no gate run is still in flight, and neither a hosted-CI label
+   nor the base branch changed since that gate was triggered. That last check
+   matters because neither change has to rerun the gate: the workflow token
+   edits labels without firing an event, and a retarget is an `edited` event.
+   Dependabot PRs always run the gate. Never skip the gate on the label name
+   alone. A skipped required job reports success, so a plain `if:` would turn a
+   failed gate green.
 3. Include `push` to `main` and release branches, `merge_group`, and
    `workflow_dispatch` when the workflow is part of merge or release confidence.
 4. Avoid workflow-level `paths` or `paths-ignore` when branch protection or

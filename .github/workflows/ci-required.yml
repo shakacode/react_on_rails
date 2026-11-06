@@ -47,14 +47,15 @@ concurrency:
     }}
 
 jobs:
-  # The gate reads only the two hosted-CI labels, but status labels
-  # (awaiting-merge-approval, awaiting-resume, hold, ...) change often. A skipped
-  # required job reports success and the newest check run of a name wins, so the
-  # gate may skip only when the newest gate that ran on this head passed, no gate
-  # run on it is in flight, and no hosted-CI label changed since that gate started
-  # (the workflow token changes them without firing an event). Dependabot PRs
-  # always run: their gate also reads +ci-* comments. Otherwise, or when this job
-  # fails, the full gate runs.
+  # Of the PR's labels, the gate reads only the two hosted-CI labels, but status
+  # labels (awaiting-merge-approval, awaiting-resume, hold, ...) change often. A
+  # skipped required job reports success and the newest check run of a name wins,
+  # so the gate may skip only when the newest gate that ran on this head passed,
+  # no gate run on it is in flight, and neither a hosted-CI label nor the base
+  # branch changed since that gate was triggered. Neither change needs to fire a
+  # gate event: the workflow token edits labels silently, and a retarget is an
+  # `edited` event. Dependabot PRs always run: their gate also reads +ci-*
+  # comments. Otherwise, or when this job fails, the full gate runs.
   label-event-filter:
     name: label-event-filter
     if: >-
@@ -89,7 +90,20 @@ jobs:
             // Earlier skips rest on the run behind them, so judge the newest gate that ran.
             const newestRan = gateRuns.find((run) => run.conclusion !== 'skipped');
 
-            async function hostedLabelChangedSince(startedAt) {
+            // The passing run's base comes from its triggering event, so measure from
+            // when that workflow run was created, not when its gate job started.
+            async function passingRunCreatedAt() {
+              const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci-required.yml',
+                head_sha: headSha,
+                per_page: 100
+              });
+              return workflowRuns.find((run) => run.check_suite_id === newestRan.check_suite?.id)?.created_at;
+            }
+
+            async function gateInputChangedSince(since) {
               const events = await github.paginate(github.rest.issues.listEvents, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -98,13 +112,15 @@ jobs:
               });
               return events.some(
                 (event) =>
-                  (event.event === 'labeled' || event.event === 'unlabeled') &&
-                  hostedLabels.has(event.label?.name) &&
-                  Date.parse(event.created_at) >= Date.parse(startedAt)
+                  Date.parse(event.created_at) >= Date.parse(since) &&
+                  (event.event === 'base_ref_changed' ||
+                    ((event.event === 'labeled' || event.event === 'unlabeled') &&
+                      hostedLabels.has(event.label?.name)))
               );
             }
 
             let reason = '';
+            let since;
             if (pullRequest.user?.login === 'dependabot[bot]') {
               reason = 'Dependabot gates also read +ci-* comments';
             } else if (gateRuns.some((run) => run.status !== 'completed')) {
@@ -113,8 +129,10 @@ jobs:
               reason = 'no gate has run on this head';
             } else if (newestRan.conclusion !== 'success') {
               reason = `the newest gate result for this head is ${newestRan.conclusion}`;
-            } else if (!newestRan.started_at || (await hostedLabelChangedSince(newestRan.started_at))) {
-              reason = 'a hosted-CI label changed after the newest passing gate started';
+            } else if (!(since = await passingRunCreatedAt())) {
+              reason = 'the workflow run behind the newest passing gate was not found';
+            } else if (await gateInputChangedSince(since)) {
+              reason = 'a hosted-CI label or the base branch changed after the newest passing gate was triggered';
             }
 
             const runGate = reason !== '';
@@ -122,8 +140,8 @@ jobs:
             core.info(
               runGate
                 ? `Running the required gate: ${reason}.`
-                : `Skipping the required gate: label ${context.payload.label?.name} is not read by the gate, ` +
-                    `and gate check run ${newestRan.id} already passed on ${headSha} with the current hosted-CI labels.`
+                : `Skipping the required gate: label ${context.payload.label?.name} is not read by the gate, and gate check run ` +
+                    `${newestRan.id} already passed on ${headSha} with the current hosted-CI labels and base branch.`
             );
 
   required-pr-gate:
