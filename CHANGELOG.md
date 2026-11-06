@@ -53,6 +53,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **TanStack Router SSR now passes `dehydrate` output to `hydrate`**: `react-on-rails-pro/tanstack-router`
+  now calls the router's `dehydrate` option once on the server after `router.load()`, and passes its result to the
+  `hydrate` option on the client. Previously the helper probed a `router.dehydrate()` method that TanStack Router
+  does not have, so `hydrate` always received `undefined` and a TanStack Query cache or other external state never
+  reached the client. The value travels as JSON, so `Date`, `Error`, and `Map` values lose their types. The helper
+  no longer calls custom `router.dehydrate()` or `router.hydrate()` methods.
+  Fixes [Issue 5126](https://github.com/shakacode/react_on_rails/issues/5126).
+  [PR 5312](https://github.com/shakacode/react_on_rails/pull/5312) by [justin808](https://github.com/justin808).
 - **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
   `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in
   `react-on-rails` and `react-on-rails-pro`, ended with `//# sourceMappingURL=` comments for maps the packages never
