@@ -1,8 +1,13 @@
 name: ci-required
 
 on:
+  # No labeled/unlabeled: any running ci-required run blocks the PR, and only the
+  # two hosted-CI labels can change this gate. When one changes,
+  # hosted-ci-label-dispatch.yml or ci-commands.yml reruns the head's latest
+  # pull_request run (dispatched runs do not count for a PR), so status labels such
+  # as awaiting-merge-approval never rerun or block the gate.
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
     inputs:
@@ -26,25 +31,11 @@ permissions:
   contents: read
   issues: read
 
+# One group per PR head: a gate rerun for an older head must never cancel the newest
+# head's run, so a push leaves the superseded head's run to finish.
 concurrency:
-  group: >-
-    ${{
-      github.event_name == 'pull_request' &&
-      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-      github.event.label.name != 'ready-for-hosted-ci' &&
-      github.event.label.name != 'force-full-hosted-ci' &&
-      format('ci-required-ignored-label-{0}', github.run_id) ||
-      format('ci-required-{0}', github.event.pull_request.number || github.ref)
-    }}
-  cancel-in-progress: >-
-    ${{
-      github.event_name != 'pull_request' ||
-      (
-        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-        github.event.label.name == 'ready-for-hosted-ci' ||
-        github.event.label.name == 'force-full-hosted-ci'
-      )
-    }}
+  group: ${{ format('ci-required-{0}-{1}', github.event.pull_request.number || github.ref, github.event.pull_request.head.sha || github.sha) }}
+  cancel-in-progress: true
 
 jobs:
   required-pr-gate:
@@ -106,6 +97,7 @@ jobs:
           bash script/lint-mirrored-blocks-test.bash
           ruby script/ci_required_merge_group_gate_test.rb
           node --test .github/workflows/ci-commands.test.cjs
+          node --test .github/workflows/hosted-ci-label-dispatch.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
           ruby .agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs-test.rb
