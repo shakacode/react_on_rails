@@ -249,5 +249,16 @@ jobs:
         run: pnpm run attw packages/react-on-rails/react-on-rails-*.tgz --profile esm-only --exclude-entrypoints reactApis ReactDOMServer
       - name: Lint package publishing
         run: pnpm run publint --strict packages/react-on-rails/react-on-rails-*.tgz
+      - name: Check packed packages for dangling source-map pointers
+        # A `//# sourceMappingURL=` comment pointing at a .map file the tarball doesn't ship breaks
+        # bundlers, `node --enable-source-maps`, and error trackers (#5079, #5307).
+        # create-react-on-rails-app has no prepare script, so install doesn't build its lib/.
+        run: |
+          bash script/check-packed-source-maps-test.bash
+          pnpm --filter create-react-on-rails-app run build
+          for package in react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app; do
+            (cd "packages/$package" && pnpm pack --pack-destination "$RUNNER_TEMP/packed")
+          done
+          node script/check-packed-source-maps.mjs packages/react-on-rails/react-on-rails-*.tgz "$RUNNER_TEMP"/packed/*.tgz
       # We only download and run Actionlint if there is any difference in GitHub Action workflows
       # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
