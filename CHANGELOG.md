@@ -31,8 +31,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   dependencies that declare Node 20 or later, and the renderer already exited at startup on Node 18.
   The documented Node 18 workaround, overriding `fastify` to `^4.29.0`, is no longer supported
   because Fastify 4 is affected by
-  [GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7); remove such overrides
-  and upgrade Node.js. On Node.js 20 with npm `engine-strict`, a fresh install can still reject
+  [GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7).
+  **Action required for upgraders:** run the Node renderer on Node.js 20.19 or later, and remove any
+  `fastify`, `@fastify/formbody`, or `@fastify/multipart` overrides or resolutions that pin Fastify 4. On Node.js 20 with npm `engine-strict`, a fresh install can still reject
   `cookie` 2.x, which needs Node.js 22; the Node renderer docs show an override. A new weekly CI
   check fails when a fresh install resolves a package that rejects the advertised floor.
   [PR 5317](https://github.com/shakacode/react_on_rails/pull/5317) by

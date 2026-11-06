@@ -223,7 +223,7 @@ These mistakes account for the majority of setup failures:
 - Stable `react-on-rails-rsc` 19.3.x starting at 19.3.1 with React 19.3.x (what the 17.2 generator installs), 19.3.0 with React 19.2.x at 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.x at 19.2.7 or newer
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
-- Node.js 20+
+- Node.js 20.19+ (the Node renderer's `engines.node` floor)
 - Understanding of the [server vs client component mental model](https://react.dev/reference/rsc/server-components)
 
 ## Related Guides

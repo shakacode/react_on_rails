@@ -139,6 +139,23 @@ describe('command line', () => {
     assert.match(result.stderr, /cookie@9\.0\.0 .* needs node >=24/);
   });
 
+  it('accepts the Node 20 packages a fresh install resolves at the advertised floor', () => {
+    // find-my-way, thread-stream and toad-cache declare >=20. They pass only while the renderer's
+    // engines.node floor is Node 20 or later, so lowering it back to 18.19 fails this test.
+    const file = path.join(dir, 'lock-node20.json');
+    const fixture = {
+      packages: {
+        '': {},
+        'node_modules/find-my-way': { version: '9.10.0', engines: { node: '>=20' } },
+        'node_modules/thread-stream': { version: '4.2.1', engines: { node: '>=20' } },
+        'node_modules/toad-cache': { version: '3.7.4', engines: { node: '>=20' } },
+      },
+    };
+    fs.writeFileSync(file, JSON.stringify(fixture));
+    const result = spawnSync(process.execPath, [checker, '--lockfile', file], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it('exits 2 when --lockfile has no path', () => {
     const result = spawnSync(process.execPath, [checker, '--lockfile'], { encoding: 'utf8' });
     assert.equal(result.status, 2);
