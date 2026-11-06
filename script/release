@@ -213,7 +213,9 @@ class ReleaseSupervisor
       pid = Process.spawn(@env.to_h, *command, in: File::NULL, out: File::NULL, err: stderr_file.path, pgroup: true)
       begin
         [wait_for_sign_in_check(pid), File.read(stderr_file.path).strip]
-      rescue Interrupt
+      rescue SignalException
+        # INT, TERM, and HUP all arrive here before the supervisor's own handlers are installed;
+        # the check runs in its own process group, so kill it before the supervisor exits.
         kill_sign_in_check(pid)
         raise
       end
@@ -223,11 +225,14 @@ class ReleaseSupervisor
   end
 
   def wait_for_sign_in_check(pid)
-    deadline = monotonic_now + SIGN_IN_CHECK_TIMEOUT
+    timeout = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_SIGN_IN_TIMEOUT", SIGN_IN_CHECK_TIMEOUT, maximum: SIGN_IN_CHECK_TIMEOUT
+    )
+    deadline = monotonic_time + timeout
     loop do
       _pid, status = Process.wait2(pid, Process::WNOHANG)
       return status.exitstatus if status
-      break if monotonic_now >= deadline
+      break if monotonic_time >= deadline
 
       sleep(POLL_INTERVAL)
     end
@@ -243,10 +248,6 @@ class ReleaseSupervisor
     nil
   end
 
-  def monotonic_now
-    Process.clock_gettime(Process::CLOCK_MONOTONIC)
-  end
-
   # Ask RubyGems for the key `gem push` would use instead of re-implementing its rules. Its
   # api_key covers GEM_HOST_API_KEY (even blank), host-specific keys, the legacy and XDG
   # credentials files, and the 0600 permission check, which ends the child process on failure.
@@ -257,7 +258,10 @@ class ReleaseSupervisor
     begin
       require "rubygems/gemcutter_utilities"
       probe = Object.new.extend(Gem::GemcutterUtilities)
-      def probe.options = {}
+      # `gem release` passes GEM_RELEASE_KEY to `gem push --key`, which selects a named key.
+      named_key = ENV.fetch("GEM_RELEASE_KEY", "")
+      # `gem push --key` parses the name as a Symbol, the type credentials-file keys load as.
+      probe.define_singleton_method(:options) { named_key.empty? ? {} : { key: named_key.to_sym } }
       key = probe.api_key
     rescue Gem::SystemExitException
       raise

@@ -192,8 +192,8 @@ run_live_headless() {
     Process.setsid
     $stdin.reopen("/dev/null")
     Dir.chdir(ENV.fetch("TEST_CASE_REPO"))
-    exec File.join(ENV.fetch("TEST_CASE_REPO"), "script", "release")
-  ' >"${output_log}" 2>&1
+    exec File.join(ENV.fetch("TEST_CASE_REPO"), "script", "release"), *ARGV
+  ' -- "$@" >"${output_log}" 2>&1
 }
 
 start_live_headless() {
@@ -362,11 +362,42 @@ pass "doctor checks the credentials file RubyGems actually reads"
 setup_case reconcile-needs-only-gh-signin
 rm "${fake_bin}/npm" "${HOME}/.gem/credentials"
 ln -s /usr/bin/false "${fake_bin}/npm"
-run_release --reconcile-accelerated-rc || true
+# Headless, so the foreground-terminal gate cannot stop it when the harness runs in a terminal.
+run_live_headless --reconcile-accelerated-rc || true
 assert_not_contains "${output_log}" "sign in before releasing:"
 # Positive proof it got past the sign-in check: the reconcile Rake task started.
 assert_contains "${bundle_log}" "release:reconcile_accelerated_rc[17.1.0.rc.0]"
 pass "accelerated RC reconciliation does not require npm or RubyGems sign-in"
+
+setup_case doctor-rubygems-named-release-key
+printf -- '---\n:release_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
+GEM_RELEASE_KEY=release_key run_release --doctor || fail "doctor rejected the named key gem release uses"
+pass "doctor accepts the named RubyGems key selected by GEM_RELEASE_KEY"
+
+setup_case doctor-sign-in-check-timeout
+rm "${fake_bin}/npm"
+cat >"${fake_bin}/npm" <<'SH'
+#!/bin/sh
+# A hung registry: a grandchild that would outlive a kill aimed only at this process.
+sleep 60 &
+echo "$!" >"${TEST_HUNG_CHILD_PID_FILE}"
+wait
+SH
+chmod +x "${fake_bin}/npm"
+export TEST_HUNG_CHILD_PID_FILE="${case_dir}/hung-child.pid"
+started_at=$(date +%s)
+if REACT_ON_RAILS_RELEASE_SIGN_IN_TIMEOUT=1 run_release --doctor; then
+  fail "doctor passed although the npm check hung"
+fi
+elapsed=$(($(date +%s) - started_at))
+[ "${elapsed}" -lt 15 ] || fail "doctor took ${elapsed}s; the sign-in check timeout did not apply"
+assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
+if kill -0 "$(cat "${TEST_HUNG_CHILD_PID_FILE}")" 2>/dev/null; then
+  fail "the hung check's grandchild survived the timeout"
+fi
+unset TEST_HUNG_CHILD_PID_FILE
+pass "a hung sign-in check times out and its whole process group is killed"
 
 setup_case changelog-selected-dry-run
 run_release --dry-run || fail "argumentless dry-run failed"
