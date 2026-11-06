@@ -4,14 +4,18 @@
     // This copies JS files to the output directory. Make false once all code is converted.
     "allowJs": true,
     "declaration": true,
-    "declarationMap": true,
+    // The published package ships only lib/**/*.js and lib/**/*.d.ts, never .map files or src/,
+    // so source and declaration maps would only add dangling `//# sourceMappingURL=` pointers
+    // that `node --enable-source-maps`, debuggers, and error trackers try to follow (#5307).
+    // script/check-packed-source-maps.mjs fails CI if a packed tarball regresses.
+    "declarationMap": false,
     "incremental": true,
     "module": "nodenext",
     "noUncheckedIndexedAccess": true,
     "outDir": "../lib",
     "resolveJsonModule": true,
     "rootDir": ".",
-    "sourceMap": true
+    "sourceMap": false
   },
   "include": ["**/*.ts", "**/*.js"]
 }
