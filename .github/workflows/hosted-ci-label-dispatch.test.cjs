@@ -38,6 +38,7 @@ async function labelEvent({
   rerunError,
   headShaNow = 'abcdef1234567890',
   gateRunStatusAfterRefusal = 'completed',
+  state = 'open',
 }) {
   const calls = {
     dispatches: [],
@@ -95,6 +96,7 @@ async function labelEvent({
       label: { name: label },
       pull_request: {
         number: 42,
+        state,
         user: { login: author },
         head: {
           ref: 'feature',
@@ -332,4 +334,52 @@ test('a rerun refused because another workflow just reran the run still succeeds
     gateRunStatusAfterRefusal: 'in_progress',
   });
   assert.deepEqual(calls.failed, []);
+});
+
+test('a hosted-CI label removed from a closed PR reruns nothing and does not fail', async () => {
+  const calls = await labelEvent({
+    action: 'unlabeled',
+    label: 'ready-for-hosted-ci',
+    labelsAfter: [],
+    state: 'closed',
+  });
+  assert.deepEqual(calls.gateRunQueries, []);
+  assert.deepEqual(calls.reruns, []);
+  assert.deepEqual(calls.failed, []);
+});
+
+test('ci-required runs for different heads of one PR never share a concurrency group', () => {
+  const group = requiredSource.match(/^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: true$/m);
+  assert.ok(group, 'ci-required must cancel superseded runs within one group');
+  const groupFor = (github) =>
+    vm.runInNewContext(group[1].replace(/^\s*\$\{\{|\}\}\s*$/g, ''), {
+      github,
+      format: (template, ...values) => template.replace(/\{(\d+)\}/g, (_, index) => values[index]),
+    });
+  const head = (sha) => ({
+    event: { pull_request: { number: 42, head: { sha } } },
+    ref: 'refs/pull/42/merge',
+    sha: 'merge',
+  });
+  assert.notEqual(
+    groupFor(head('old-head')),
+    groupFor(head('new-head')),
+    'an old-head rerun must not cancel the new head',
+  );
+  assert.equal(
+    groupFor(head('same-head')),
+    groupFor(head('same-head')),
+    'reruns of one head supersede each other',
+  );
+  assert.notEqual(
+    groupFor({ event: { pull_request: { number: 43, head: { sha: 'same-head' } } } }),
+    groupFor(head('same-head')),
+    'different PRs stay apart',
+  );
+  const mergeGroup = {
+    event: { pull_request: { head: {} } },
+    ref: 'refs/heads/gh-readonly-queue/main/pr-42',
+    sha: 'queue-sha',
+  };
+  assert.equal(groupFor(mergeGroup), 'ci-required-refs/heads/gh-readonly-queue/main/pr-42-queue-sha');
 });

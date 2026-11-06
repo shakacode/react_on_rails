@@ -590,6 +590,9 @@ jobs:
               if (!isSameRepositoryPullRequest(pr)) {
                 return 'Skipped the `ci-required` rerun on a fork PR; its gate never reads hosted CI labels.';
               }
+              if (pr.state !== 'open') {
+                return 'Skipped the `ci-required` rerun because the PR is not open.';
+              }
 
               try {
                 for (let attempt = 1; attempt <= requiredGateRerunAttempts; attempt += 1) {
@@ -639,7 +642,7 @@ jobs:
                 return 'Unable to rerun `ci-required`; push a commit or rerun its latest pull_request run.';
               }
             }
-            
+
             async function removeForceFullHostedCiLabel() {
               return removeLabels([forceFullHostedCiLabel]);
             }

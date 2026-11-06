@@ -31,8 +31,10 @@ permissions:
   contents: read
   issues: read
 
+# One group per PR head: a gate rerun for an older head must never cancel the newest
+# head's run, so a push leaves the superseded head's run to finish.
 concurrency:
-  group: ${{ format('ci-required-{0}', github.event.pull_request.number || github.ref) }}
+  group: ${{ format('ci-required-{0}-{1}', github.event.pull_request.number || github.ref, github.event.pull_request.head.sha || github.sha) }}
   cancel-in-progress: true
 
 jobs:

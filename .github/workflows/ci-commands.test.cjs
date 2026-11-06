@@ -1744,3 +1744,13 @@ test('a rerun refused because another workflow just reran the run still succeeds
   assert.deepEqual(raced.failures, []);
   assert.match(raced.comments.at(-1), /Reran `ci-required`/);
 });
+
+test('+ci-stop-hosted on a closed PR skips the gate rerun without failing', async () => {
+  const pullRequest = defaultPullRequest();
+  pullRequest.state = 'closed';
+  const calls = await runCommand({ body: '+ci-stop-hosted', pullRequest });
+
+  assert.deepEqual(calls.requiredGateRunQueries, []);
+  assert.deepEqual(calls.failures, []);
+  assert.match(calls.comments.at(-1), /Skipped the `ci-required` rerun because the PR is not open/);
+});
