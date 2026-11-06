@@ -53,6 +53,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
+  `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in
+  `react-on-rails` and `react-on-rails-pro`, ended with `//# sourceMappingURL=` comments for maps the packages never
+  shipped. `node --enable-source-maps`, debuggers, and error trackers that followed them looked for a file that
+  isn't there. The packages' `tsc` builds no longer emit source or declaration maps, and CI now packs all four
+  packages and fails on any dangling pointer. Fixes [Issue 5307](https://github.com/shakacode/react_on_rails/issues/5307).
+  [PR 5321](https://github.com/shakacode/react_on_rails/pull/5321) by [justin808](https://github.com/justin808).
+
 - **`bin/dev` pack generation keeps variables that `bin/dev` sets after Bundler loads**: The
   `react_on_rails:generate_packs` child now receives every variable that changed since Bundler
   loaded, and loses any that were deleted. Bundler's own variables stay out, so the child still
