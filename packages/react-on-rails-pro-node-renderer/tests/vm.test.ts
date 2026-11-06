@@ -537,6 +537,7 @@ describe('buildVM and runInVM', () => {
       // The ordinary global cannot take this key, so the build keeps the contextified sandbox.
       expect(vm.runInContext('globalThis', context) === context).toBe(false);
       expect(await runInVM('testString', bundlePath)).toBe('a string');
+      expect(await runInVM('NaN', bundlePath)).toBe('shadowed');
     });
   });
 
