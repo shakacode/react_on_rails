@@ -577,6 +577,39 @@ jobs:
               return removeLabels([hostedCiLabel, forceFullHostedCiLabel]);
             }
 
+            // ci-required does not run on label events, and this token's label changes fire
+            // none, so rerun the required gate after changing hosted-CI labels. A plain run
+            // passes the gate's hosted-CI check; a forced recheck treats hosted CI as not requested.
+            async function dispatchRequiredGate(pr, { forceRecheck }) {
+              if (!isSameRepositoryPullRequest(pr)) {
+                return 'Skipped the `ci-required` rerun because fork PR heads cannot be workflow-dispatched.';
+              }
+
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: 'ci-required.yml',
+                  ref: pr.head.ref,
+                  inputs: {
+                    pull_request_base_ref: pr.base.ref,
+                    pull_request_base_sha: pr.base.sha,
+                    ...(forceRecheck ? { force_required_hosted_ci_recheck: 'true' } : {})
+                  }
+                });
+              } catch (error) {
+                core.warning(`Unable to dispatch ci-required: ${error.message || error}`);
+                if (forceRecheck) {
+                  core.setFailed('Hosted CI labels were removed, but ci-required could not be rerun.');
+                }
+                return 'Unable to rerun `ci-required`; the required gate updates on the next push.';
+              }
+
+              return forceRecheck
+                ? 'Reran `ci-required` with hosted CI treated as not requested.'
+                : 'Reran `ci-required` so the required gate sees the hosted CI request.';
+            }
+
             async function removeForceFullHostedCiLabel() {
               return removeLabels([forceFullHostedCiLabel]);
             }
@@ -1208,6 +1241,10 @@ jobs:
                 }
               }
 
+              const requiredGateMessage = labelAdded
+                ? await dispatchRequiredGate(pr, { forceRecheck: false })
+                : '';
+
               await addReaction(failed.length > 0 ? 'confused' : succeeded.length > 0 ? 'rocket' : 'eyes');
 
               const failedList = failed.length > 0
@@ -1283,6 +1320,7 @@ jobs:
                   : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
                 ...(fallbackMessage ? [fallbackMessage] : []),
                 labelMessage,
+                ...(requiredGateMessage ? [requiredGateMessage] : []),
                 '',
                 'View progress in the Actions tab.',
                 failedList
@@ -1321,6 +1359,9 @@ jobs:
               }
 
               const removedHostedCi = await removeHostedCiLabels();
+              const requiredGateMessage = removedHostedCi
+                ? await dispatchRequiredGate(pr, { forceRecheck: true })
+                : '';
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
 
@@ -1333,11 +1374,11 @@ jobs:
                 '',
                 'This waiver is bound to the current head SHA and does not apply after another push.',
                 'The required fast gate still applies for this PR.',
-                ...(removedHostedCi ? ['', 'Removed hosted CI labels from this PR.'] : [])
+                ...(removedHostedCi ? ['', 'Removed hosted CI labels from this PR.', requiredGateMessage] : [])
               ].join('\n'));
             }
 
-            async function handleStopHosted() {
+            async function handleStopHosted(pr) {
               if (await hasNewerCiCommand(['+ci-run-hosted', '+ci-force-full'])) {
                 await postComment('Skipped hosted CI label removal because a newer hosted-CI request command was posted after this command.');
                 return;
@@ -1349,12 +1390,14 @@ jobs:
               }
 
               const removed = await removeHostedCiLabels();
+              const requiredGateMessage = removed ? await dispatchRequiredGate(pr, { forceRecheck: true }) : '';
               await postComment([
                 '## Hosted CI Mode Disabled',
                 '',
                 removed
                   ? 'Removed hosted CI labels. Future commits will use only the required gate until hosted CI is requested again.'
                   : 'No hosted CI labels were present. Future commits are already using only the required gate.',
+                ...(requiredGateMessage ? [requiredGateMessage] : []),
                 '',
                 'Use `+ci-run-hosted` to re-enable optimized hosted CI.'
               ].join('\n'));
@@ -1479,7 +1522,7 @@ jobs:
                 break;
               case '+ci-stop-hosted':
                 await addReaction('eyes');
-                await handleStopHosted();
+                await handleStopHosted(pr);
                 break;
               case '+ci-stop-full':
                 await addReaction('eyes');

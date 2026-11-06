@@ -218,7 +218,7 @@ assert.equal(evaluateExpression(benchmarkMatrixCondition, { event_name: 'workflo
 assertMatches(
   'hosted-ci-label-dispatch trigger',
   labelDispatchWorkflow,
-  /pull_request:\n\s+types: \[labeled\]/,
+  /pull_request:\n\s+types: \[labeled, unlabeled\]/,
 );
 assertMatches(
   'workflow-token label events',

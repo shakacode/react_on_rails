@@ -1,21 +1,25 @@
 name: ci-required
 
 on:
+  # No labeled/unlabeled: any running ci-required run blocks the PR, and only the
+  # two hosted-CI labels can change this gate. Their changes dispatch this workflow
+  # instead (hosted-ci-label-dispatch.yml and ci-commands.yml), so status labels
+  # such as awaiting-merge-approval never rerun or block the gate.
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
     inputs:
       pull_request_base_ref:
-        description: PR base branch for hosted-label cleanup rechecks.
+        description: PR base branch for hosted-label rechecks.
         required: false
         type: string
       pull_request_base_sha:
-        description: PR base SHA for hosted-label cleanup rechecks.
+        description: PR base SHA for hosted-label rechecks.
         required: false
         type: string
       force_required_hosted_ci_recheck:
-        description: Re-run the required gate after hosted-label cleanup with hosted CI treated as not requested.
+        description: Re-run the required gate after hosted-CI labels were removed, with hosted CI treated as not requested.
         required: false
         type: boolean
         default: false
@@ -27,159 +31,12 @@ permissions:
   issues: read
 
 concurrency:
-  group: >-
-    ${{
-      github.event_name == 'pull_request' &&
-      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-      github.event.label.name != 'ready-for-hosted-ci' &&
-      github.event.label.name != 'force-full-hosted-ci' &&
-      format('ci-required-ignored-label-{0}', github.run_id) ||
-      format('ci-required-{0}', github.event.pull_request.number || github.ref)
-    }}
-  cancel-in-progress: >-
-    ${{
-      github.event_name != 'pull_request' ||
-      (
-        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-        github.event.label.name == 'ready-for-hosted-ci' ||
-        github.event.label.name == 'force-full-hosted-ci'
-      )
-    }}
+  group: ${{ format('ci-required-{0}', github.event.pull_request.number || github.ref) }}
+  cancel-in-progress: true
 
 jobs:
-  # Of the PR's labels, the gate reads only the two hosted-CI labels, but status
-  # labels (awaiting-merge-approval, awaiting-resume, hold, ...) change often. A
-  # skipped required job reports success and the newest check run of a name wins,
-  # so the gate may skip only when the newest gate that ran on this head passed,
-  # no gate run on it is in flight, and neither a hosted-CI label nor the base
-  # branch changed after that gate read them. Neither change needs to fire a
-  # gate event: the workflow token edits labels silently, and a retarget is an
-  # `edited` event. Dependabot PRs always run: their gate also reads +ci-*
-  # comments. Otherwise, or when this job fails, the full gate runs.
-  label-event-filter:
-    name: label-event-filter
-    if: >-
-      github.event_name == 'pull_request' &&
-      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-      github.event.label.name != 'ready-for-hosted-ci' &&
-      github.event.label.name != 'force-full-hosted-ci'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: read
-      checks: read
-      pull-requests: read
-    outputs:
-      run_gate: ${{ steps.decide.outputs.run_gate }}
-    steps:
-      - name: Decide whether the required gate must rerun
-        id: decide
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const hostedLabels = new Set(['ready-for-hosted-ci', 'force-full-hosted-ci']);
-            // A run's base comes from its triggering event, a little before its check suite exists.
-            const triggerMarginMs = 2 * 60 * 1000;
-            const { owner, repo } = context.repo;
-            const pullRequest = context.payload.pull_request;
-            const headSha = pullRequest.head.sha;
-            // Direct reads: the workflow-run listing can lag behind a run that just started.
-            const [checkRuns, { data: currentRun }] = await Promise.all([
-              github.paginate(github.rest.checks.listForRef, {
-                owner,
-                repo,
-                ref: headSha,
-                check_name: 'required-pr-gate',
-                filter: 'all',
-                per_page: 100
-              }),
-              github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId })
-            ]);
-            // This run's own gate is never an earlier result, even if GitHub lists it early.
-            const gateRuns = checkRuns
-              .filter((run) => run.app?.slug === 'github-actions' && run.check_suite?.id !== currentRun.check_suite_id)
-              .sort((left, right) => right.id - left.id);
-            // Earlier skips rest on the run behind them, so judge the newest gate that ran.
-            const newestRan = gateRuns.find((run) => run.conclusion !== 'skipped');
-
-            // The gate reads labels live after its job starts, but takes the base from its
-            // triggering event. REST issue events omit base changes, so read the GraphQL timeline.
-            async function gateInputChangedAfter(passingGate) {
-              const { data: suite } = await github.rest.checks.getSuite({
-                owner,
-                repo,
-                check_suite_id: passingGate.check_suite.id
-              });
-              const baseSince = Date.parse(suite.created_at) - triggerMarginMs;
-              const labelSince = Date.parse(passingGate.started_at);
-              const query = `query($owner: String!, $repo: String!, $number: Int!, $since: DateTime!, $after: String) {
-                repository(owner: $owner, name: $repo) {
-                  pullRequest(number: $number) {
-                    timelineItems(first: 100, after: $after, since: $since,
-                      itemTypes: [LABELED_EVENT, UNLABELED_EVENT, BASE_REF_CHANGED_EVENT]) {
-                      pageInfo { hasNextPage endCursor }
-                      nodes {
-                        __typename
-                        ... on LabeledEvent { createdAt label { name } }
-                        ... on UnlabeledEvent { createdAt label { name } }
-                        ... on BaseRefChangedEvent { createdAt }
-                      }
-                    }
-                  }
-                }
-              }`;
-              const since = new Date(Math.min(baseSince, labelSince)).toISOString();
-              let after = null;
-              do {
-                const result = await github.graphql(query, { owner, repo, number: pullRequest.number, since, after });
-                const items = result.repository.pullRequest.timelineItems;
-                const changed = items.nodes.some((item) =>
-                  item.__typename === 'BaseRefChangedEvent'
-                    ? Date.parse(item.createdAt) >= baseSince
-                    : hostedLabels.has(item.label?.name) && Date.parse(item.createdAt) >= labelSince
-                );
-                if (changed) {
-                  return true;
-                }
-                after = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
-              } while (after);
-              return false;
-            }
-
-            let reason = '';
-            if (pullRequest.user?.login === 'dependabot[bot]') {
-              reason = 'Dependabot gates also read +ci-* comments';
-            } else if (gateRuns.some((run) => run.status !== 'completed')) {
-              reason = 'an earlier gate run for this head is still in progress';
-            } else if (!newestRan) {
-              reason = 'no gate has run on this head';
-            } else if (newestRan.conclusion !== 'success') {
-              reason = `the newest gate result for this head is ${newestRan.conclusion}`;
-            } else if (!newestRan.started_at || !newestRan.check_suite?.id) {
-              reason = 'the newest passing gate has no start time or check suite';
-            } else if (await gateInputChangedAfter(newestRan)) {
-              reason = 'a hosted-CI label or the base branch changed after the newest passing gate read it';
-            }
-
-            const runGate = reason !== '';
-            core.setOutput('run_gate', String(runGate));
-            core.info(
-              runGate
-                ? `Running the required gate: ${reason}.`
-                : `Skipping the required gate: label ${context.payload.label?.name} is not read by the gate, and gate check run ` +
-                    `${newestRan.id} already passed on ${headSha} with the current hosted-CI labels and base branch.`
-            );
-
   required-pr-gate:
     name: required-pr-gate
-    needs: label-event-filter
-    # Run unless the filter succeeded and found a passing gate on this head.
-    # A skipped or failed filter always runs the full gate.
-    if: >-
-      ${{
-        !cancelled() &&
-        !(needs.label-event-filter.result == 'success' && needs.label-event-filter.outputs.run_gate == 'false')
-      }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -237,7 +94,7 @@ jobs:
           bash script/lint-mirrored-blocks-test.bash
           ruby script/ci_required_merge_group_gate_test.rb
           node --test .github/workflows/ci-commands.test.cjs
-          node --test .github/workflows/ci-required-label-filter.test.cjs
+          node --test .github/workflows/hosted-ci-label-dispatch.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
           ruby .agents/skills/react-on-rails-update-changelog/bin/changelog-merged-prs-test.rb

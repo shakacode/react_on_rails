@@ -268,16 +268,15 @@ dispatcher, and docs together:
    jobs the only required PR signal.
 2. Include `pull_request` events for normal PR updates and label changes:
    `opened`, `synchronize`, `reopened`, `ready_for_review`, `labeled`, and
-   `unlabeled`. In `ci-required.yml`, the gate reads only the two hosted-CI
-   labels. For any other label, the `label-event-filter` job skips
-   `required-pr-gate` when three things hold: the newest gate that ran on that
-   head passed, no gate run is still in flight, and neither a hosted-CI label
-   nor the base branch changed after that gate read them. That last check
-   matters because neither change has to rerun the gate: the workflow token
-   edits labels without firing an event, and a retarget is an `edited` event.
-   Dependabot PRs always run the gate. Never skip the gate on the label name
-   alone. A skipped required job reports success, so a plain `if:` would turn a
-   failed gate green.
+   `unlabeled`. The exception is `ci-required.yml`: it skips label events,
+   because any running `ci-required` run blocks the PR and status labels such as
+   `awaiting-merge-approval` change often. Only the hosted-CI labels can change
+   its result. `hosted-ci-label-dispatch.yml` and the `+ci-*` commands dispatch
+   `ci-required` when they change one: a plain run after a trusted hosted-CI
+   request, and a `force_required_hosted_ci_recheck` run after the last
+   hosted-CI label is removed. Never skip `required-pr-gate` with a job `if:`
+   instead. A skipped required job reports success, so it would turn a failed
+   gate green.
 3. Include `push` to `main` and release branches, `merge_group`, and
    `workflow_dispatch` when the workflow is part of merge or release confidence.
 4. Avoid workflow-level `paths` or `paths-ignore` when branch protection or

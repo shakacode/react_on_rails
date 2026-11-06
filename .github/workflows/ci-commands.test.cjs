@@ -87,6 +87,7 @@ async function runCommand({
     commentUpdates: [],
     dispatches: [],
     failures: [],
+    requiredGateDispatches: [],
     labels: [],
     reactions: [],
     serializationQueries: [],
@@ -125,6 +126,13 @@ async function runCommand({
     },
     createLabel: async () => {},
     createWorkflowDispatch: async (options) => {
+      // Required-gate reruns are recorded apart from hosted dispatches and their proof.
+      if (options.workflow_id === 'ci-required.yml') {
+        calls.requiredGateDispatches.push(options);
+        const requiredGateError = dispatchErrors['ci-required.yml'];
+        if (requiredGateError) throw requiredGateError;
+        return { data: '', status: 204 };
+      }
       calls.dispatches.push(options);
       const dispatchIndex = dispatchIndexesByWorkflow.get(options.workflow_id) || 0;
       dispatchIndexesByWorkflow.set(options.workflow_id, dispatchIndex + 1);
@@ -1580,4 +1588,76 @@ test('fork safety and one-command parsing remain intact', async () => {
   });
   assert.equal(oneCommandCalls.dispatches.length, 0);
   assert.match(oneCommandCalls.comments.at(-1), /^## CI Status/);
+});
+
+// ci-required no longer runs on label events, so each hosted-CI label change made
+// through a command must rerun the required gate itself.
+const requiredGateRun = (extraInputs = {}) => ({
+  owner: 'shakacode',
+  repo: 'react_on_rails',
+  workflow_id: 'ci-required.yml',
+  ref: 'verify-release-ci',
+  inputs: { pull_request_base_ref: 'release/17.0.0', pull_request_base_sha: 'base-sha', ...extraInputs },
+});
+
+test('+ci-run-hosted reruns the required gate after adding the hosted CI label', async () => {
+  const calls = await runCommand({ body: '+ci-run-hosted' });
+
+  assert.ok(calls.labels.includes('ready-for-hosted-ci'));
+  assert.deepEqual(calls.requiredGateDispatches, [requiredGateRun()]);
+  assert.match(calls.comments.at(-1), /Reran `ci-required` so the required gate sees the hosted CI request/);
+});
+
+test('+ci-run-hosted does not rerun the required gate when the labels were not added', async () => {
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    dispatchErrors: { 'gem-tests.yml': Object.assign(new Error('rejected'), { status: 422 }) },
+  });
+
+  assert.deepEqual(calls.labels, []);
+  assert.deepEqual(calls.requiredGateDispatches, []);
+});
+
+for (const command of ['+ci-stop-hosted', '+ci-skip-hosted reason']) {
+  test(`${command} reruns the required gate with hosted CI treated as not requested`, async () => {
+    const calls = await runCommand({ body: command, labels: ['ready-for-hosted-ci'] });
+
+    assert.deepEqual(calls.requiredGateDispatches, [
+      requiredGateRun({ force_required_hosted_ci_recheck: 'true' }),
+    ]);
+    assert.match(calls.comments.at(-1), /Reran `ci-required` with hosted CI treated as not requested/);
+    assert.deepEqual(calls.failures, []);
+  });
+}
+
+test('+ci-stop-hosted fails visibly when the required-gate recheck cannot be dispatched', async () => {
+  const calls = await runCommand({
+    body: '+ci-stop-hosted',
+    dispatchErrors: { 'ci-required.yml': Object.assign(new Error('unavailable'), { status: 503 }) },
+  });
+
+  assert.equal(calls.requiredGateDispatches.length, 1);
+  assert.equal(calls.failures.length, 1);
+  assert.match(calls.comments.at(-1), /Unable to rerun `ci-required`/);
+});
+
+test('+ci-stop-full leaves the required gate alone', async () => {
+  const calls = await runCommand({
+    body: '+ci-stop-full',
+    labels: ['ready-for-hosted-ci', 'force-full-hosted-ci'],
+  });
+
+  assert.deepEqual(calls.requiredGateDispatches, []);
+});
+
+test('+ci-stop-hosted on a fork PR skips the required-gate rerun', async () => {
+  const pullRequest = defaultPullRequest();
+  pullRequest.head.repo.full_name = 'someone/react_on_rails';
+  const calls = await runCommand({ body: '+ci-stop-hosted', pullRequest });
+
+  assert.deepEqual(calls.requiredGateDispatches, []);
+  assert.match(
+    calls.comments.at(-1),
+    /Skipped the `ci-required` rerun because fork PR heads cannot be workflow-dispatched/,
+  );
 });

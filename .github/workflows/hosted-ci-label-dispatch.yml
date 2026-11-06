@@ -1,8 +1,10 @@
 name: Hosted CI Label Dispatch
 
+# ci-required does not run on label events, so this workflow also reruns the
+# required gate whenever a hosted-CI control label changes its result.
 on:
   pull_request:
-    types: [labeled]
+    types: [labeled, unlabeled]
 
 permissions:
   actions: write
@@ -10,12 +12,15 @@ permissions:
   issues: write
   pull-requests: read
 
-concurrency:
-  group: hosted-ci-label-dispatch-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-  cancel-in-progress: false
-
 jobs:
   dispatch-hosted-ci:
+    # Status labels (awaiting-*, hold, ...) start no job and join no concurrency group.
+    if: >-
+      github.event.label.name == 'ready-for-hosted-ci' ||
+      github.event.label.name == 'force-full-hosted-ci'
+    concurrency:
+      group: hosted-ci-label-dispatch-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-22.04
     steps:
       - name: Dispatch hosted CI for control labels
@@ -79,9 +84,11 @@ jobs:
               return [await removeLabelIfPresent(labelName)];
             }
 
-            async function dispatchRequiredGateRecheck() {
+            // A plain dispatch passes the gate's hosted-CI check, so send it only after a
+            // trusted hosted-CI request; a forced recheck treats hosted CI as not requested.
+            async function dispatchRequiredGate({ forceRecheck }) {
               if (headRepoFullName !== repoFullName) {
-                core.info('Skipping forced ci-required recheck because fork PR heads cannot be workflow-dispatched.');
+                core.info('Skipping ci-required dispatch because fork PR heads cannot be workflow-dispatched.');
                 return { dispatched: false, skipped: true };
               }
 
@@ -94,16 +101,18 @@ jobs:
                   inputs: {
                     pull_request_base_ref: pr.base.ref,
                     pull_request_base_sha: pr.base.sha,
-                    force_required_hosted_ci_recheck: 'true'
+                    ...(forceRecheck ? { force_required_hosted_ci_recheck: 'true' } : {})
                   }
                 });
                 return { dispatched: true };
               } catch (error) {
-                core.warning(
-                  `Unable to dispatch ci-required after hosted CI label cleanup: ${error.message || error}`
-                );
+                core.warning(`Unable to dispatch ci-required: ${error.message || error}`);
                 return { dispatched: false, error };
               }
+            }
+
+            function dispatchRequiredGateRecheck() {
+              return dispatchRequiredGate({ forceRecheck: true });
             }
 
             function cleanupSummary(cleanupResults) {
@@ -154,6 +163,31 @@ jobs:
 
               permissionByLogin.set(username, hasWriteAccess);
               return hasWriteAccess;
+            }
+
+            if (context.payload.action === 'unlabeled') {
+              if (!headRepoFullName || headRepoFullName !== repoFullName) {
+                core.info('Ignoring hosted CI label removal on a fork PR; its gate never reads hosted CI labels.');
+                return;
+              }
+
+              const { data: remainingLabels } = await github.rest.issues.listLabelsOnIssue({
+                owner,
+                repo,
+                issue_number: pr.number
+              });
+              if (remainingLabels.some((label) => controlLabels.has(label.name))) {
+                core.info(`Removed ${labelName}, but another hosted CI label remains, so the required gate is unchanged.`);
+                return;
+              }
+
+              const requiredGateRecheck = await dispatchRequiredGateRecheck();
+              if (!requiredGateRecheck.dispatched) {
+                core.setFailed(`Removed ${labelName}, but the ci-required recheck could not be dispatched.`);
+                return;
+              }
+              core.info(`Removed ${labelName}; dispatched ci-required with hosted CI treated as not requested.`);
+              return;
             }
 
             if (!headRepoFullName || headRepoFullName !== repoFullName) {
@@ -362,4 +396,11 @@ jobs:
               core.info(
                 `Dispatched ${workflows.length} hosted CI workflow(s) for ${pr.head.sha.slice(0, 12)}.`
               );
+
+              const requiredGate = await dispatchRequiredGate({ forceRecheck: false });
+              if (!requiredGate.dispatched) {
+                core.setFailed(
+                  'Hosted CI was dispatched, but ci-required could not be rerun; it will pass on the next push.'
+                );
+              }
             }

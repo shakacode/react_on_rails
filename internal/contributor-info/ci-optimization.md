@@ -20,7 +20,10 @@ CI should give fast feedback during review without weakening merge safety:
 ## Required PR Gate
 
 `.github/workflows/ci-required.yml` is the branch-protection-friendly gate. It
-always starts for PR updates, label changes, merge queue, and manual dispatch.
+always starts for PR updates, merge queue, and manual dispatch. Label events do
+not start it: hosted-CI label changes dispatch it from
+`hosted-ci-label-dispatch.yml` or the `+ci-*` commands, so status labels never
+rerun or block the gate.
 
 The `required-pr-gate` job intentionally stays lightweight:
 
@@ -232,7 +235,7 @@ dispatcher, and docs in sync:
 
 1. Include `pull_request` events for normal PR updates and label changes:
    `opened`, `synchronize`, `reopened`, `ready_for_review`, `labeled`, and
-   `unlabeled`.
+   `unlabeled`. `ci-required.yml` is the exception; see Required PR Gate.
 2. Include `push` to `main`, `merge_group`, and `workflow_dispatch` when the
    workflow is part of merge or release confidence.
 3. Avoid workflow-level `paths` or `paths-ignore` when branch protection or
