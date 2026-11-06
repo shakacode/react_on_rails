@@ -129,7 +129,7 @@ const pad = (id) => String(id).padStart(2, '0');
 const currentRunId = 777;
 const currentSuiteId = 7770;
 
-// Each gate check run belongs to a workflow run triggered one minute before the job started.
+// Each gate's check suite is created one minute before its job starts at 10:00:<id>.
 function gateRun(id, status, conclusion, overrides = {}) {
   return {
     id,
@@ -143,20 +143,8 @@ function gateRun(id, status, conclusion, overrides = {}) {
   };
 }
 
-function workflowRunFor(checkRun) {
-  return {
-    id: checkRun.id,
-    check_suite_id: checkRun.check_suite?.id,
-    created_at: `2026-11-05T09:59:${pad(checkRun.id)}Z`,
-  };
-}
-
-const currentWorkflowRun = {
-  id: currentRunId,
-  check_suite_id: currentSuiteId,
-  created_at: '2026-11-05T11:00:00Z',
-};
-// The current run's own gate, queued while it waits on the filter.
+const suiteCreatedAt = (suiteId) => `2026-11-05T09:59:${pad(suiteId - 1000)}Z`;
+// The current run's own gate, if GitHub ever listed it while it waits on the filter.
 const ownQueuedGate = gateRun(99, 'queued', null, { check_suite: { id: currentSuiteId } });
 
 function timelineItem(typename, createdAt, label) {
@@ -165,19 +153,39 @@ function timelineItem(typename, createdAt, label) {
 
 const repo = { owner: 'shakacode', repo: 'react_on_rails' };
 
-async function decide(checkRuns, { timeline = [], author = 'justin808', workflowRuns, pageSize = 100 } = {}) {
+async function decide(checkRuns, { timeline = [], author = 'justin808', pageSize = 100 } = {}) {
   const outputs = {};
-  const requests = { graphql: [] };
-  const runs = workflowRuns ?? [...checkRuns.map(workflowRunFor), currentWorkflowRun];
+  const requests = { graphql: [], suites: [] };
   const github = {
-    rest: { checks: { listForRef: 'checks' }, actions: { listWorkflowRuns: 'workflowRuns' } },
+    rest: {
+      checks: {
+        listForRef: 'checks',
+        getSuite: async (params) => {
+          requests.suites.push(params);
+          return { data: { id: params.check_suite_id, created_at: suiteCreatedAt(params.check_suite_id) } };
+        },
+      },
+      actions: {
+        getWorkflowRun: async (params) => {
+          assert.deepEqual(params, { ...repo, run_id: currentRunId });
+          return { data: { id: currentRunId, check_suite_id: currentSuiteId } };
+        },
+      },
+    },
     paginate: async (kind, params) => {
-      assert.equal(requests[kind], undefined, `${kind} requested twice`);
-      requests[kind] = params;
-      return { checks: checkRuns, workflowRuns: runs }[kind];
+      assert.equal(kind, 'checks');
+      assert.deepEqual(params, {
+        ...repo,
+        ref: 'head-sha',
+        check_name: 'required-pr-gate',
+        filter: 'all',
+        per_page: 100,
+      });
+      return checkRuns;
     },
     graphql: async (query, variables) => {
       assert.match(query, /itemTypes: \[LABELED_EVENT, UNLABELED_EVENT, BASE_REF_CHANGED_EVENT\]/);
+      assert.equal(variables.number, 42);
       requests.graphql.push(variables);
       // Like GitHub, return only items at or after `since`, a page at a time.
       const visible = timeline.filter((item) => Date.parse(item.createdAt) >= Date.parse(variables.since));
@@ -210,26 +218,7 @@ async function decide(checkRuns, { timeline = [], author = 'justin808', workflow
     info: () => {},
   };
   await runFilterScript(github, context, core);
-  if (requests.checks) {
-    assert.deepEqual(requests.checks, {
-      ...repo,
-      ref: 'head-sha',
-      check_name: 'required-pr-gate',
-      filter: 'all',
-      per_page: 100,
-    });
-    assert.deepEqual(requests.workflowRuns, {
-      ...repo,
-      workflow_id: 'ci-required.yml',
-      head_sha: 'head-sha',
-      per_page: 100,
-    });
-  }
-  for (const variables of requests.graphql) {
-    assert.equal(variables.number, 42);
-    assert.equal(variables.owner, 'shakacode');
-  }
-  return { runGate: outputs.run_gate, graphql: requests.graphql };
+  return { runGate: outputs.run_gate, graphql: requests.graphql, suites: requests.suites };
 }
 
 async function runGate(checkRuns, options) {
@@ -256,28 +245,31 @@ test('the filter skips the gate after a passing gate on the same head', async ()
   assert.equal(
     await runGate([gateRun(5, 'completed', 'success')], {
       timeline: [
-        timelineItem('UnlabeledEvent', '2026-11-05T09:56:00Z', 'ready-for-hosted-ci'),
+        // The hosted-label change that triggered the passing gate, which read it.
+        timelineItem('LabeledEvent', '2026-11-05T09:59:04Z', 'ready-for-hosted-ci'),
         timelineItem('BaseRefChangedEvent', '2026-11-05T09:56:30Z'),
         timelineItem('LabeledEvent', '2026-11-05T10:30:00Z', 'awaiting-resume'),
       ],
     }),
     'false',
-    'gate-input changes well before the trigger and status-label changes after it do not matter',
+    'the triggering hosted-label change, an old retarget, and status labels do not matter',
   );
   assert.equal(
     await runGate([gateRun(5, 'completed', 'failure'), gateRun(7, 'completed', 'success')], {
-      timeline: [timelineItem('BaseRefChangedEvent', '2026-11-05T09:56:30Z')],
+      timeline: [timelineItem('LabeledEvent', '2026-11-05T10:00:06Z', 'ready-for-hosted-ci')],
     }),
     'false',
-    'the change is measured from the passing run, not an older one',
+    'label history is measured from the passing gate, not an older one',
   );
 });
 
-test('the filter measures history from two minutes before the passing run was created', async () => {
-  const { graphql } = await decide([gateRun(5, 'completed', 'success')]);
+test('the filter reads history from the passing gate and its check suite', async () => {
+  const { graphql, suites } = await decide([gateRun(5, 'completed', 'success')]);
+  assert.deepEqual(suites, [{ ...repo, check_suite_id: 1005 }]);
   assert.deepEqual(
     graphql.map((variables) => variables.since),
     ['2026-11-05T09:57:05.000Z'],
+    'two minutes before the passing suite was created',
   );
 });
 
@@ -313,24 +305,19 @@ test('the filter reruns the gate whenever the head has no settled pass', async (
     'a same-named check from another app does not count',
   );
   assert.equal(
-    await runGate([gateRun(5, 'completed', 'success')], { workflowRuns: [currentWorkflowRun] }),
+    await runGate([gateRun(5, 'completed', 'success', { started_at: null })]),
     'true',
-    'a pass whose workflow run cannot be found',
-  );
-  assert.equal(
-    await runGate([gateRun(5, 'completed', 'success')], { workflowRuns: [workflowRunFor(gateRun(5))] }),
-    'true',
-    'the current run cannot be found, so its own gate cannot be told apart',
+    'a pass with no start time',
   );
 });
 
-test('the filter reruns the gate when a gate input changed around or after the passing run', async () => {
+test('the filter reruns the gate when a gate input changed after the passing gate read it', async () => {
   const changes = [
-    timelineItem('UnlabeledEvent', '2026-11-05T09:59:05Z', 'ready-for-hosted-ci'),
+    timelineItem('UnlabeledEvent', '2026-11-05T10:00:05Z', 'ready-for-hosted-ci'),
     timelineItem('LabeledEvent', '2026-11-05T10:20:00Z', 'ready-for-hosted-ci'),
     timelineItem('UnlabeledEvent', '2026-11-05T10:20:00Z', 'force-full-hosted-ci'),
     timelineItem('BaseRefChangedEvent', '2026-11-05T10:20:00Z'),
-    // After the triggering event but before the workflow run was created.
+    // Before the suite existed but after its triggering event: the payload holds the old base.
     timelineItem('BaseRefChangedEvent', '2026-11-05T09:58:30Z'),
   ];
   const decisions = await Promise.all(

@@ -272,7 +272,7 @@ dispatcher, and docs together:
    labels. For any other label, the `label-event-filter` job skips
    `required-pr-gate` when three things hold: the newest gate that ran on that
    head passed, no gate run is still in flight, and neither a hosted-CI label
-   nor the base branch changed since that gate was triggered. That last check
+   nor the base branch changed after that gate read them. That last check
    matters because neither change has to rerun the gate: the workflow token
    edits labels without firing an event, and a retarget is an `edited` event.
    Dependabot PRs always run the gate. Never skip the gate on the label name
