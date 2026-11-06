@@ -4420,84 +4420,87 @@ RSpec.describe "release.rake helper methods" do
       expect(self).to have_received(:fetch_shakaperf_release_gate_evidence).with(repo_slug:, run: matching_prerun)
     end
 
-    it "waits for an in-progress pre-run before reusing its evidence" do
-      candidate_sha = "feedface" * 5
-      in_progress_prerun = run.merge(
-        "displayTitle" => shakaperf_release_gate_display_title(
-          ref: "release-branch", head_sha: candidate_sha, target_version:
-        ),
-        "headSha" => candidate_sha,
-        "status" => "in_progress",
-        "conclusion" => nil,
-        "updatedAt" => "2026-07-14T12:00:30Z"
-      )
-      completed_prerun = in_progress_prerun.merge(
-        "status" => "completed",
-        "conclusion" => "success",
-        "updatedAt" => "2026-07-14T13:30:00Z"
-      )
-      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug:, ref: "release-branch")
-        .and_return([in_progress_prerun])
-      allow(self).to receive(:capture_gh_output_with_timeout)
-        .with(
-          "run", "watch", "123456", "--repo", repo_slug,
-          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+    # gh run list reports "" for a running run's conclusion; nil covers other observation paths.
+    [nil, ""].each do |in_progress_conclusion|
+      it "waits for an in-progress pre-run (conclusion #{in_progress_conclusion.inspect}) before reusing evidence" do
+        candidate_sha = "feedface" * 5
+        in_progress_prerun = run.merge(
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref: "release-branch", head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => "in_progress",
+          "conclusion" => in_progress_conclusion,
+          "updatedAt" => "2026-07-14T12:00:30Z"
         )
-        .and_return(["", success_status, false])
-      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
-        .with(repo_slug:, run: in_progress_prerun).and_return(completed_prerun)
-      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
-        .with(repo_slug:, run: in_progress_prerun)
-      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
-        .with(repo_slug:, run: completed_prerun).and_return({ "candidate_sha" => candidate_sha })
-      allow(self).to receive(:shakaperf_release_gate_evidence_rejection).with(
-        monorepo_root:,
-        ref: "release-branch",
-        head_sha:,
-        target_version:,
-        run: completed_prerun,
-        evidence: { "candidate_sha" => candidate_sha },
-        release_started_at:,
-        validation_time: kind_of(Time),
-        require_prerun: true,
-        allow_prerun_completion_after_release_start: true
-      ).and_return(nil)
-      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
-
-      validated_run = nil
-      expect do
-        validated_run = run_shakaperf_release_gate!(
+        completed_prerun = in_progress_prerun.merge(
+          "status" => "completed",
+          "conclusion" => "success",
+          "updatedAt" => "2026-07-14T13:30:00Z"
+        )
+        allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+          .with(repo_slug:, ref: "release-branch")
+          .and_return([in_progress_prerun])
+        allow(self).to receive(:capture_gh_output_with_timeout)
+          .with(
+            "run", "watch", "123456", "--repo", repo_slug,
+            timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+          )
+          .and_return(["", success_status, false])
+        allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+          .with(repo_slug:, run: in_progress_prerun).and_return(completed_prerun)
+        expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence)
+          .with(repo_slug:, run: in_progress_prerun)
+        allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+          .with(repo_slug:, run: completed_prerun).and_return({ "candidate_sha" => candidate_sha })
+        allow(self).to receive(:shakaperf_release_gate_evidence_rejection).with(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
           target_version:,
+          run: completed_prerun,
+          evidence: { "candidate_sha" => candidate_sha },
           release_started_at:,
-          allow_override: false,
-          dry_run: false
+          validation_time: kind_of(Time),
+          require_prerun: true,
+          allow_prerun_completion_after_release_start: true
+        ).and_return(nil)
+        expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+        validated_run = nil
+        expect do
+          validated_run = run_shakaperf_release_gate!(
+            monorepo_root:,
+            ref: "release-branch",
+            head_sha:,
+            target_version:,
+            release_started_at:,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/watching it before deciding whether to dispatch.*Reusing successful ShakaPerf pre-run/m)
+          .to_stdout
+        expect(self).to have_received(:shakaperf_release_gate_evidence_rejection).with(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version:,
+          run: completed_prerun,
+          evidence: { "candidate_sha" => candidate_sha },
+          release_started_at:,
+          validation_time: kind_of(Time),
+          require_prerun: true,
+          allow_prerun_completion_after_release_start: true
         )
-      end.to output(/watching it before deciding whether to dispatch.*Reusing successful ShakaPerf pre-run/m)
-        .to_stdout
-      expect(self).to have_received(:shakaperf_release_gate_evidence_rejection).with(
-        monorepo_root:,
-        ref: "release-branch",
-        head_sha:,
-        target_version:,
-        run: completed_prerun,
-        evidence: { "candidate_sha" => candidate_sha },
-        release_started_at:,
-        validation_time: kind_of(Time),
-        require_prerun: true,
-        allow_prerun_completion_after_release_start: true
-      )
-      expect(validated_run).to eq(completed_prerun)
-      expect(validated_run).to include(
-        "databaseId" => 123_456,
-        "attempt" => 1,
-        "headSha" => candidate_sha,
-        "status" => "completed",
-        "conclusion" => "success"
-      )
+        expect(validated_run).to eq(completed_prerun)
+        expect(validated_run).to include(
+          "databaseId" => 123_456,
+          "attempt" => 1,
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => "success"
+        )
+      end
     end
 
     it "dispatches an exact-head gate when the active pre-run attempt changes while waiting" do
@@ -5411,17 +5414,55 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
-    it "rejects every active status when its conclusion is non-nil" do
-      non_nil_conclusions = ["failure", ""]
+    it "rejects every active status when its conclusion is a terminal value" do
       aggregate_failures do
         SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.each do |status|
-          non_nil_conclusions.each do |conclusion|
+          expect do
+            active_shakaperf_release_gate_run?("status" => status, "conclusion" => "failure")
+          end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+        end
+      end
+    end
+
+    it "treats the empty conclusion gh run list reports for a running run as no conclusion" do
+      no_conclusions = [nil, ""]
+      aggregate_failures do
+        SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.each do |status|
+          no_conclusions.each do |conclusion|
+            active = nil
             expect do
-              active_shakaperf_release_gate_run?("status" => status, "conclusion" => conclusion)
-            end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+              active = active_shakaperf_release_gate_run?("status" => status, "conclusion" => conclusion)
+            end.not_to raise_error
+            expect(active).to be(true)
           end
         end
       end
+    end
+
+    it "classifies an accelerated run gh reports in progress with an empty conclusion as active" do
+      in_progress_run = {
+        "databaseId" => 910_010,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress",
+        "conclusion" => "",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/910010"
+      }
+      state = nil
+      expect do
+        state = accelerated_shakaperf_run_state!(
+          repo_slug: "shakacode/react_on_rails", run: in_progress_run, unordered: false
+        )
+      end.not_to raise_error
+      expect(state).to eq(:active)
+      expect(valid_accelerated_shakaperf_run_state_metadata?(in_progress_run.merge("conclusion" => "failure")))
+        .to be(false)
     end
 
     it "dispatches an exact-head gate and returns its URL without watching it" do
