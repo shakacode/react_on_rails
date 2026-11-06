@@ -60,10 +60,11 @@ export function findEngineMismatches({ lock, enginesRange, semver, knownMismatch
 
   // Same test as npm's engine check: an unparseable range rejects every version.
   // Dev-only entries, present when --lockfile names a project's own lockfile, are not installed
-  // for production.
+  // for production. A devOptional entry is also an optional dependency of a production package,
+  // so it stays.
   const excluding = Object.entries(lock.packages).filter(([lockPath, entry]) => {
     const required = entry.engines?.node;
-    const devOnly = entry.dev === true || entry.devOptional === true;
+    const devOnly = entry.dev === true;
     return (
       lockPath !== '' &&
       !devOnly &&

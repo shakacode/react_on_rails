@@ -94,7 +94,7 @@ test('counts an engines.node npm cannot parse as a mismatch, as npm does', () =>
   );
 });
 
-test('skips dev-only lockfile entries, which production installs omit', () => {
+test('skips dev-only lockfile entries but keeps devOptional ones, which production installs keep', () => {
   const withDev = {
     packages: {
       'node_modules/dev-tool': { version: '1.0.0', dev: true, engines: { node: '>=24' } },
@@ -105,7 +105,7 @@ test('skips dev-only lockfile entries, which production installs omit', () => {
   const result = findEngineMismatches({ lock: withDev, enginesRange: '>=20', semver, knownMismatches: [] });
   assert.deepEqual(
     result.mismatches.map((item) => item.name),
-    ['runtime'],
+    ['dev-optional', 'runtime'],
   );
 });
 
