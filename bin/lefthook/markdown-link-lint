@@ -63,7 +63,9 @@ fi
 #      links and this repository's blob/tree main links, which
 #      bin/lychee-self-repo-links turns into file:// URLs.
 #   2. Fetch only the remote URLs that are new in each file since the merge base.
-# CI's check-markdown-links workflow still checks every link.
+# Untouched remote URLs are left to CI's check-markdown-links workflow and
+# bin/check-links, which fetch every link in docs/, root *.md, and
+# react_on_rails_pro/*.md (not other directories).
 echo "🔗 Lychee (offline) on all local links in branch Markdown files:"
 printf "  %s\n" "${files_arr[@]}"
 lychee --config .lychee.toml --offline "${files_arr[@]}"
@@ -118,7 +120,7 @@ for file in "${files_arr[@]}"; do
 done
 
 if [ "${#new_link_files[@]}" -eq 0 ]; then
-  echo "✅ Local links passed; no new remote links to check (bin/check-links checks them all)"
+  echo "✅ Local links passed; no new remote links to check"
   exit 0
 fi
 
