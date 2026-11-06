@@ -168,6 +168,11 @@ RUBY
   export TEST_BUNDLE_LOG="${bundle_log}"
   export TEST_BRANCH="release/17.1.0"
   export TEST_BUNDLE_MODE="success"
+  # Publishing sign-in: the fake npm and gh succeed; give RubyGems a stand-in credential in an isolated HOME.
+  export HOME="${case_dir}/home"
+  mkdir -p "${HOME}/.gem"
+  printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+  unset GEM_HOST_API_KEY XDG_DATA_HOME
   unset AGENT_COORD_API_URL AGENT_COORD_API_TOKEN AGENT_COORD_MACHINE_ID
   unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
   : >"${output_log}"
@@ -239,6 +244,36 @@ if PATH="${fake_bin}" run_release --doctor; then
 fi
 assert_contains "${output_log}" "install required release tool(s) on PATH: npm"
 pass "doctor still validates publishing tools"
+
+setup_case doctor-missing-signin
+rm "${fake_bin}/npm" "${fake_bin}/gh"
+ln -s /usr/bin/false "${fake_bin}/npm"
+ln -s /usr/bin/false "${fake_bin}/gh"
+rm "${HOME}/.gem/credentials"
+if run_release --doctor; then
+  fail "release doctor accepted missing publishing sign-in"
+fi
+assert_contains "${output_log}" "sign in before releasing:"
+assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth login\`"
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor names every missing publishing sign-in"
+
+setup_case doctor-rubygems-env-key
+rm "${HOME}/.gem/credentials"
+GEM_HOST_API_KEY=rubygems_test_key run_release --doctor || fail "doctor rejected GEM_HOST_API_KEY"
+assert_contains "${output_log}" "publishing sign-in: npm, GitHub CLI, RubyGems ready"
+pass "doctor accepts a RubyGems key from GEM_HOST_API_KEY"
+
+setup_case live-missing-signin
+rm "${fake_bin}/npm"
+ln -s /usr/bin/false "${fake_bin}/npm"
+if run_release; then
+  fail "live release started without npm sign-in"
+fi
+assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
+assert_not_contains "${bundle_log}" "args:"
+pass "live release stops before publishing when npm sign-in is missing"
 
 setup_case changelog-selected-dry-run
 run_release --dry-run || fail "argumentless dry-run failed"

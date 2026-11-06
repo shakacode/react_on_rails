@@ -22,6 +22,7 @@ class ReleaseSupervisor
   SIGNALS = %w[INT TERM HUP].freeze
   RELEASE_START = "S"
   PR_SET_CHILD_SUBREAPER = 36
+  NPM_REGISTRY = "https://registry.npmjs.org/"
 
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
   TerminalHandoff = Data.define(:fd, :supervisor_pgid, :release_pgid)
@@ -71,6 +72,7 @@ class ReleaseSupervisor
 
   def run_live(scope)
     doctor_tools!
+    doctor_publishing_auth!
     verify_live_terminal_foreground!
     intervals = supervisor_intervals
 
@@ -159,6 +161,7 @@ class ReleaseSupervisor
     raise UsageError, "--doctor does not accept positional arguments" unless @remaining_args.empty?
 
     doctor_tools!
+    doctor_publishing_auth!
     print_doctor_success
     0
   end
@@ -170,9 +173,48 @@ class ReleaseSupervisor
     raise UsageError, "install required release tool(s) on PATH: #{missing_tools.join(', ')}"
   end
 
+  # Without this, a live release stops mid-pre-flight at an interactive npm login, or later at a
+  # missing RubyGems key. Check every publishing sign-in up front and name each fix.
+  def doctor_publishing_auth!
+    missing = []
+    missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
+    missing << "GitHub CLI: run `gh auth login`" unless command_succeeds?("gh", "auth", "status")
+    missing << "RubyGems: run `gem signin`" unless rubygems_credentials?
+    return if missing.empty?
+
+    raise UsageError, "sign in before releasing:\n  #{missing.join("\n  ")}"
+  end
+
+  def npm_signed_in?
+    command_succeeds?("npm", "whoami", "--registry", NPM_REGISTRY)
+  end
+
+  def command_succeeds?(*command)
+    _output, status = Open3.capture2e(*command)
+    status.success?
+  rescue SystemCallError
+    false
+  end
+
+  def rubygems_credentials?
+    return true unless @env.fetch("GEM_HOST_API_KEY", "").strip.empty?
+
+    rubygems_credential_paths.any? do |path|
+      File.file?(path) && File.read(path).match?(/^:?rubygems_api_key:\s*\S/)
+    end
+  end
+
+  def rubygems_credential_paths
+    home = @env.fetch("HOME", "")
+    data_home = @env.fetch("XDG_DATA_HOME", "")
+    data_home = File.join(home, ".local", "share") if data_home.empty?
+    [File.join(home, ".gem", "credentials"), File.join(data_home, "gem", "credentials")]
+  end
+
   def print_doctor_success
     @stdout.puts "Release machine doctor: PASS"
     @stdout.puts "  local release tools: ready"
+    @stdout.puts "  publishing sign-in: npm, GitHub CLI, RubyGems ready"
     @stdout.puts "  publication supervision: local process guard ready"
   end
 
