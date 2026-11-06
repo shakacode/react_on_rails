@@ -395,11 +395,18 @@ elapsed=$(($(date +%s) - started_at))
 assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
 [ -s "${TEST_HUNG_CHILD_PID_FILE}" ] || fail "the hung npm shim never recorded its grandchild PID"
 hung_child_pid="$(cat "${TEST_HUNG_CHILD_PID_FILE}")"
-# A killed grandchild can linger as a zombie where PID 1 reaps slowly, so check for a live process.
-hung_child_stat="$(ps -o stat= -p "${hung_child_pid}" 2>/dev/null || true)"
-if [ -n "${hung_child_stat}" ] && [[ "${hung_child_stat}" != Z* ]]; then
-  fail "the hung check's grandchild survived the timeout (state ${hung_child_stat})"
-fi
+# SIGKILL to the group is asynchronous, so allow a short window for the grandchild to die. A killed
+# grandchild can also linger as a zombie where PID 1 reaps slowly, so only a live process counts.
+hung_child_stat=""
+for _attempt in $(seq 1 50); do
+  hung_child_stat="$(ps -o stat= -p "${hung_child_pid}" 2>/dev/null || true)"
+  if [ -z "${hung_child_stat}" ] || [[ "${hung_child_stat}" == Z* ]]; then
+    hung_child_stat=""
+    break
+  fi
+  sleep 0.1
+done
+[ -z "${hung_child_stat}" ] || fail "the hung check's grandchild survived the timeout (state ${hung_child_stat})"
 unset TEST_HUNG_CHILD_PID_FILE
 pass "a hung sign-in check times out and its whole process group is killed"
 
