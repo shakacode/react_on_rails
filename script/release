@@ -190,8 +190,9 @@ class ReleaseSupervisor
     raise SupervisorError, "sign in before releasing:\n  #{missing.join("\n  ")}"
   end
 
+  # --active: a stale inactive account on github.com must not block a valid active one.
   def gh_signed_in?
-    command_succeeds?("gh", "auth", "status", "--hostname", "github.com")
+    command_succeeds?("gh", "auth", "status", "--active", "--hostname", "github.com")
   end
 
   def npm_signed_in?
@@ -200,7 +201,7 @@ class ReleaseSupervisor
 
   # No stdin, so a prompt cannot block, and a bounded wait, so a hung registry fails the check.
   def command_succeeds?(*command)
-    pid = Process.spawn(*command, in: File::NULL, out: File::NULL, err: File::NULL)
+    pid = Process.spawn(*command, in: File::NULL, out: File::NULL, err: File::NULL, pgroup: true)
     deadline = monotonic_now + SIGN_IN_CHECK_TIMEOUT
     loop do
       _pid, status = Process.wait2(pid, Process::WNOHANG)
@@ -209,7 +210,8 @@ class ReleaseSupervisor
 
       sleep(POLL_INTERVAL)
     end
-    Process.kill("KILL", pid)
+    # Kill the whole group so a wrapper such as an npm shim leaves no grandchildren behind.
+    Process.kill("KILL", -pid)
     Process.wait(pid)
     false
   rescue SystemCallError
@@ -221,7 +223,8 @@ class ReleaseSupervisor
   end
 
   def rubygems_credentials?
-    return true unless @env.fetch("GEM_HOST_API_KEY", "").strip.empty?
+    # RubyGems uses GEM_HOST_API_KEY whenever it is set, even blank, ahead of any credentials file.
+    return !@env.fetch("GEM_HOST_API_KEY").strip.empty? if @env.key?("GEM_HOST_API_KEY")
 
     path = rubygems_credentials_path
     return false unless File.file?(path)

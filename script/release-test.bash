@@ -287,11 +287,29 @@ pass "live release stops before publishing when GitHub CLI sign-in is missing"
 
 setup_case doctor-rubygems-empty-key
 printf -- '---\n:rubygems_api_key:\n:other: value\n' >"${HOME}/.gem/credentials"
-if GEM_HOST_API_KEY="   " run_release --doctor; then
-  fail "doctor accepted an empty RubyGems key and a whitespace-only GEM_HOST_API_KEY"
+if run_release --doctor; then
+  fail "doctor accepted an empty RubyGems key in the credentials file"
 fi
 assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
 pass "doctor rejects an empty RubyGems key"
+
+setup_case doctor-rubygems-blank-env-key
+if GEM_HOST_API_KEY="   " run_release --doctor; then
+  fail "doctor fell back to the credentials file although a blank GEM_HOST_API_KEY wins in RubyGems"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor rejects a blank GEM_HOST_API_KEY even with a valid credentials file"
+
+setup_case doctor-gh-active-account
+rm "${fake_bin}/gh"
+cat >"${fake_bin}/gh" <<'RUBY'
+#!/usr/bin/env ruby
+# Succeeds only for the active account, as gh does when an inactive account is stale.
+exit(ARGV.include?("--active") ? 0 : 1)
+RUBY
+chmod +x "${fake_bin}/gh"
+run_release --doctor || fail "doctor rejected a valid active github.com account"
+pass "doctor checks only the active github.com account"
 
 setup_case doctor-rubygems-xdg-key
 rm "${HOME}/.gem/credentials"
@@ -315,8 +333,9 @@ setup_case reconcile-needs-only-gh-signin
 rm "${fake_bin}/npm" "${HOME}/.gem/credentials"
 ln -s /usr/bin/false "${fake_bin}/npm"
 run_release --reconcile-accelerated-rc || true
-assert_not_contains "${output_log}" "npm: run"
-assert_not_contains "${output_log}" "RubyGems: run"
+assert_not_contains "${output_log}" "sign in before releasing:"
+# Positive proof it got past the sign-in check: the reconcile Rake task started.
+assert_contains "${bundle_log}" "release:reconcile_accelerated_rc[17.1.0.rc.0]"
 pass "accelerated RC reconciliation does not require npm or RubyGems sign-in"
 
 setup_case changelog-selected-dry-run
