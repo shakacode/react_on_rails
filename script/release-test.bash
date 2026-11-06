@@ -256,7 +256,7 @@ if run_release --doctor; then
 fi
 assert_contains "${output_log}" "sign in before releasing:"
 assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
-assert_contains "${output_log}" "GitHub CLI: run \`gh auth login --hostname github.com\`"
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth status\` and fix every account it reports"
 assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
 pass "doctor names every missing publishing sign-in"
 
@@ -282,7 +282,7 @@ ln -s /usr/bin/false "${fake_bin}/gh"
 if run_release; then
   fail "live release started without GitHub CLI sign-in"
 fi
-assert_contains "${output_log}" "GitHub CLI: run \`gh auth login --hostname github.com\`"
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth status\` and fix every account it reports"
 assert_not_contains "${bundle_log}" "args:"
 pass "live release stops before publishing when GitHub CLI sign-in is missing"
 
@@ -302,16 +302,20 @@ fi
 assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
 pass "doctor rejects a blank GEM_HOST_API_KEY even with a valid credentials file"
 
-setup_case doctor-gh-active-account
+setup_case doctor-gh-matches-release-gate
 rm "${fake_bin}/gh"
 cat >"${fake_bin}/gh" <<'RUBY'
 #!/usr/bin/env ruby
-# A stale inactive account makes `gh auth status` fail; an API call uses only the active token.
-exit(ARGV == %w[api --hostname github.com user] ? 0 : 1)
+# A stale account: the API works for the active token, but plain `gh auth status` fails, and the
+# release pre-flight (`verify_gh_auth`) aborts on that. The doctor must predict that gate.
+exit(ARGV == %w[auth status] ? 1 : 0)
 RUBY
 chmod +x "${fake_bin}/gh"
-run_release --doctor || fail "doctor rejected a valid active github.com account"
-pass "doctor checks the active github.com token through the API"
+if run_release --doctor; then
+  fail "doctor passed although the release's own gh auth status gate would abort"
+fi
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth status\` and fix every account it reports"
+pass "doctor runs the same gh auth status check as the release pre-flight"
 
 setup_case doctor-rubygems-host-key
 printf -- '---\nhttps://rubygems.org: rubygems_test_key\n' >"${HOME}/.gem/credentials"

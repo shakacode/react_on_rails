@@ -180,7 +180,9 @@ class ReleaseSupervisor
   # Accelerated RC reconciliation only writes GitHub tracker records, so it needs only gh.
   def doctor_publishing_auth!(publishing: true)
     missing = []
-    missing << "GitHub CLI: run `gh auth login --hostname github.com`" unless gh_signed_in?
+    unless gh_signed_in?
+      missing << "GitHub CLI: run `gh auth status` and fix every account it reports (or `gh auth login`)"
+    end
     if publishing
       missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
       rubygems_problem = rubygems_credentials_problem
@@ -191,10 +193,11 @@ class ReleaseSupervisor
     raise SupervisorError, "sign in before releasing:\n  #{missing.join("\n  ")}"
   end
 
-  # Calls the API with the active github.com token, so it works on every gh version and a
-  # stale inactive account cannot block a valid active one.
+  # The same command the release's own pre-flight (`verify_gh_auth` in rakelib/release.rake)
+  # runs, so this check predicts that gate: plain `gh auth status` fails when any account has a
+  # problem, and the release would then abort there.
   def gh_signed_in?
-    command_succeeds?("gh", "api", "--hostname", "github.com", "user")
+    command_succeeds?("gh", "auth", "status")
   end
 
   def npm_signed_in?
