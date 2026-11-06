@@ -1123,6 +1123,19 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#confirm_release!" do
+    around do |example|
+      original = ENV.fetch(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV, nil)
+      ENV.delete(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV)
+      example.run
+    ensure
+      if original.nil?
+        ENV.delete(RELEASE_CHANGELOG_DATE_OVERRIDE_ENV)
+      else
+        ENV[RELEASE_CHANGELOG_DATE_OVERRIDE_ENV] =
+          original
+      end
+    end
+
     before do
       allow(self).to receive(:changelog_section_heading_date).and_return(Date.today.strftime("%Y-%m-%d"))
     end
