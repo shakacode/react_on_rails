@@ -6,6 +6,7 @@ require "io/wait"
 require "open3"
 require "optparse"
 require "rubygems/version"
+require "tempfile"
 require_relative "../rakelib/release_changelog_selector"
 require_relative "../rakelib/release_lease_guard"
 
@@ -182,9 +183,8 @@ class ReleaseSupervisor
     missing << "GitHub CLI: run `gh auth login --hostname github.com`" unless gh_signed_in?
     if publishing
       missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
-      unless rubygems_credentials?
-        missing << "RubyGems: run `gem signin` (or `chmod 0600` its credentials file if RubyGems reports it insecure)"
-      end
+      rubygems_problem = rubygems_credentials_problem
+      missing << rubygems_problem if rubygems_problem
     end
     return if missing.empty?
 
@@ -201,23 +201,46 @@ class ReleaseSupervisor
     command_succeeds?("npm", "whoami", "--registry", NPM_REGISTRY)
   end
 
-  # No stdin, so a prompt cannot block, and a bounded wait, so a hung registry fails the check.
   def command_succeeds?(*command)
-    pid = Process.spawn(@env.to_h, *command, in: File::NULL, out: File::NULL, err: File::NULL, pgroup: true)
+    exit_status, _stderr = run_sign_in_check(*command)
+    exit_status&.zero? || false
+  end
+
+  # No stdin, so a prompt cannot block, and a bounded wait, so a hung registry fails the check.
+  # Returns [exit status or nil on timeout or spawn failure, stderr text].
+  def run_sign_in_check(*command)
+    Tempfile.create("release-sign-in-check") do |stderr_file|
+      pid = Process.spawn(@env.to_h, *command, in: File::NULL, out: File::NULL, err: stderr_file.path, pgroup: true)
+      begin
+        [wait_for_sign_in_check(pid), File.read(stderr_file.path).strip]
+      rescue Interrupt
+        kill_sign_in_check(pid)
+        raise
+      end
+    end
+  rescue SystemCallError
+    [nil, ""]
+  end
+
+  def wait_for_sign_in_check(pid)
     deadline = monotonic_now + SIGN_IN_CHECK_TIMEOUT
     loop do
       _pid, status = Process.wait2(pid, Process::WNOHANG)
-      return status.success? if status
+      return status.exitstatus if status
       break if monotonic_now >= deadline
 
       sleep(POLL_INTERVAL)
     end
-    # Kill the whole group so a wrapper such as an npm shim leaves no grandchildren behind.
+    kill_sign_in_check(pid)
+    nil
+  end
+
+  # Kill the whole group so a wrapper such as an npm shim leaves no grandchildren behind.
+  def kill_sign_in_check(pid)
     Process.kill("KILL", -pid)
     Process.wait(pid)
-    false
   rescue SystemCallError
-    false
+    nil
   end
 
   def monotonic_now
@@ -227,16 +250,37 @@ class ReleaseSupervisor
   # Ask RubyGems for the key `gem push` would use instead of re-implementing its rules. Its
   # api_key covers GEM_HOST_API_KEY (even blank), host-specific keys, the legacy and XDG
   # credentials files, and the 0600 permission check, which ends the child process on failure.
-  RUBYGEMS_KEY_PROBE = <<~RUBY
-    require "rubygems/gemcutter_utilities"
-    probe = Object.new.extend(Gem::GemcutterUtilities)
-    def probe.options = {}
-    key = probe.api_key
+  # Exit 0: a usable key. Exit 1: no key, or RubyGems refused the credentials file (its message
+  # is on stderr). Exit 3: the probe itself broke, for example after a RubyGems internals change.
+  RUBYGEMS_PROBE_BROKEN = 3
+  RUBYGEMS_KEY_PROBE = <<~RUBY.freeze
+    begin
+      require "rubygems/gemcutter_utilities"
+      probe = Object.new.extend(Gem::GemcutterUtilities)
+      def probe.options = {}
+      key = probe.api_key
+    rescue Gem::SystemExitException
+      raise
+    rescue StandardError, ScriptError => e
+      warn "RubyGems key probe failed: \#{e.class}: \#{e.message}"
+      exit #{RUBYGEMS_PROBE_BROKEN}
+    end
     exit(key.is_a?(String) && !key.strip.empty? ? 0 : 1)
   RUBY
 
-  def rubygems_credentials?
-    command_succeeds?(RbConfig.ruby, "-e", RUBYGEMS_KEY_PROBE)
+  # Returns nil when RubyGems has a usable key, otherwise the line to show the operator.
+  def rubygems_credentials_problem
+    exit_status, stderr = run_sign_in_check(RbConfig.ruby, "-e", RUBYGEMS_KEY_PROBE)
+    return nil if exit_status&.zero?
+
+    detail = stderr.lines.map(&:strip).reject(&:empty?).first(3).join(" ")
+    if exit_status == RUBYGEMS_PROBE_BROKEN
+      "RubyGems: could not check the API key (#{detail}); report this, then run `gem signin` only if needed"
+    elsif detail.empty?
+      "RubyGems: run `gem signin`"
+    else
+      "RubyGems: run `gem signin` (RubyGems said: #{detail})"
+    end
   end
 
   def print_doctor_success

@@ -173,7 +173,7 @@ RUBY
   mkdir -p "${HOME}/.gem"
   printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
   chmod 600 "${HOME}/.gem/credentials"
-  unset GEM_HOST_API_KEY XDG_DATA_HOME
+  unset GEM_HOST_API_KEY XDG_DATA_HOME RUBYGEMS_HOST GEMRC
   unset AGENT_COORD_API_URL AGENT_COORD_API_TOKEN AGENT_COORD_MACHINE_ID
   unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
   : >"${output_log}"
@@ -325,7 +325,18 @@ if run_release --doctor; then
   fail "doctor accepted a credentials file RubyGems refuses as insecure"
 fi
 assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
-pass "doctor rejects a RubyGems credentials file without 0600 permissions"
+assert_contains "${output_log}" "0600 is required"
+pass "doctor rejects a RubyGems credentials file without 0600 permissions and shows why"
+
+setup_case doctor-rubygems-probe-broken
+mkdir -p "${case_dir}/broken-rubygems/rubygems"
+printf 'raise LoadError, "simulated RubyGems internals change"\n' >"${case_dir}/broken-rubygems/rubygems/gemcutter_utilities.rb"
+if RUBYLIB="${case_dir}/broken-rubygems" run_release --doctor; then
+  fail "doctor passed although the RubyGems key probe could not run"
+fi
+assert_contains "${output_log}" "RubyGems: could not check the API key"
+assert_contains "${output_log}" "simulated RubyGems internals change"
+pass "doctor reports a broken RubyGems probe instead of asking for gem signin"
 
 setup_case doctor-rubygems-xdg-key
 rm "${HOME}/.gem/credentials"
