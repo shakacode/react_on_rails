@@ -967,3 +967,5 @@ class PrMergeLedgerTest < Minitest::Test
 end
 
 require_relative "pr_merge_ledger_closing_keyword_test"
+
+require_relative "pr_merge_ledger_screened_reader_test"
