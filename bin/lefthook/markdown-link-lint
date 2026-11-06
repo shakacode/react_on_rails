@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Check links in changed Markdown files with lychee
+# Check links in changed Markdown files with lychee.
+# Pre-push (branch context, online) checks local links in full and fetches only
+# remote URLs new since the merge base; see below.
 set -euo pipefail
 source "$(dirname "$0")/ensure-mise"
 
@@ -44,9 +46,75 @@ while IFS= read -r file; do
   [ -n "$file" ] && files_arr+=("$file")
 done <<< "$files"
 
-echo "🔗 Lychee (${mode_label}) on $CONTEXT Markdown files:"
-printf "  %s\n" "${files_arr[@]}"
+if [ "$CONTEXT" != "branch" ] || [ "$MODE" = "--offline" ]; then
+  echo "🔗 Lychee (${mode_label}) on $CONTEXT Markdown files:"
+  printf "  %s\n" "${files_arr[@]}"
 
-lychee "${lychee_args[@]}" "${files_arr[@]}"
+  lychee "${lychee_args[@]}" "${files_arr[@]}"
+
+  echo "✅ Markdown link checks passed"
+  exit 0
+fi
+
+# Pre-push (branch context, online). Checking every link in each changed file
+# re-fetched ~400 untouched CHANGELOG.md URLs on every push, and GitHub
+# throttling stretched that to 10+ minutes. Instead:
+#   1. Check every local link in the changed files offline. This covers relative
+#      links and this repository's blob/tree main links, which
+#      bin/lychee-self-repo-links turns into file:// URLs.
+#   2. Fetch only the remote URLs that are new in each file since the merge base.
+# CI's check-markdown-links workflow still checks every link.
+echo "🔗 Lychee (offline) on all local links in branch Markdown files:"
+printf "  %s\n" "${files_arr[@]}"
+lychee --config .lychee.toml --offline "${files_arr[@]}"
+
+repo_root="$(git rev-parse --show-toplevel)"
+# shellcheck source=script/lib/git-diff-base
+source "$repo_root/script/lib/git-diff-base"
+base="$(git_diff_base_normalize_base_ref "${BASE_REF:-}")"
+if ! merge_base="$(git_diff_base_resolve "$base" HEAD lenient)"; then
+  exit 1
+fi
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Print the remote URLs lychee would check in a Markdown file, after the
+# config's preprocess, remap, and exclude rules.
+remote_urls() {
+  lychee --config .lychee.toml --dump "$1" | { grep -E '^https?://' || true; } | LC_ALL=C sort -u
+}
+
+new_link_files=()
+for file in "${files_arr[@]}"; do
+  base_urls="$tmpdir/base-urls"
+  : > "$base_urls"
+  # A file added or renamed on this branch has no base version, so all its
+  # remote URLs are new. A base copy keeps the file's relative path, so
+  # exclude_path patterns match it the same way.
+  if [ "$(git cat-file -t "$merge_base:$file" 2>/dev/null || true)" = "blob" ]; then
+    base_copy="$tmpdir/base/$file"
+    mkdir -p "$(dirname "$base_copy")"
+    git show "$merge_base:$file" > "$base_copy"
+    remote_urls "$base_copy" > "$base_urls"
+  fi
+
+  new_links="$tmpdir/new/$file.new-links.txt"
+  mkdir -p "$(dirname "$new_links")"
+  remote_urls "$file" | LC_ALL=C comm -13 "$base_urls" - > "$new_links"
+  if [ -s "$new_links" ]; then
+    new_link_files+=("$new_links")
+    echo "🔗 New remote links in $file:"
+    sed 's/^/  /' "$new_links"
+  fi
+done
+
+if [ "${#new_link_files[@]}" -eq 0 ]; then
+  echo "✅ Local links passed; no new remote links to check (bin/check-links checks them all)"
+  exit 0
+fi
+
+echo "🔗 Lychee (online) on new remote links:"
+lychee --config .lychee.toml "${new_link_files[@]}"
 
 echo "✅ Markdown link checks passed"
