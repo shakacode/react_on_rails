@@ -173,7 +173,7 @@ RUBY
   mkdir -p "${HOME}/.gem"
   printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
   chmod 600 "${HOME}/.gem/credentials"
-  unset GEM_HOST_API_KEY XDG_DATA_HOME RUBYGEMS_HOST GEMRC
+  unset GEM_HOST_API_KEY GEM_RELEASE_KEY XDG_DATA_HOME RUBYGEMS_HOST GEMRC
   unset AGENT_COORD_API_URL AGENT_COORD_API_TOKEN AGENT_COORD_MACHINE_ID
   unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
   : >"${output_log}"
