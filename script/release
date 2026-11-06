@@ -6,7 +6,6 @@ require "io/wait"
 require "open3"
 require "optparse"
 require "rubygems/version"
-require "yaml"
 require_relative "../rakelib/release_changelog_selector"
 require_relative "../rakelib/release_lease_guard"
 
@@ -183,16 +182,19 @@ class ReleaseSupervisor
     missing << "GitHub CLI: run `gh auth login --hostname github.com`" unless gh_signed_in?
     if publishing
       missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
-      missing << "RubyGems: run `gem signin`" unless rubygems_credentials?
+      unless rubygems_credentials?
+        missing << "RubyGems: run `gem signin` (or `chmod 0600` its credentials file if RubyGems reports it insecure)"
+      end
     end
     return if missing.empty?
 
     raise SupervisorError, "sign in before releasing:\n  #{missing.join("\n  ")}"
   end
 
-  # --active: a stale inactive account on github.com must not block a valid active one.
+  # Calls the API with the active github.com token, so it works on every gh version and a
+  # stale inactive account cannot block a valid active one.
   def gh_signed_in?
-    command_succeeds?("gh", "auth", "status", "--active", "--hostname", "github.com")
+    command_succeeds?("gh", "api", "--hostname", "github.com", "user")
   end
 
   def npm_signed_in?
@@ -201,7 +203,7 @@ class ReleaseSupervisor
 
   # No stdin, so a prompt cannot block, and a bounded wait, so a hung registry fails the check.
   def command_succeeds?(*command)
-    pid = Process.spawn(*command, in: File::NULL, out: File::NULL, err: File::NULL, pgroup: true)
+    pid = Process.spawn(@env.to_h, *command, in: File::NULL, out: File::NULL, err: File::NULL, pgroup: true)
     deadline = monotonic_now + SIGN_IN_CHECK_TIMEOUT
     loop do
       _pid, status = Process.wait2(pid, Process::WNOHANG)
@@ -222,31 +224,19 @@ class ReleaseSupervisor
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end
 
+  # Ask RubyGems for the key `gem push` would use instead of re-implementing its rules. Its
+  # api_key covers GEM_HOST_API_KEY (even blank), host-specific keys, the legacy and XDG
+  # credentials files, and the 0600 permission check, which ends the child process on failure.
+  RUBYGEMS_KEY_PROBE = <<~RUBY
+    require "rubygems/gemcutter_utilities"
+    probe = Object.new.extend(Gem::GemcutterUtilities)
+    def probe.options = {}
+    key = probe.api_key
+    exit(key.is_a?(String) && !key.strip.empty? ? 0 : 1)
+  RUBY
+
   def rubygems_credentials?
-    # RubyGems uses GEM_HOST_API_KEY whenever it is set, even blank, ahead of any credentials file.
-    return !@env.fetch("GEM_HOST_API_KEY").strip.empty? if @env.key?("GEM_HOST_API_KEY")
-
-    path = rubygems_credentials_path
-    return false unless File.file?(path)
-
-    credentials = YAML.safe_load_file(path, permitted_classes: [Symbol])
-    return false unless credentials.is_a?(Hash)
-
-    key = credentials[:rubygems_api_key] || credentials["rubygems_api_key"]
-    key.is_a?(String) && !key.strip.empty?
-  rescue Psych::Exception, SystemCallError
-    false
-  end
-
-  # RubyGems reads the legacy file whenever it exists and only falls back to the XDG location.
-  def rubygems_credentials_path
-    home = @env.fetch("HOME", "")
-    legacy = File.join(home, ".gem", "credentials")
-    return legacy if File.exist?(legacy)
-
-    data_home = @env.fetch("XDG_DATA_HOME", "")
-    data_home = File.join(home, ".local", "share") if data_home.empty?
-    File.join(data_home, "gem", "credentials")
+    command_succeeds?(RbConfig.ruby, "-e", RUBYGEMS_KEY_PROBE)
   end
 
   def print_doctor_success

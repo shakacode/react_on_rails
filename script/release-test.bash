@@ -172,6 +172,7 @@ RUBY
   export HOME="${case_dir}/home"
   mkdir -p "${HOME}/.gem"
   printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+  chmod 600 "${HOME}/.gem/credentials"
   unset GEM_HOST_API_KEY XDG_DATA_HOME
   unset AGENT_COORD_API_URL AGENT_COORD_API_TOKEN AGENT_COORD_MACHINE_ID
   unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
@@ -287,6 +288,7 @@ pass "live release stops before publishing when GitHub CLI sign-in is missing"
 
 setup_case doctor-rubygems-empty-key
 printf -- '---\n:rubygems_api_key:\n:other: value\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
 if run_release --doctor; then
   fail "doctor accepted an empty RubyGems key in the credentials file"
 fi
@@ -304,25 +306,42 @@ setup_case doctor-gh-active-account
 rm "${fake_bin}/gh"
 cat >"${fake_bin}/gh" <<'RUBY'
 #!/usr/bin/env ruby
-# Succeeds only for the active account, as gh does when an inactive account is stale.
-exit(ARGV.include?("--active") ? 0 : 1)
+# A stale inactive account makes `gh auth status` fail; an API call uses only the active token.
+exit(ARGV == %w[api --hostname github.com user] ? 0 : 1)
 RUBY
 chmod +x "${fake_bin}/gh"
 run_release --doctor || fail "doctor rejected a valid active github.com account"
-pass "doctor checks only the active github.com account"
+pass "doctor checks the active github.com token through the API"
+
+setup_case doctor-rubygems-host-key
+printf -- '---\nhttps://rubygems.org: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
+run_release --doctor || fail "doctor rejected a host-specific RubyGems key"
+pass "doctor accepts a host-specific RubyGems key"
+
+setup_case doctor-rubygems-insecure-file
+chmod 644 "${HOME}/.gem/credentials"
+if run_release --doctor; then
+  fail "doctor accepted a credentials file RubyGems refuses as insecure"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor rejects a RubyGems credentials file without 0600 permissions"
 
 setup_case doctor-rubygems-xdg-key
 rm "${HOME}/.gem/credentials"
 rmdir "${HOME}/.gem"
 mkdir -p "${HOME}/.local/share/gem"
 printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.local/share/gem/credentials"
+chmod 600 "${HOME}/.local/share/gem/credentials"
 run_release --doctor || fail "doctor rejected the XDG RubyGems credentials file"
 pass "doctor reads the XDG RubyGems credentials file when no legacy file exists"
 
 setup_case doctor-rubygems-legacy-file-wins
 printf -- '---\n:other: value\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
 mkdir -p "${HOME}/.local/share/gem"
 printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.local/share/gem/credentials"
+chmod 600 "${HOME}/.local/share/gem/credentials"
 if run_release --doctor; then
   fail "doctor read the XDG key although RubyGems uses the legacy file"
 fi
