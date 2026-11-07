@@ -396,7 +396,10 @@ describe ReactOnRailsPro::AssetsPrecompile do
   end
 
   describe ".publish_current_bundle_if_configured" do
-    let(:server_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-server-bundle.js") }
+    # A per-example temp dir keeps concurrent suite runs on one machine (other
+    # worktrees or sessions) from deleting or overwriting each other's files.
+    let(:upload_tmp_dir) { Dir.mktmpdir("rolling-deploy-upload") }
+    let(:server_bundle) { File.join(upload_tmp_dir, "rolling-deploy-upload-server-bundle.js") }
     let(:server_artifact) do
       ReactOnRailsPro::RendererArtifact.new(role: :server, bundle: server_bundle, companions: {})
     end
@@ -428,7 +431,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
 
     after do
-      FileUtils.rm_rf(server_bundle)
+      FileUtils.rm_rf(upload_tmp_dir)
     end
 
     it "is a no-op when no rolling_deploy_adapter is configured" do
@@ -559,7 +562,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
 
     context "when RSC support is enabled" do
-      let(:rsc_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-rsc-bundle.js") }
+      let(:rsc_bundle) { File.join(upload_tmp_dir, "rolling-deploy-upload-rsc-bundle.js") }
       let(:rsc_artifact) do
         ReactOnRailsPro::RendererArtifact.new(role: :rsc, bundle: rsc_bundle, companions: {})
       end
@@ -582,8 +585,6 @@ describe ReactOnRailsPro::AssetsPrecompile do
                                                           ])
         allow(adapter).to receive(:upload)
       end
-
-      after { FileUtils.rm_f(rsc_bundle) }
 
       it "uploads both server and RSC bundles" do
         described_class.send(:publish_current_bundle_if_configured)
@@ -656,8 +657,8 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
 
     context "when collect_assets returns a missing optional asset path" do
-      let(:existing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-existing-asset.js") }
-      let(:missing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-missing-asset.js") }
+      let(:existing_asset) { File.join(upload_tmp_dir, "rolling-deploy-upload-existing-asset.js") }
+      let(:missing_asset) { File.join(upload_tmp_dir, "rolling-deploy-upload-missing-asset.js") }
 
       before do
         File.write(existing_asset, "// existing asset")
@@ -666,8 +667,6 @@ describe ReactOnRailsPro::AssetsPrecompile do
           .and_return([existing_asset, missing_asset])
         allow(adapter).to receive(:upload)
       end
-
-      after { FileUtils.rm_f(existing_asset) }
 
       it "filters out missing assets, warns, and still uploads the remaining ones" do
         result = nil
@@ -679,7 +678,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
 
     context "when collect_assets returns a directory asset path" do
-      let(:existing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-existing-file.js") }
+      let(:existing_asset) { File.join(upload_tmp_dir, "rolling-deploy-upload-existing-file.js") }
       let(:directory_asset) { Dir.mktmpdir("rolling-deploy-upload-directory-asset") }
 
       before do
@@ -689,10 +688,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
         allow(adapter).to receive(:upload)
       end
 
-      after do
-        FileUtils.rm_f(existing_asset)
-        FileUtils.rm_rf(directory_asset)
-      end
+      after { FileUtils.rm_rf(directory_asset) }
 
       it "filters out non-file assets, warns, and still uploads the remaining files" do
         result = nil
@@ -708,8 +704,8 @@ describe ReactOnRailsPro::AssetsPrecompile do
     # the partition step a mixed payload could mis-label one bucket as the
     # other in the warning, hiding which entries actually went missing.
     context "when collect_assets returns a mix of valid, missing, and non-file paths" do
-      let(:valid_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-valid.js") }
-      let(:missing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-missing.js") }
+      let(:valid_asset) { File.join(upload_tmp_dir, "rolling-deploy-upload-valid.js") }
+      let(:missing_asset) { File.join(upload_tmp_dir, "rolling-deploy-upload-missing.js") }
       let(:directory_asset) { Dir.mktmpdir("rolling-deploy-upload-mixed-dir") }
 
       before do
@@ -720,10 +716,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
         allow(adapter).to receive(:upload)
       end
 
-      after do
-        FileUtils.rm_f(valid_asset)
-        FileUtils.rm_rf(directory_asset)
-      end
+      after { FileUtils.rm_rf(directory_asset) }
 
       it "uploads only the valid entries and warns about both invalid kinds in a single line" do
         warning_pattern = /Skipping invalid assets.*missing:.*rolling-deploy-upload-missing.*not a file:.*mixed-dir/m
@@ -738,7 +731,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
 
     context "when a missing upload asset is required for RSC" do
-      let(:missing_manifest) { File.join(Dir.tmpdir, "react-client-manifest.json") }
+      let(:missing_manifest) { File.join(upload_tmp_dir, "react-client-manifest.json") }
 
       before do
         allow(config).to receive(:enable_rsc_support).and_return(true)
@@ -756,8 +749,8 @@ describe ReactOnRailsPro::AssetsPrecompile do
       # Regression: a same-basename match between an unrelated missing asset and a
       # required RSC manifest must not trigger the required-companion warning when
       # the real required file lives at a different expanded path.
-      let(:required_manifest) { File.join(Dir.tmpdir, "react-rolling-deploy-required-manifest.json") }
-      let(:unrelated_missing) { File.join(Dir.tmpdir, "unrelated", File.basename(required_manifest)) }
+      let(:required_manifest) { File.join(upload_tmp_dir, "react-rolling-deploy-required-manifest.json") }
+      let(:unrelated_missing) { File.join(upload_tmp_dir, "unrelated", File.basename(required_manifest)) }
 
       before do
         File.write(required_manifest, "{}")
@@ -765,8 +758,6 @@ describe ReactOnRailsPro::AssetsPrecompile do
         allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths_for_current_config)
           .and_return(Set.new([required_manifest]))
       end
-
-      after { FileUtils.rm_f(required_manifest) }
 
       it "does not flag the required RSC companion when only an unrelated same-name asset is missing" do
         expect { described_class.send(:filter_existing_assets, [required_manifest, unrelated_missing]) }
@@ -800,7 +791,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
     context "when collect_assets returns a URL-backed asset (dev server)" do
       let(:url_asset) { "http://localhost:3035/packs/manifest.json" }
-      let(:existing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-with-url.js") }
+      let(:existing_asset) { File.join(upload_tmp_dir, "rolling-deploy-upload-with-url.js") }
 
       before do
         File.write(existing_asset, "// existing asset")
@@ -808,8 +799,6 @@ describe ReactOnRailsPro::AssetsPrecompile do
           .and_return([existing_asset, url_asset])
         allow(adapter).to receive(:upload)
       end
-
-      after { FileUtils.rm_f(existing_asset) }
 
       it "skips URL-backed assets without misclassifying them as missing files" do
         expect(described_class.send(:filter_existing_assets, [existing_asset, url_asset])).to eq([existing_asset])

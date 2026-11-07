@@ -35,6 +35,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5223](https://github.com/shakacode/react_on_rails/pull/5223) by
   [justin808](https://github.com/justin808). Fixes
   [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
+- **[Pro]** **Node Renderer server bundles read globals faster**: on Node 20.18+ and 22.8+, the
+  Node Renderer builds each bundle's VM context with `vm.constants.DONT_CONTEXTIFY`, so global
+  lookups inside the bundle skip V8's sandbox interceptors. Renders of three real application
+  bundles used about 20-25% less CPU in a local A/B. Rendered HTML and request isolation are
+  unchanged, and older Node versions keep the previous context.
+  [PR 5313](https://github.com/shakacode/react_on_rails/pull/5313) by
+  [alexeyr-ci2](https://github.com/alexeyr-ci2) and [justin808](https://github.com/justin808).
 
 #### Changed
 
@@ -63,6 +70,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   fallback path.
   Fixes [Issue 5288](https://github.com/shakacode/react_on_rails/issues/5288).
   [PR 5319](https://github.com/shakacode/react_on_rails/pull/5319) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **TanStack Router SSR now passes `dehydrate` output to `hydrate`**: `react-on-rails-pro/tanstack-router`
+  now calls the router's `dehydrate` option once on the server after `router.load()`, and passes its result to the
+  `hydrate` option on the client. Previously the helper probed a `router.dehydrate()` method that TanStack Router
+  does not have, so `hydrate` always received `undefined` and a TanStack Query cache or other external state never
+  reached the client. The value travels as JSON, so `Date`, `Error`, and `Map` values lose their types. The helper
+  no longer calls custom `router.dehydrate()` or `router.hydrate()` methods.
+  Fixes [Issue 5126](https://github.com/shakacode/react_on_rails/issues/5126).
+  [PR 5312](https://github.com/shakacode/react_on_rails/pull/5312) by [justin808](https://github.com/justin808).
 
 - **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
   `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in

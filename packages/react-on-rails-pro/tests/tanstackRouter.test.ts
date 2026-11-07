@@ -68,14 +68,19 @@ function buildRouter(): TanStackRouter {
     loadRouteChunk: undefined,
     state,
     options: {
+      // Async on purpose: the server render must await RouterOptions.dehydrate.
+      dehydrate: jest.fn().mockResolvedValue({ queryCache: { products: ['hammer'] } }),
       hydrate: jest.fn(),
     },
-    dehydrate: jest.fn().mockReturnValue({ matches: [{ id: 'products' }] }),
-    hydrate: jest.fn(),
   };
 }
 
-function buildActualTanStackRouter(): TanStackRouter {
+function buildActualTanStackRouter(
+  ssrHooks: {
+    dehydrate?: () => unknown;
+    hydrate?: (dehydrated: unknown) => void | Promise<void>;
+  } = {},
+): TanStackRouter {
   const RootLayout = () => React.createElement('div', null, React.createElement('main'));
   const ProductsPage = () => React.createElement('h1', null, 'Products');
   const rootRoute = createRootRoute({ component: RootLayout });
@@ -90,7 +95,8 @@ function buildActualTanStackRouter(): TanStackRouter {
   return createActualRouter({
     routeTree,
     history: createActualMemoryHistory({ initialEntries: ['/products'] }),
-  }) as unknown as TanStackRouter;
+    ...ssrHooks,
+  } as Parameters<typeof createActualRouter>[0]) as unknown as TanStackRouter;
 }
 
 async function compatAct(callback: () => void | Promise<void>): Promise<void> {
@@ -215,7 +221,7 @@ describe('tanstack-router integration (Pro)', () => {
     expect(resolved.clientProps).toEqual({
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         ssrRouter: {
           manifest: undefined,
           lastMatchId: '\u0000products',
@@ -438,6 +444,52 @@ describe('tanstack-router integration (Pro)', () => {
       );
     }));
 
+  it('carries RouterOptions.dehydrate output from an actual server router to RouterOptions.hydrate on the client', () =>
+    withResponsePolyfill(async () => {
+      const queryCacheState = { queries: [{ queryKey: ['products'], data: ['hammer'] }] };
+      const dehydrate = jest.fn(() => ({ queryCacheState }));
+      const serverRouter = buildActualTanStackRouter({ dehydrate });
+      const serverResult = await serverRenderTanStackAppAsync(
+        { createRouter: () => serverRouter },
+        {},
+        {
+          serverSide: true,
+          pathname: '/products',
+          search: '',
+        } as unknown as RailsContext & { serverSide: true },
+        ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+        ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+      );
+
+      expect(dehydrate).toHaveBeenCalledTimes(1);
+
+      // Send the payload through the same JSON channel Rails uses for props.
+      const props = JSON.parse(
+        JSON.stringify({ __tanstackRouterDehydratedState: serverResult.dehydratedState }),
+      ) as Record<string, unknown>;
+
+      const hydrate = jest.fn();
+      const clientRouter = buildActualTanStackRouter({ hydrate });
+      const renderFn = createTanStackRouterRenderFunction(
+        { createRouter: () => clientRouter },
+        {
+          RouterProvider: ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+          createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+          createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+        },
+      );
+      const result = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
+
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+      expect(hydrate).toHaveBeenCalledTimes(1);
+      expect(hydrate).toHaveBeenCalledWith({ queryCacheState });
+    }));
+
   it('hydrates server-rendered HTML from actual router loader state without recoverable hydration errors', () =>
     withResponsePolyfill(async () => {
       // This narrow provider intentionally reads the first-render router state.
@@ -560,7 +612,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         ssrRouter: {
           manifest: undefined,
           lastMatchId: '\u0000products',
@@ -862,7 +914,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
       userId: 42,
     };
@@ -903,7 +955,7 @@ describe('tanstack-router integration (Pro)', () => {
       {
         __tanstackRouterDehydratedState: {
           url: '/products?category=tools',
-          dehydratedRouter: { matches: [{ id: 'products' }] },
+          dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         },
       },
       {
@@ -917,7 +969,7 @@ describe('tanstack-router integration (Pro)', () => {
       React.createElement(result as React.ComponentType<Record<string, unknown>>, {
         __tanstackRouterDehydratedState: {
           url: '/products?category=tools',
-          dehydratedRouter: { matches: [{ id: 'products' }] },
+          dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         },
       }),
     );
@@ -963,7 +1015,7 @@ describe('tanstack-router integration (Pro)', () => {
       {
         __tanstackRouterDehydratedState: {
           url: '/products?category=tools',
-          dehydratedRouter: { matches: [{ id: 'products' }] },
+          dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         },
       },
       {
@@ -977,7 +1029,7 @@ describe('tanstack-router integration (Pro)', () => {
       React.createElement(result as React.ComponentType<Record<string, unknown>>, {
         __tanstackRouterDehydratedState: {
           url: '/products?category=tools',
-          dehydratedRouter: { matches: [{ id: 'products' }] },
+          dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         },
       }),
     );
@@ -1013,7 +1065,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const result = renderFn(props, {
@@ -1341,7 +1393,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -1404,7 +1456,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -1467,7 +1519,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -1526,7 +1578,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -1593,7 +1645,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -1630,7 +1682,6 @@ describe('tanstack-router integration (Pro)', () => {
 
   it('does not throw on client hydration when the SSR payload has no dehydrated router data', () => {
     const router = buildRouter();
-    router.dehydrate = jest.fn().mockReturnValue(null);
 
     const options = {
       createRouter: () => router,
@@ -1687,7 +1738,7 @@ describe('tanstack-router integration (Pro)', () => {
         }),
       ),
     ).not.toThrow();
-    expect(router.hydrate).not.toHaveBeenCalled();
+    expect(router.options?.hydrate).toHaveBeenCalledWith(undefined);
   });
 
   it('treats a null SSR payload as absent during client hydration', () => {
@@ -1729,13 +1780,13 @@ describe('tanstack-router integration (Pro)', () => {
         }),
       ),
     ).not.toThrow();
-    expect(router.hydrate).not.toHaveBeenCalled();
+    expect(router.options?.hydrate).not.toHaveBeenCalled();
     expect(router.ssr).toBeFalsy();
   });
 
-  it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
+  it('builds SSR match payloads even when RouterOptions.dehydrate is not defined', async () => {
     const router = buildRouter();
-    delete router.dehydrate;
+    delete router.options?.dehydrate;
 
     const result = await serverRenderTanStackAppAsync(
       { createRouter: () => router },
@@ -1800,7 +1851,7 @@ describe('tanstack-router integration (Pro)', () => {
     expect(router.ssr).toBeUndefined();
     expect(result.dehydratedState).toEqual({
       url: '/products?category=tools',
-      dehydratedRouter: { matches: [{ id: 'products' }] },
+      dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       ssrRouter: {
         manifest: undefined,
         lastMatchId: '\u0000products',
@@ -1859,7 +1910,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -1948,7 +1999,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const clientApp = renderFn(props, {
@@ -2031,7 +2082,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const Client = renderFn(props, {
@@ -2111,7 +2162,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
       },
     };
     const Client = renderFn(props, {
@@ -2191,7 +2242,7 @@ describe('tanstack-router integration (Pro)', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
+        dehydratedRouter: { dehydratedData: { queryCache: { products: ['hammer'] } } },
         ssrRouter: {
           manifest: undefined,
           lastMatchId: '\u0000products',
