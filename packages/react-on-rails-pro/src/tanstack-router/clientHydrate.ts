@@ -280,8 +280,6 @@ function TanStackHydrationApp({
     | null
     | undefined;
   const hasSsrPayload = dehydratedState != null;
-  const hasDehydratedRouter =
-    dehydratedState?.dehydratedRouter !== undefined && dehydratedState.dehydratedRouter !== null;
 
   const routerRef = useRef<TanStackRouter | null>(null);
   const didTriggerPostHydrationLoadRef = useRef(false);
@@ -432,12 +430,6 @@ function TanStackHydrationApp({
             // Let async hydration failures reject so we do not continue into
             // router.load() with partially hydrated client state.
             hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult).then(() => undefined);
-          }
-
-          // Backward-compatibility hook: if user router exposes router.hydrate(),
-          // invoke it with the full dehydrated router payload.
-          if (hasDehydratedRouter && typeof router.hydrate === 'function') {
-            router.hydrate(dehydratedState.dehydratedRouter);
           }
         } catch (error) {
           // If render-phase hydration throws, clear only the temporary SSR flag
