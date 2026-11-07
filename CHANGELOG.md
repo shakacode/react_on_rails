@@ -24,6 +24,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **[Pro] The Node renderer now requires Node.js 20.19 or later**: `react-on-rails-pro-node-renderer`
+  raises `engines.node` from `>=18.19.0` to `>=20.19.0`. Fresh installs already resolved Fastify 5
+  dependencies that declare Node 20 or later, and the renderer already exited at startup on Node 18.
+  The documented Node 18 workaround, overriding `fastify` to `^4.29.0`, is no longer supported
+  because Fastify 4 is affected by
+  [GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7).
+  **Action required for upgraders:** run the Node renderer on Node.js 20.19 or later, and remove any
+  `fastify`, `@fastify/formbody`, or `@fastify/multipart` overrides or resolutions that pin Fastify 4. On Node.js 20 with npm `engine-strict`, a fresh install can still reject
+  `cookie` 2.x, which needs Node.js 22; the Node renderer docs show an override. A new weekly CI
+  check fails when a fresh install resolves a package that rejects the advertised floor.
+  [PR 5317](https://github.com/shakacode/react_on_rails/pull/5317) by
+  [justin808](https://github.com/justin808). Part of
+  [Issue 5305](https://github.com/shakacode/react_on_rails/issues/5305).
+
 #### Improved
 
 - **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
