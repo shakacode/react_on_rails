@@ -168,6 +168,12 @@ RUBY
   export TEST_BUNDLE_LOG="${bundle_log}"
   export TEST_BRANCH="release/17.1.0"
   export TEST_BUNDLE_MODE="success"
+  # Publishing sign-in: the fake npm and gh succeed; give RubyGems a stand-in credential in an isolated HOME.
+  export HOME="${case_dir}/home"
+  mkdir -p "${HOME}/.gem"
+  printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+  chmod 600 "${HOME}/.gem/credentials"
+  unset GEM_HOST_API_KEY GEM_RELEASE_KEY XDG_DATA_HOME RUBYGEMS_HOST GEMRC
   unset AGENT_COORD_API_URL AGENT_COORD_API_TOKEN AGENT_COORD_MACHINE_ID
   unset RELEASE_COORDINATOR_ID RELEASE_COORDINATOR_INSTANCE_ID
   : >"${output_log}"
@@ -186,8 +192,8 @@ run_live_headless() {
     Process.setsid
     $stdin.reopen("/dev/null")
     Dir.chdir(ENV.fetch("TEST_CASE_REPO"))
-    exec File.join(ENV.fetch("TEST_CASE_REPO"), "script", "release")
-  ' >"${output_log}" 2>&1
+    exec File.join(ENV.fetch("TEST_CASE_REPO"), "script", "release"), *ARGV
+  ' -- "$@" >"${output_log}" 2>&1
 }
 
 start_live_headless() {
@@ -239,6 +245,174 @@ if PATH="${fake_bin}" run_release --doctor; then
 fi
 assert_contains "${output_log}" "install required release tool(s) on PATH: npm"
 pass "doctor still validates publishing tools"
+
+setup_case doctor-missing-signin
+rm "${fake_bin}/npm" "${fake_bin}/gh"
+ln -s /usr/bin/false "${fake_bin}/npm"
+ln -s /usr/bin/false "${fake_bin}/gh"
+rm "${HOME}/.gem/credentials"
+if run_release --doctor; then
+  fail "release doctor accepted missing publishing sign-in"
+fi
+assert_contains "${output_log}" "sign in before releasing:"
+assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth status\` and fix every account it reports"
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor names every missing publishing sign-in"
+
+setup_case doctor-rubygems-env-key
+rm "${HOME}/.gem/credentials"
+GEM_HOST_API_KEY=rubygems_test_key run_release --doctor || fail "doctor rejected GEM_HOST_API_KEY"
+assert_contains "${output_log}" "publishing sign-in: npm and GitHub CLI signed in, RubyGems API key present"
+pass "doctor accepts a RubyGems key from GEM_HOST_API_KEY"
+
+setup_case live-missing-signin
+rm "${fake_bin}/npm"
+ln -s /usr/bin/false "${fake_bin}/npm"
+if run_release; then
+  fail "live release started without npm sign-in"
+fi
+assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
+assert_not_contains "${bundle_log}" "args:"
+pass "live release stops before publishing when npm sign-in is missing"
+
+setup_case live-missing-gh-signin
+rm "${fake_bin}/gh"
+ln -s /usr/bin/false "${fake_bin}/gh"
+if run_release; then
+  fail "live release started without GitHub CLI sign-in"
+fi
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth status\` and fix every account it reports"
+assert_not_contains "${bundle_log}" "args:"
+pass "live release stops before publishing when GitHub CLI sign-in is missing"
+
+setup_case doctor-rubygems-empty-key
+printf -- '---\n:rubygems_api_key:\n:other: value\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
+if run_release --doctor; then
+  fail "doctor accepted an empty RubyGems key in the credentials file"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor rejects an empty RubyGems key"
+
+setup_case doctor-rubygems-blank-env-key
+if GEM_HOST_API_KEY="   " run_release --doctor; then
+  fail "doctor fell back to the credentials file although a blank GEM_HOST_API_KEY wins in RubyGems"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor rejects a blank GEM_HOST_API_KEY even with a valid credentials file"
+
+setup_case doctor-gh-matches-release-gate
+rm "${fake_bin}/gh"
+cat >"${fake_bin}/gh" <<'RUBY'
+#!/usr/bin/env ruby
+# A stale account: the API works for the active token, but plain `gh auth status` fails, and the
+# release pre-flight (`verify_gh_auth`) aborts on that. The doctor must predict that gate.
+exit(ARGV == %w[auth status] ? 1 : 0)
+RUBY
+chmod +x "${fake_bin}/gh"
+if run_release --doctor; then
+  fail "doctor passed although the release's own gh auth status gate would abort"
+fi
+assert_contains "${output_log}" "GitHub CLI: run \`gh auth status\` and fix every account it reports"
+pass "doctor runs the same gh auth status check as the release pre-flight"
+
+setup_case doctor-rubygems-host-key
+printf -- '---\nhttps://rubygems.org: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
+run_release --doctor || fail "doctor rejected a host-specific RubyGems key"
+pass "doctor accepts a host-specific RubyGems key"
+
+setup_case doctor-rubygems-insecure-file
+chmod 644 "${HOME}/.gem/credentials"
+if run_release --doctor; then
+  fail "doctor accepted a credentials file RubyGems refuses as insecure"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+assert_contains "${output_log}" "0600 is required"
+pass "doctor rejects a RubyGems credentials file without 0600 permissions and shows why"
+
+setup_case doctor-rubygems-probe-broken
+mkdir -p "${case_dir}/broken-rubygems/rubygems"
+printf 'raise LoadError, "simulated RubyGems internals change"\n' >"${case_dir}/broken-rubygems/rubygems/gemcutter_utilities.rb"
+if RUBYLIB="${case_dir}/broken-rubygems" run_release --doctor; then
+  fail "doctor passed although the RubyGems key probe could not run"
+fi
+assert_contains "${output_log}" "RubyGems: could not check the API key"
+assert_contains "${output_log}" "simulated RubyGems internals change"
+pass "doctor reports a broken RubyGems probe instead of asking for gem signin"
+
+setup_case doctor-rubygems-xdg-key
+rm "${HOME}/.gem/credentials"
+rmdir "${HOME}/.gem"
+mkdir -p "${HOME}/.local/share/gem"
+printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.local/share/gem/credentials"
+chmod 600 "${HOME}/.local/share/gem/credentials"
+run_release --doctor || fail "doctor rejected the XDG RubyGems credentials file"
+pass "doctor reads the XDG RubyGems credentials file when no legacy file exists"
+
+setup_case doctor-rubygems-legacy-file-wins
+printf -- '---\n:other: value\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
+mkdir -p "${HOME}/.local/share/gem"
+printf -- '---\n:rubygems_api_key: rubygems_test_key\n' >"${HOME}/.local/share/gem/credentials"
+chmod 600 "${HOME}/.local/share/gem/credentials"
+if run_release --doctor; then
+  fail "doctor read the XDG key although RubyGems uses the legacy file"
+fi
+assert_contains "${output_log}" "RubyGems: run \`gem signin\`"
+pass "doctor checks the credentials file RubyGems actually reads"
+
+setup_case reconcile-needs-only-gh-signin
+rm "${fake_bin}/npm" "${HOME}/.gem/credentials"
+ln -s /usr/bin/false "${fake_bin}/npm"
+# Headless, so the foreground-terminal gate cannot stop it when the harness runs in a terminal.
+run_live_headless --reconcile-accelerated-rc || true
+assert_not_contains "${output_log}" "sign in before releasing:"
+# Positive proof it got past the sign-in check: the reconcile Rake task started.
+assert_contains "${bundle_log}" "release:reconcile_accelerated_rc[17.1.0.rc.0]"
+pass "accelerated RC reconciliation does not require npm or RubyGems sign-in"
+
+setup_case doctor-rubygems-named-release-key
+printf -- '---\n:release_key: rubygems_test_key\n' >"${HOME}/.gem/credentials"
+chmod 600 "${HOME}/.gem/credentials"
+GEM_RELEASE_KEY=release_key run_release --doctor || fail "doctor rejected the named key gem release uses"
+pass "doctor accepts the named RubyGems key selected by GEM_RELEASE_KEY"
+
+setup_case doctor-sign-in-check-timeout
+rm "${fake_bin}/npm"
+cat >"${fake_bin}/npm" <<'SH'
+#!/bin/sh
+# A hung registry: a grandchild that would outlive a kill aimed only at this process.
+sleep 60 &
+echo "$!" >"${TEST_HUNG_CHILD_PID_FILE}"
+wait
+SH
+chmod +x "${fake_bin}/npm"
+export TEST_HUNG_CHILD_PID_FILE="${case_dir}/hung-child.pid"
+started_at=$(date +%s)
+if REACT_ON_RAILS_RELEASE_SIGN_IN_TIMEOUT=1 run_release --doctor; then
+  fail "doctor passed although the npm check hung"
+fi
+elapsed=$(($(date +%s) - started_at))
+[ "${elapsed}" -lt 15 ] || fail "doctor took ${elapsed}s; the sign-in check timeout did not apply"
+assert_contains "${output_log}" "npm: run \`npm login --registry https://registry.npmjs.org/\`"
+[ -s "${TEST_HUNG_CHILD_PID_FILE}" ] || fail "the hung npm shim never recorded its grandchild PID"
+hung_child_pid="$(cat "${TEST_HUNG_CHILD_PID_FILE}")"
+# SIGKILL to the group is asynchronous, so allow a short window for the grandchild to die. A killed
+# grandchild can also linger as a zombie where PID 1 reaps slowly, so only a live process counts.
+hung_child_stat=""
+for _attempt in $(seq 1 50); do
+  hung_child_stat="$(ps -o stat= -p "${hung_child_pid}" 2>/dev/null || true)"
+  if [ -z "${hung_child_stat}" ] || [[ "${hung_child_stat}" == Z* ]]; then
+    hung_child_stat=""
+    break
+  fi
+  sleep 0.1
+done
+[ -z "${hung_child_stat}" ] || fail "the hung check's grandchild survived the timeout (state ${hung_child_stat})"
+unset TEST_HUNG_CHILD_PID_FILE
+pass "a hung sign-in check times out and its whole process group is killed"
 
 setup_case changelog-selected-dry-run
 run_release --dry-run || fail "argumentless dry-run failed"
