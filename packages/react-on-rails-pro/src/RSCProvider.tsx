@@ -34,7 +34,16 @@ import {
   RSC_PAYLOAD_FAILURE_RETENTION_MS,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
+import type { RSCStreamObserver, RSCStreamState } from './RSCStreamCompletion.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
+
+export type RSCRefetchRecovery = {
+  fallback: Promise<ReactNode>;
+  recover: (error: Error) => void;
+  canRecover: () => boolean;
+  hasFailed: () => boolean;
+  commit: () => void;
+};
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
@@ -43,9 +52,12 @@ type RSCContextType = {
     componentName: string,
     componentProps: unknown,
     recoverOnError?: boolean,
+    onStreamError?: (error: Error) => void,
   ) => Promise<ReactNode>;
 
   getRefetchVersion: (componentName: string, componentProps: unknown) => number;
+
+  getRenderRecovery: (promise: Promise<ReactNode>) => RSCRefetchRecovery | undefined;
 
   retainComponent: (componentName: string, componentProps: unknown) => () => void;
 
@@ -115,7 +127,10 @@ const isRetryableRSCPayloadError = (error: unknown): boolean => {
  * This factory function accepts an environment-specific getServerComponent implementation,
  * allowing it to work correctly in both client and server environments.
  *
- * @param getServerComponent - Environment-specific function for fetching server components
+ * @param getServerComponent - Environment-specific function for fetching server components.
+ * Internal HTTP loaders report stream state through the optional second argument
+ * before resolving the root. Wrappers must forward that observer as well as props;
+ * non-streaming loaders can ignore it and keep returning Promise<ReactNode>.
  * @param domNodeId - Optional root id used to locate embedded browser payloads
  * @param retryRejectedPayloads - Whether to perform and retain the bounded rejected-payload retry.
  * Official wrappers pass this explicitly; the environment check is only a compatibility fallback
@@ -131,7 +146,10 @@ export const createRSCProvider = ({
   domNodeId,
   retryRejectedPayloads = typeof window !== 'undefined',
 }: {
-  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
+  getServerComponent: (
+    props: ClientGetReactServerComponentProps,
+    onStreamState?: RSCStreamObserver,
+  ) => Promise<ReactNode>;
   domNodeId?: string;
   retryRejectedPayloads?: boolean;
 }) => {
@@ -142,6 +160,11 @@ export const createRSCProvider = ({
     // version. (`versions`/`successfulVersions` state is cleaned via the same
     // `onEvict` path below.)
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
+    const renderRecoveries = useRef(new WeakMap<Promise<ReactNode>, RSCRefetchRecovery>()).current;
+    const getRenderRecovery = useCallback(
+      (promise: Promise<ReactNode>) => renderRecoveries.get(promise),
+      [renderRecoveries],
+    );
     const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
     // refetch (inside startTransition) is what makes <RSCRoute> consumers re-
@@ -480,7 +503,12 @@ export const createRSCProvider = ({
     );
 
     const refetchComponent = useCallback(
-      (componentName: string, componentProps: unknown, recoverOnError?: boolean) => {
+      (
+        componentName: string,
+        componentProps: unknown,
+        recoverOnError?: boolean,
+        onStreamError?: (error: Error) => void,
+      ) => {
         let key: string;
         try {
           key = createRSCPayloadKey(componentName, componentProps);
@@ -488,19 +516,30 @@ export const createRSCProvider = ({
           return rejectWithError<ReactNode>(error);
         }
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
+        // A Flight root can resolve before a descendant boundary fails. Keep
+        // the pre-request payload, not the root that decoding just accepted.
+        const previousSuccessfulPromise = lastSuccessfulRSCPromisesRef.current[key];
+        if (previousSuccessfulPromise != null) {
+          // Do not retain a chain of earlier recovery snapshots across refetches.
+          renderRecoveries.delete(previousSuccessfulPromise);
+        }
         let promise!: Promise<ReactNode>;
+        let streamState: RSCStreamState | undefined;
+        let active = true;
+        let streamCompleted = false;
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromises.get(key, false) !== promise) {
             return;
           }
 
-          if (key in lastSuccessfulRSCPromisesRef.current) {
+          if (previousSuccessfulPromise != null) {
+            lastSuccessfulRSCPromisesRef.current[key] = previousSuccessfulPromise;
             // Keep the restored last-successful payload protected until the
             // caller's rejection handler has observed the still-current refetch
             // version. Otherwise, an unrelated key settling in the same turn
             // could reconcile an over-cap cache and delete this version before
             // RSCRoute.refetch() surfaces the error.
-            fetchRSCPromises.setPinned(key, lastSuccessfulRSCPromisesRef.current[key]);
+            fetchRSCPromises.setPinned(key, previousSuccessfulPromise);
             // Unpin via a macrotask (`setTimeout(0)`): restoreLastSuccessfulPromise
             // is called from a `.then`/`.catch` rejection handler (a microtask), so
             // the rejection chain and RSCRoute.refetch() error surface complete
@@ -530,25 +569,50 @@ export const createRSCProvider = ({
         };
 
         promise = Promise.resolve()
-          .then(() =>
-            getServerComponent({
-              componentName,
-              componentProps,
-              enforceRefetch: true,
-            }),
-          )
+          .then(() => {
+            return getServerComponent(
+              {
+                componentName,
+                componentProps,
+                enforceRefetch: true,
+              },
+              (state) => {
+                streamState = state;
+              },
+            );
+          })
           .then(
             (payload) => {
               if (payload instanceof Error) {
                 if (recoverOnError) {
                   restoreLastSuccessfulPromise();
                 }
-              } else if (markSuccessfulPromise(key, promise, true)) {
-                // Delete the entire count: a winning refetch supersedes
-                // replacement-load latches for this key, so stale replacements
-                // should not re-notify when their `.finally()` handlers run.
-                evictedSuccessfulPayloadKeys.deleteWithoutEvict(key);
-                inFlightEvictedSuccessfulPayloadCounts.delete(key);
+              } else {
+                const markSuccessful = (successful: boolean) => {
+                  if (successful && markSuccessfulPromise(key, promise, true)) {
+                    // A winning refetch supersedes replacement-load latches.
+                    evictedSuccessfulPayloadKeys.deleteWithoutEvict(key);
+                    inFlightEvictedSuccessfulPayloadCounts.delete(key);
+                  }
+                };
+                if (streamState) {
+                  // A decoded Flight root is not yet a successful payload.
+                  // Preserve the snapshot across overlapping streamed refetches.
+                  void streamState.completion.then((successful) => {
+                    markSuccessful(successful);
+                    streamCompleted = true;
+                    if (!successful && recoverOnError && fetchRSCPromises.get(key, false) === promise) {
+                      // Let React render the completed Flight tree first. Its
+                      // boundary error carries details (including digest) that
+                      // completion metadata alone cannot supply.
+                      startTransition(() => {
+                        setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+                      });
+                    }
+                  });
+                } else {
+                  markSuccessful(true);
+                }
               }
               return payload;
             },
@@ -568,6 +632,32 @@ export const createRSCProvider = ({
         // path were added — and prevents the refetch's new promise from being
         // the eviction victim when the cache is already full of pinned keys.
         fetchRSCPromises.setPinned(key, promise);
+        if (recoverOnError && previousSuccessfulPromise != null) {
+          const recovery: RSCRefetchRecovery = {
+            fallback: previousSuccessfulPromise,
+            recover: (error) => {
+              restoreLastSuccessfulPromise();
+              // Report after route layout effects, including when a sibling
+              // boundary restores this shared request before its initiating route.
+              queueMicrotask(() => onStreamError?.(error));
+            },
+            // An interactive client can fail while a healthy Flight stream is
+            // still pending. Only its server/transport failure arms recovery.
+            canRecover: () => active && (!streamState || streamState.error != null),
+            hasFailed: () => streamCompleted && streamState?.error != null,
+            // Root fulfillment alone cannot certify a rendered Flight payload.
+            // Wait for a successful commit and, for HTTP Flight, its error-free
+            // stream completion before treating later client errors as unrelated.
+            commit: () => {
+              if (!active || (streamState && !streamCompleted)) return;
+              if (fetchRSCPromises.get(key, false) !== promise) return;
+              active = false;
+              renderRecoveries.delete(promise);
+              if (streamState?.error) recovery.recover(streamState.error);
+            },
+          };
+          renderRecoveries.set(promise, recovery);
+        }
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
@@ -579,15 +669,31 @@ export const createRSCProvider = ({
         inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
         scheduleAbsentKeyVersionCleanup,
+        renderRecoveries,
         startTransition,
       ],
     );
 
     // `versions` and `successfulVersions` intentionally refresh this context.
     const contextValue = useMemo(
-      () => ({ getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions }),
+      () => ({
+        getComponent,
+        refetchComponent,
+        getRefetchVersion,
+        getRenderRecovery,
+        retainComponent,
+        successfulVersions,
+      }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [getComponent, refetchComponent, getRefetchVersion, retainComponent, versions, successfulVersions],
+      [
+        getComponent,
+        refetchComponent,
+        getRefetchVersion,
+        getRenderRecovery,
+        retainComponent,
+        versions,
+        successfulVersions,
+      ],
     );
 
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
