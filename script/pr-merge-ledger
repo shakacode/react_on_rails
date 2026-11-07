@@ -2364,29 +2364,24 @@ class PrMergeLedger
       review_threads = fetch_review_threads(pr_number)
       reviews = fetch_reviews(pr_number)
       comments = fetch_comments(pr_number)
-      if screened
-        screened.apply!(reviews, "review_summaries")
-        screened.apply!(comments, "issue_comments")
-        review_threads.each { |thread| screened.apply!(thread.fetch("comments").fetch("nodes"), "inline_comments") }
-        screened.verify_complete!
-        verify_screened_head!(pr_number, metadata.fetch("headRefOid"))
-        @screened_collections << screened.provenance.merge("pr" => pr_number, "reader" => "shaka")
-      end
+      reconcile_screened!(screened, reviews:, comments:, review_threads:) if screened
+      ci_readiness = fetch_ci_readiness(
+        pr_number,
+        head_sha: metadata.fetch("headRefOid"),
+        metadata:,
+        comments:,
+        hosted_ci_requested:,
+        expected_hosted_workflows:,
+        allow_pull_request_hosted_ci:
+      )
+      record_screened!(screened, pr_number, metadata.fetch("headRefOid")) if screened
       {
         "pull_request" => metadata,
         "files" => files,
         "review_threads" => review_threads,
         "reviews" => reviews,
         "comments" => comments,
-        "ci_readiness" => fetch_ci_readiness(
-          pr_number,
-          head_sha: metadata.fetch("headRefOid"),
-          metadata:,
-          comments:,
-          hosted_ci_requested:,
-          expected_hosted_workflows:,
-          allow_pull_request_hosted_ci:
-        )
+        "ci_readiness" => ci_readiness
       }
     end
 
@@ -2445,6 +2440,19 @@ class PrMergeLedger
       raise Error, "Shaka screened comment reader failed" unless status.success?
 
       ShakaScreenedComments.new(JSON.parse(stdout), head)
+    end
+
+    def reconcile_screened!(screened, reviews:, comments:, review_threads:)
+      screened.apply!(reviews, "review_summaries")
+      screened.apply!(comments, "issue_comments")
+      review_threads.each { |thread| screened.apply!(thread.fetch("comments").fetch("nodes"), "inline_comments") }
+      screened.verify_complete!
+    end
+
+    # CI checks are read by PR number, so the head check comes after every live read.
+    def record_screened!(screened, pr_number, head)
+      verify_screened_head!(pr_number, head)
+      @screened_collections << screened.provenance.merge("pr" => pr_number, "reader" => "shaka")
     end
 
     def verify_screened_head!(pr_number, expected)

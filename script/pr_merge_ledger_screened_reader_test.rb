@@ -156,6 +156,102 @@ class PrMergeLedgerScreenedReaderTest < Minitest::Test
   end
 end
 
+# Reader edge cases, and GitHubCollector#fetch run end to end with the reader and GitHub calls replaced.
+class PrMergeLedgerScreenedCollectionTest < Minitest::Test
+  HEAD = PrMergeLedgerScreenedReaderTest::HEAD
+  URL = PrMergeLedgerScreenedReaderTest::URL
+
+  def packet = PrMergeLedgerScreenedReaderTest.new(nil).packet
+
+  def metadata(...) = PrMergeLedgerScreenedReaderTest.new(nil).metadata(...)
+
+  def test_deleted_account_comment_is_matched_as_ghost
+    data = packet
+    data["issue_comments"] = [{ "url" => URL, "author" => "ghost", "body" => "old note" }]
+    reader = ShakaScreenedComments.new(data, HEAD)
+    rows = [{ "url" => URL, "author" => nil, "id" => "node-id" }]
+    reader.apply!(rows, "issue_comments")
+    reader.verify_complete!
+    assert_equal "old note", rows.first.fetch("body")
+  end
+
+  def test_empty_body_review_listed_by_the_reader_passes
+    data = packet
+    data["issue_comments"] = []
+    review_url = "https://github.com/shakacode/react_on_rails/pull/5182#pullrequestreview-1"
+    data["review_summaries"] = [{ "url" => review_url, "author" => "maintainer", "body" => "" }]
+    reader = ShakaScreenedComments.new(data, HEAD)
+    rows = [metadata(url: review_url).merge("state" => "COMMENTED")]
+    reader.apply!(rows, "review_summaries")
+    reader.verify_complete!
+    assert_equal "", rows.first.fetch("body")
+  end
+
+  def test_malformed_packet_fails_with_ledger_error
+    [
+      packet.merge("issue_comments" => nil),
+      packet.merge("review_summaries" => {}),
+      packet.merge("inline_comments" => ["not an object"]),
+      packet.merge("excluded_interactions" => nil),
+      packet.merge("excluded_interactions" => [42])
+    ].each do |data|
+      assert_raises(PrMergeLedger::Error) { ShakaScreenedComments.new(data, HEAD) }
+    end
+  end
+
+  def test_screened_collection_records_provenance_when_head_is_stable
+    collector = screened_collector(push_during_ci: false)
+    data = with_reader_packet { collector.fetch(5182) }
+    assert_equal "P1: fix this", data.fetch("comments").first.fetch("body")
+    provenance = collector.screened_collections.first
+    assert_equal({ "pr" => 5182, "reader" => "shaka", "head" => HEAD },
+                 provenance.slice("pr", "reader", "head"))
+    assert_equal 0, provenance.fetch("withheld_count")
+  end
+
+  def test_push_during_ci_collection_rejects_screened_comments
+    collector = screened_collector(push_during_ci: true)
+    error = assert_raises(PrMergeLedger::Error) { with_reader_packet { collector.fetch(5182) } }
+    assert_match(/head changed during screened collection/, error.message)
+    assert_empty collector.screened_collections
+  end
+
+  private
+
+  # A collector whose GitHub calls return body-free rows; CI collection can simulate a push.
+  def screened_collector(push_during_ci:)
+    collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails",
+                                                   shaka_reader: "/trusted/shaka", trusted_ref: HEAD)
+    state = { pushed: false }
+    collector.define_singleton_method(:fetch_metadata_and_files) { |_number| [{ "headRefOid" => HEAD }, []] }
+    collector.define_singleton_method(:fetch_labels) { |_number| [] }
+    collector.define_singleton_method(:fetch_review_threads) { |_number| [] }
+    collector.define_singleton_method(:fetch_reviews) { |_number| [] }
+    collector.define_singleton_method(:fetch_comments) do |_number|
+      [{ "url" => URL, "author" => { "login" => "maintainer" } }]
+    end
+    collector.define_singleton_method(:fetch_ci_readiness) do |_number, **_options|
+      state[:pushed] = push_during_ci
+      {}
+    end
+    collector.define_singleton_method(:graphql) do |_query, _variables|
+      head = state[:pushed] ? "c" * 40 : HEAD
+      { "data" => { "repository" => { "pullRequest" => { "headRefOid" => head } } } }
+    end
+    collector
+  end
+
+  def with_reader_packet
+    ok = Struct.new(:success?).new(true)
+    stdout = JSON.generate(packet)
+    original = PrMergeLedger.method(:capture_command_with_timeout)
+    PrMergeLedger.define_singleton_method(:capture_command_with_timeout) { |*_args, **_options| [stdout, "", ok] }
+    yield
+  ensure
+    PrMergeLedger.define_singleton_method(:capture_command_with_timeout, original)
+  end
+end
+
 class PrMergeLedgerScreenedReaderPathTest < Minitest::Test
   HEAD = "a" * 40
 

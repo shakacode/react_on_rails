@@ -16,6 +16,7 @@ class ShakaScreenedComments
     @packet = packet
     @entries = {}
     @seen = []
+    validate_shape!
     validate_sources!
     SECTIONS.each_key do |section|
       packet.fetch(section).each { |entry| add_entry(section, entry, withheld: false) }
@@ -62,6 +63,14 @@ class ShakaScreenedComments
 
   private
 
+  def validate_shape!
+    valid = [*SECTIONS.keys, "excluded_interactions"].all? do |section|
+      entries = @packet[section]
+      entries.is_a?(Array) && entries.all?(Hash)
+    end
+    raise PrMergeLedger::Error, "screened comments packet is malformed" unless valid
+  end
+
   def validate_sources!
     sources = @packet.fetch("trust_sources")
     valid = sources.is_a?(Array) && !sources.empty? && sources.all? do |source|
@@ -82,8 +91,11 @@ class ShakaScreenedComments
     end
   end
 
+  # GraphQL reports a deleted account as a null author; the reader's REST data names it "ghost".
   def actor_login(row)
     actor = row.fetch("author")
+    return "ghost" unless actor.is_a?(Hash) && actor["login"].is_a?(String)
+
     login = actor.fetch("login")
     actor["__typename"] == "Bot" && !login.end_with?("[bot]") ? "#{login}[bot]" : login
   end
