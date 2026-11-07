@@ -1,0 +1,77 @@
+name: Node renderer fresh-install engines
+
+# A fresh install of react-on-rails-pro-node-renderer resolves the newest
+# matching transitive packages, not this repository's lockfile. When one of them
+# drops support for the renderer's lowest advertised Node version, nothing in
+# normal CI notices (issue #5305). That drift arrives from the npm registry
+# without a pull request, so this runs on a schedule as well as on changes to
+# the renderer's dependencies. It is not a required check. A failed scheduled
+# run opens an issue, or comments on the open one, so the drift reaches people.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  pull_request:
+    paths:
+      - 'packages/react-on-rails-pro-node-renderer/package.json'
+      - 'script/check-node-renderer-fresh-engines.mjs'
+      - 'script/check-node-renderer-fresh-engines.test.mjs'
+      - '.github/workflows/node-renderer-fresh-engines.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fresh-engines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      # npm prefers versions whose engines accept the Node running it. On the
+      # newest release it picks the highest version in range, as pnpm and Yarn
+      # do, except for a package whose newest release excludes that Node.
+      - name: Setup newest Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: node
+
+      - name: Test the engines checker
+        run: node --test script/check-node-renderer-fresh-engines.test.mjs
+
+      - name: Check a fresh resolution against the renderer's engines.node
+        run: node script/check-node-renderer-fresh-engines.mjs
+
+  report-scheduled-failure:
+    needs: fresh-engines
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Node renderer fresh-install engines check is failing'
+          body="The scheduled fresh-install engines check failed: $RUN_URL
+
+          Read the run log first. A failed check step that lists ::error:: packages means a fresh install of react-on-rails-pro-node-renderer now resolves a package whose engines.node excludes the renderer's lowest advertised Node version; see #5305 for background and options. A failed test step or a registry error is a problem with the check itself."
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Still failing: $RUN_URL"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

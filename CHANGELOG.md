@@ -24,6 +24,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **[Pro] The Node renderer now requires Node.js 20.19 or later**: `react-on-rails-pro-node-renderer`
+  raises `engines.node` from `>=18.19.0` to `>=20.19.0`. Fresh installs already resolved Fastify 5
+  dependencies that declare Node 20 or later, and the renderer already exited at startup on Node 18.
+  The documented Node 18 workaround, overriding `fastify` to `^4.29.0`, is no longer supported
+  because Fastify 4 is affected by
+  [GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7).
+  **Action required for upgraders:** run the Node renderer on Node.js 20.19 or later, and remove any
+  `fastify`, `@fastify/formbody`, or `@fastify/multipart` overrides or resolutions that pin Fastify 4. On Node.js 20 with npm `engine-strict`, a fresh install can still reject
+  `cookie` 2.x, which needs Node.js 22; the Node renderer docs show an override. A new weekly CI
+  check fails when a fresh install resolves a package that rejects the advertised floor.
+  [PR 5317](https://github.com/shakacode/react_on_rails/pull/5317) by
+  [justin808](https://github.com/justin808). Part of
+  [Issue 5305](https://github.com/shakacode/react_on_rails/issues/5305).
+
 #### Improved
 
 - **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
@@ -71,6 +87,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5135](https://github.com/shakacode/react_on_rails/pull/5135) by
   [Justin Gordon](https://github.com/justin808).
 
+- **Server rendering works when Bun is installed**: ExecJS 2.9+ picks Bun ahead of Node.js, and Bun fails to
+  evaluate some server bundles ("Expected CommonJS module to have a function wrapper"), so a freshly generated
+  `--standard` app returned HTTP 500 on its server-rendered page. When ExecJS autodetects Bun and Node.js is
+  installed, React on Rails now renders with Node.js. `ExecJS.runtime` itself is unchanged for other ExecJS users,
+  and an explicit `EXECJS_RUNTIME` still wins; set `EXECJS_RUNTIME=Bun` to force Bun (assigning
+  `ExecJS.runtime` in Ruby code is treated like autodetection). `react_on_rails:doctor` reports the runtime server
+  rendering uses and warns when it is Bun. Pro apps that render through the Node Renderer change only on their ExecJS
+  fallback path.
+  Fixes [Issue 5288](https://github.com/shakacode/react_on_rails/issues/5288).
+  [PR 5319](https://github.com/shakacode/react_on_rails/pull/5319) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **TanStack Router SSR now passes `dehydrate` output to `hydrate`**: `react-on-rails-pro/tanstack-router`
   now calls the router's `dehydrate` option once on the server after `router.load()`, and passes its result to the
   `hydrate` option on the client. Previously the helper probed a `router.dehydrate()` method that TanStack Router
@@ -79,6 +106,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   no longer calls custom `router.dehydrate()` or `router.hydrate()` methods.
   Fixes [Issue 5126](https://github.com/shakacode/react_on_rails/issues/5126).
   [PR 5312](https://github.com/shakacode/react_on_rails/pull/5312) by [justin808](https://github.com/justin808).
+
 - **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
   `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in
   `react-on-rails` and `react-on-rails-pro`, ended with `//# sourceMappingURL=` comments for maps the packages never
@@ -86,6 +114,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   isn't there. The packages' `tsc` builds no longer emit source or declaration maps, and CI now packs all four
   packages and fails on any dangling pointer. Fixes [Issue 5307](https://github.com/shakacode/react_on_rails/issues/5307).
   [PR 5321](https://github.com/shakacode/react_on_rails/pull/5321) by [justin808](https://github.com/justin808).
+
+- **`bin/dev` pack generation keeps variables that `bin/dev` sets after Bundler loads**: The
+  `react_on_rails:generate_packs` child now receives every variable that changed since Bundler
+  loaded, and loses any that were deleted. Bundler's own variables stay out, so the child still
+  runs unbundled. Previously `Bundler.with_unbundled_env` reset the child to Bundler's startup
+  snapshot. An initializer that needed a variable set after `require "bundler/setup"`, or under
+  `bundle exec bin/dev`, then failed at "Generating packs". Fixes
+  [Issue 5297](https://github.com/shakacode/react_on_rails/issues/5297).
+  [PR 5320](https://github.com/shakacode/react_on_rails/pull/5320) by
+  [justin808](https://github.com/justin808).
 
 - **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
   package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
@@ -128,6 +166,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5184](https://github.com/shakacode/react_on_rails/issues/5184).
   [PR 5185](https://github.com/shakacode/react_on_rails/pull/5185) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Generated Pro apps ignore the Node renderer bundle cache**: `react_on_rails:install --pro` and `--rsc`,
+  including the default Pro and `--rsc` setups of `create-react-on-rails-app`, now add `.node-renderer-bundles` and its preseed lock/snapshot siblings to
+  `.gitignore`, so the server bundles that the generated `renderer/node-renderer.js` caches there stay out of commits.
+  [PR 5182](https://github.com/shakacode/react_on_rails/pull/5182) by [justin808](https://github.com/justin808).
+
 - **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
   `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
   and prevents console replay from exposing server diagnostics that error metadata omits. Ruby diagnostics now use JavaScript trim whitespace rules:
@@ -161,6 +204,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 5304](https://github.com/shakacode/react_on_rails/pull/5304) by [justin808](https://github.com/justin808).
 
 #### Security
+
+- **`create-react-on-rails-app` no longer commits the Rails master key**: The CLI runs `rails new --skip-git` and then
+  writes `.gitignore` itself, but Rails adds its key-file ignore rule only when `.gitignore` already exists. The CLI's
+  first generated commit therefore tracked `config/master.key`, the key that decrypts `config/credentials.yml.enc`.
+  Generated apps now ignore `/config/*.key` and `/config/credentials/*.key` before the first commit.
+  **Action required for upgraders:** apps generated by `create-react-on-rails-app` 16.6.0-rc.0 through 17.2.0 have
+  `config/master.key` in their git history. Before publishing such a repository, rotate the credentials and remove the
+  key from the history; if it was already pushed, treat the key as compromised.
+  [PR 5182](https://github.com/shakacode/react_on_rails/pull/5182) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
   `rake react_on_rails:doctor` now reads every `react-server-dom-webpack` copy in `yarn.lock`, `package-lock.json`,

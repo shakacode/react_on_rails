@@ -10,6 +10,7 @@ require "timeout"
 require "uri"
 require "yaml"
 require_relative "utils"
+require_relative "exec_js_runtime"
 require_relative "version"
 require_relative "config_path_resolver"
 require_relative "shakapacker_config_helpers"
@@ -2036,6 +2037,45 @@ module ReactOnRails
       @shakapacker_manifest_data = nil
     end
 
+    # The runtime React on Rails server rendering uses; it can differ from ExecJS.runtime only
+    # when ExecJS selected Bun.
+    def server_rendering_execjs_runtime_name(execjs_name)
+      return execjs_name unless execjs_name == ReactOnRails::ExecJSRuntime::BUN_NAME
+
+      ReactOnRails::ExecJSRuntime.for_server_rendering.name
+    end
+
+    # The Pro Node Renderer's ExecJS fallback renders through the same pool, so it uses the same runtime.
+    # With the fallback disabled, ExecJS never renders, so there is no runtime to explain or warn about.
+    def report_execjs_fallback_runtime(execjs_name)
+      unless pro_execjs_fallback_enabled?
+        checker.add_info("  ExecJS available as fallback: #{execjs_name}")
+        return
+      end
+
+      runtime_name = server_rendering_execjs_runtime_name(execjs_name)
+      checker.add_info("  ExecJS available as fallback: #{runtime_name}")
+      report_execjs_bun_runtime(execjs_name, runtime_name) if execjs_name == ReactOnRails::ExecJSRuntime::BUN_NAME
+    end
+
+    # Bun cannot evaluate every server bundle (issue #5288). Explains which runtime React on
+    # Rails server rendering uses after ExecJS selected Bun.
+    def report_execjs_bun_runtime(bun_name, runtime_name)
+      if runtime_name == bun_name
+        checker.add_warning("  ⚠️  Server rendering uses #{bun_name}, which fails on some server bundles " \
+                            "(\"Expected CommonJS module to have a function wrapper\")")
+        fix = if ENV["EXECJS_RUNTIME"].to_s.empty?
+                "Put node on the PATH of the Rails process; React on Rails then uses it instead of Bun"
+              else
+                "Set EXECJS_RUNTIME=Node"
+              end
+        checker.add_info("  💡 #{fix}")
+      else
+        checker.add_info("  ℹ️  ExecJS autodetected #{bun_name}; React on Rails server rendering uses " \
+                         "#{runtime_name} instead. Set EXECJS_RUNTIME to choose explicitly.")
+      end
+    end
+
     # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def check_server_rendering_engine
       return unless defined?(ReactOnRails)
@@ -2049,7 +2089,7 @@ module ReactOnRails
         if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
-            checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
+            report_execjs_fallback_runtime(ExecJS.runtime.name)
           elsif pro_execjs_fallback_enabled?
             checker.add_warning("  ⚠️  ExecJS fallback is enabled but ExecJS is not available")
             checker.add_info("  💡 Install mini_racer or set renderer_use_fallback_exec_js = false")
@@ -2057,7 +2097,8 @@ module ReactOnRails
             checker.add_info("  ℹ️  ExecJS fallback is disabled (renderer_use_fallback_exec_js = false)")
           end
         elsif defined?(ExecJS)
-          runtime_name = ExecJS.runtime.name if ExecJS.runtime
+          execjs_name = ExecJS.runtime.name if ExecJS.runtime
+          runtime_name = server_rendering_execjs_runtime_name(execjs_name)
           if runtime_name
             checker.add_info("  ExecJS Runtime: #{runtime_name}")
 
@@ -2071,6 +2112,7 @@ module ReactOnRails
             else
               checker.add_info("    ℹ️  JavaScript runtime: #{runtime_name}")
             end
+            report_execjs_bun_runtime(execjs_name, runtime_name) if execjs_name == ReactOnRails::ExecJSRuntime::BUN_NAME
           else
             checker.add_warning("  ⚠️  ExecJS runtime not detected")
           end
