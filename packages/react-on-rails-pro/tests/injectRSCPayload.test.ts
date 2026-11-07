@@ -1109,27 +1109,108 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('<li<script');
   });
 
-  it('promotes split stylesheet links after a retained raw-text tail closes', async () => {
-    const mockRSC = createMockRSCStream(['{"test": "data"}']);
-    const mockHTML = createMockHTMLStream({
-      0: 'before<script>window.msg = 1;',
-      10: '</script><link rel="preload" as="style" href="/webpack/test/css/client1-',
-      20: '46072b81.css">after',
-    });
-    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+  // The RSC payload push script may flush at any boundary between complete HTML, so
+  // where it lands depends on when the RSC chunk arrives relative to the HTML chunks.
+  // Under machine load the 0ms and 10ms HTML timers can fire in one tick, which moves
+  // the payload from before the app <script> to between `</script>` and the held
+  // `<link` tail. Each case below sequences its pushes on observed output instead of
+  // wall-clock timers, so every arrival window stays fixed however loaded the machine
+  // is. Assertions are placement-independent: none relies on adjacency that only one
+  // arrival order produces.
+  describe('promotes split stylesheet links after a retained raw-text tail closes', () => {
+    const rscPayloadContent = '{"test": "data"}';
+    const htmlChunks = [
+      'before<script>window.msg = 1;',
+      '</script><link rel="preload" as="style" href="/webpack/test/css/client1-',
+      '46072b81.css">after',
+    ];
+    const expectedHtml =
+      'before<script>window.msg = 1;</script><link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after';
 
-    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
-      rscClientChunkStylesheetHrefsByChunkName: new Map([
-        ['client1', ['/webpack/test/css/client1-46072b81.css']],
-      ]),
-    });
-    const resultStr = await collectStreamData(result);
+    // escapeScript turns any `</script` inside payload text into `<\/script`, so the
+    // first literal `</script>` after a payload marker closes that payload script.
+    const stripPayloadScripts = (html: string) =>
+      html.replace(new RegExp(`<script ${rscPayloadScriptMarker}>.*?</script>`, 'g'), '');
 
-    expect(resultStr).toContain(
-      '<script>window.msg = 1;</script><link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
-    );
-    expect(resultStr).not.toContain('rel="preload" as="style"');
-    expect(resultStr).not.toContain('client1-<script');
+    const runWithRSCArrivingAfterHtmlChunk = async (htmlChunksBeforeRSC: number) => {
+      const mockRSC = new PassThrough();
+      const mockHTML = new PassThrough();
+      const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+      const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+        rscClientChunkStylesheetHrefsByChunkName: new Map([
+          ['client1', ['/webpack/test/css/client1-46072b81.css']],
+        ]),
+      });
+
+      let output = '';
+      const outputWaiters: Array<{ expected: string; resolve: () => void }> = [];
+      const ended = new Promise<void>((resolve, reject) => {
+        result.on('data', (chunk: Buffer) => {
+          output += new TextDecoder().decode(chunk);
+          outputWaiters
+            .filter(
+              ({ expected }) => output.includes(expected) || stripPayloadScripts(output).includes(expected),
+            )
+            .forEach((waiter) => {
+              outputWaiters.splice(outputWaiters.indexOf(waiter), 1);
+              waiter.resolve();
+            });
+        });
+        result.on('end', resolve);
+        result.on('error', reject);
+      });
+      // HTML markers are matched with payload scripts stripped, so a payload wrongly spliced
+      // into app markup fails the assertions below instead of stalling the next push.
+      const waitForOutput = (expected: string) =>
+        output.includes(expected) || stripPayloadScripts(output).includes(expected)
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              outputWaiters.push({ expected, resolve });
+            });
+
+      // Each HTML chunk is pushed only after the previous one has been flushed past its
+      // complete prefix, so the injector sees exactly one new HTML chunk per flush.
+      const flushedHtmlMarkers = ['before', 'window.msg = 1;</script>', 'data-precedence="rsc-css">after'];
+      const pushRSC = async () => {
+        mockRSC.end(new TextEncoder().encode(toLengthPrefixed(rscPayloadContent)));
+        await waitForOutput(expectedPayloadPushScript(rscPayloadContent));
+      };
+
+      for (let index = 0; index < htmlChunks.length; index += 1) {
+        if (index === htmlChunksBeforeRSC) {
+          // eslint-disable-next-line no-await-in-loop -- pushes must stay strictly ordered
+          await pushRSC();
+        }
+        mockHTML.write(new TextEncoder().encode(htmlChunks[index]));
+        // eslint-disable-next-line no-await-in-loop -- pushes must stay strictly ordered
+        await waitForOutput(flushedHtmlMarkers[index]);
+      }
+      mockHTML.end();
+      if (htmlChunksBeforeRSC >= htmlChunks.length) {
+        await pushRSC();
+      }
+      await ended;
+      return output;
+    };
+
+    it.each([
+      ['before the retained raw-text tail closes', 1],
+      ['while the split link tail is held', 2],
+      ['after all HTML has flushed', 3],
+    ])('when RSC arrives %s', async (_window, htmlChunksBeforeRSC) => {
+      const resultStr = await runWithRSCArrivingAfterHtmlChunk(htmlChunksBeforeRSC);
+      const htmlWithoutPayloadScripts = stripPayloadScripts(resultStr);
+
+      expect(resultStr.split(expectedPayloadPushScript(rscPayloadContent))).toHaveLength(2);
+      // Must stay on the raw output: stripping would hide a payload injected into app script text.
+      expect(resultStr).toContain('<script>window.msg = 1;</script>');
+      expect(resultStr).toContain(
+        '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+      );
+      expect(htmlWithoutPayloadScripts).toBe(expectedHtml);
+      expect(resultStr).not.toContain('rel="preload" as="style"');
+      expect(resultStr).not.toContain('client1-<script');
+    });
   });
 
   it('does not hold non-link partial tags for stylesheet gating when observability is disabled', async () => {
