@@ -2,6 +2,7 @@
 
 require "open-uri"
 require "execjs"
+require "react_on_rails/exec_js_runtime"
 require "react_on_rails/length_prefixed_parser"
 require "react_on_rails/lenient_json"
 
@@ -187,7 +188,7 @@ module ReactOnRails
                   "#{ReactOnRails::Utils.server_bundle_js_file_path}"
               end
             end
-            ExecJS.compile(base_js_code)
+            ReactOnRails::ExecJSRuntime.for_server_rendering.compile(base_js_code)
           rescue StandardError => e
             msg = "ERROR when compiling base_js_code! " \
                   "See file #{file_name} to " \

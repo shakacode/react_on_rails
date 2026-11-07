@@ -76,6 +76,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Server rendering works when Bun is installed**: ExecJS 2.9+ picks Bun ahead of Node.js, and Bun fails to
+  evaluate some server bundles ("Expected CommonJS module to have a function wrapper"), so a freshly generated
+  `--standard` app returned HTTP 500 on its server-rendered page. When ExecJS autodetects Bun and Node.js is
+  installed, React on Rails now renders with Node.js. `ExecJS.runtime` itself is unchanged for other ExecJS users,
+  and an explicit `EXECJS_RUNTIME` still wins; set `EXECJS_RUNTIME=Bun` to force Bun (assigning
+  `ExecJS.runtime` in Ruby code is treated like autodetection). `react_on_rails:doctor` reports the runtime server
+  rendering uses and warns when it is Bun. Pro apps that render through the Node Renderer change only on their ExecJS
+  fallback path.
+  Fixes [Issue 5288](https://github.com/shakacode/react_on_rails/issues/5288).
+  [PR 5319](https://github.com/shakacode/react_on_rails/pull/5319) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **TanStack Router SSR now passes `dehydrate` output to `hydrate`**: `react-on-rails-pro/tanstack-router`
   now calls the router's `dehydrate` option once on the server after `router.load()`, and passes its result to the
   `hydrate` option on the client. Previously the helper probed a `router.dehydrate()` method that TanStack Router
@@ -84,6 +95,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   no longer calls custom `router.dehydrate()` or `router.hydrate()` methods.
   Fixes [Issue 5126](https://github.com/shakacode/react_on_rails/issues/5126).
   [PR 5312](https://github.com/shakacode/react_on_rails/pull/5312) by [justin808](https://github.com/justin808).
+
 - **npm packages no longer ship `sourceMappingURL` pointers to missing `.map` files**: The published
   `create-react-on-rails-app` and `react-on-rails-pro-node-renderer` `.js` and `.d.ts` files, and the `.d.ts` files in
   `react-on-rails` and `react-on-rails-pro`, ended with `//# sourceMappingURL=` comments for maps the packages never
