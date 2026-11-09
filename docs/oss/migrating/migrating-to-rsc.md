@@ -196,7 +196,8 @@ Before starting any component migration, verify these items. Skipping them is th
 
 - [ ] **React 19.2.7 or newer installed** -- both `react` and `react-dom` on 19.3.x (what the RSC generator installs) or 19.2.x with patch `>= 19.2.7`, with matching versions (`yarn why react` shows no duplicates)
 - [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
-- [ ] **Stable `react-on-rails-rsc` that matches your React line** -- `19.3.2` or newer with React 19.3.x at 19.3.1 or later, `19.3.1` with React 19.3.x, `19.3.0` with React 19.2.x at 19.2.8 or later, or 19.2.x with patch `>= 19.2.1` and React 19.2.x at 19.2.7 or later; check with `yarn why react-on-rails-rsc`
+- [ ] **Stable `react-on-rails-rsc` that matches your React line** -- 19.3.x at `19.3.2` or later with React 19.3.x at 19.3.1 or later, `19.3.1` with React 19.3.x, `19.3.0` with React 19.2.x at 19.2.8 or later, or 19.2.x with patch `>= 19.2.1` and React 19.2.x at 19.2.7 or later; check with `yarn why react-on-rails-rsc`
+- [ ] **Patched `react-server-dom-webpack`** -- every resolved copy is at or above its line's patched release (19.3.1 on 19.3.x, 19.2.9 on 19.2.x) for React's GHSA-xqc2-xf4c-x3h3 and GHSA-h3gv-c5rc-p453; remove overrides that pin older copies, and check with `yarn why react-server-dom-webpack`
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
@@ -220,7 +221,7 @@ These mistakes account for the majority of setup failures:
 
 - React and React DOM 19.2.7 or newer on a supported line (19.2.x or 19.3.x)
 - [React on Rails Pro 17](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails 17
-- Stable `react-on-rails-rsc` 19.3.2 or newer with React 19.3.x at 19.3.1 or newer (what the generator installs), 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.x at 19.2.7 or newer
+- Stable `react-on-rails-rsc` 19.3.x at 19.3.2 or newer with React 19.3.x at 19.3.1 or newer (what the generator installs), 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.x at 19.2.7 or newer
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20.19+ (the Node renderer's `engines.node` floor)
