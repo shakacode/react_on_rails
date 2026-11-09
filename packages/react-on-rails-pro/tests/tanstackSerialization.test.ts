@@ -246,6 +246,19 @@ describe('TanStack SSR serialization', () => {
     ).rejects.toThrow('Production error rendering requires router.updateMatch()');
   });
 
+  it.each(['Error', 'CustomError'])('sanitizes a cross-realm Error with an explicit %s tag', async (tag) => {
+    process.env.NODE_ENV = 'production';
+    const error: unknown = runInNewContext(
+      'Object.assign(new Error("PRIVATE_MESSAGE"), { [Symbol.toStringTag]: tag, token: "PRIVATE_TOKEN" })',
+      { tag },
+    );
+    const server = await render(() => {
+      throw error;
+    });
+    expect(JSON.stringify(server.dehydratedState)).not.toContain('PRIVATE');
+    expect(renderToString(server.appElement)).toBe('<p>Error: An unexpected error occurred.</p>');
+  });
+
   it('does not reinterpret a plain thrown object with an Error toStringTag', async () => {
     const thrown = { name: 'Custom', message: 'application value', [Symbol.toStringTag]: 'Error' };
     const server = await render(() => {

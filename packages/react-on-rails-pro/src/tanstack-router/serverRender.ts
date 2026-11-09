@@ -57,14 +57,24 @@ function dehydrateSsrMatchId(id: string): string {
 }
 
 function isRouteError(value: unknown): value is Error {
-  // Node APIs can create errors outside the renderer's JavaScript realm.
-  return (
-    value instanceof Error ||
-    (value !== null &&
-      typeof value === 'object' &&
-      !(Symbol.toStringTag in value) &&
-      Object.prototype.toString.call(value) === '[object Error]')
-  );
+  if (value instanceof Error) return true;
+  if (value === null || typeof value !== 'object') return false;
+
+  // Native Error constructors have the same source across realms. Inspect the
+  // prototype chain because toStringTag can hide a real Error or spoof a plain object.
+  const nativeErrorSource = Function.prototype.toString.call(Error);
+  let prototype = Object.getPrototypeOf(value);
+  while (prototype !== null) {
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    if (
+      typeof constructor === 'function' &&
+      Function.prototype.toString.call(constructor) === nativeErrorSource
+    ) {
+      return true;
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return false;
 }
 
 function sanitizeProductionErrors(router: TanStackRouter): void {
