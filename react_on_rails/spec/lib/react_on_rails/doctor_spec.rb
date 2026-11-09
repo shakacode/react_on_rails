@@ -12286,6 +12286,7 @@ RSpec.describe ReactOnRails::Doctor do
         [
           %w[19.3.0 19.2.8],
           %w[19.3.1 19.3.0],
+          %w[19.3.1 19.3.1],
           %w[19.3.2 19.3.1]
         ].each do |rsc_version, react_version|
           it "accepts react-on-rails-rsc #{rsc_version} with React #{react_version}" do
