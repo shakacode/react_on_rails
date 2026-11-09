@@ -263,6 +263,54 @@ const injectWithOptions = (
   options: Parameters<typeof injectRSCPayload>[4],
 ) => injectRSCPayload(html, tracker, nodeId, undefined, options);
 
+// Tests that assert what the first output chunk holds need the second HTML chunk to reach
+// the injector only after that flush. Wall-clock timers cannot promise that: under machine
+// load the 0ms and 10ms timers fire in one tick and both chunks land in the first flush.
+// This helper writes the second HTML chunk only after the first output chunk is observed,
+// and keeps the RSC stream open until it releases the payload (before the second HTML
+// chunk when `rscBeforeSecondHtmlChunk` is set, otherwise after it).
+const splitHtmlFlightData = '{"test": "data"}';
+const splitHtmlStylesheetOptions = {
+  rscClientChunkStylesheetHrefsByChunkName: new Map([
+    ['client1', ['/webpack/test/css/client1-46072b81.css']],
+  ]),
+};
+
+const injectSplitHtmlAfterFirstFlush = async (
+  [firstHtmlChunk, secondHtmlChunk]: [string, string],
+  options: Parameters<typeof injectRSCPayload>[4],
+  { rscBeforeSecondHtmlChunk = false } = {},
+) => {
+  const mockRSC = new PassThrough();
+  const mockHTML = new PassThrough();
+  const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+  const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, options);
+  const { allData, chunks, firstChunk } = collectStreamDataByChunk(result);
+  const waitForOutput = (expected: string) =>
+    new Promise<void>((resolve) => {
+      const onData = () => {
+        if (!chunks.join('').includes(expected)) return;
+        result.off('data', onData);
+        resolve();
+      };
+      result.on('data', onData);
+      onData();
+    });
+
+  mockHTML.write(new TextEncoder().encode(firstHtmlChunk));
+  const firstOutputChunk = await firstChunk;
+  if (rscBeforeSecondHtmlChunk) {
+    mockRSC.end(new TextEncoder().encode(toLengthPrefixed(splitHtmlFlightData)));
+    await waitForOutput(expectedPayloadPushScript(splitHtmlFlightData));
+  }
+  mockHTML.end(new TextEncoder().encode(secondHtmlChunk));
+  if (!rscBeforeSecondHtmlChunk) {
+    mockRSC.end(new TextEncoder().encode(toLengthPrefixed(splitHtmlFlightData)));
+  }
+
+  return { firstOutputChunk, resultStr: await allData };
+};
+
 // Test setup helper
 const setupTestWithStreams = (
   streamInfos: Array<{ stream: Readable; componentName?: string; props?: unknown }>,
@@ -1214,65 +1262,39 @@ describe('injectRSCPayload', () => {
   });
 
   it('does not hold non-link partial tags for stylesheet gating when observability is disabled', async () => {
-    const mockRSC = createMockRSCStream(['{"test": "data"}']);
-    const mockHTML = createMockHTMLStream({
-      0: 'before<spa',
-      10: 'n>after',
-    });
-    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+    const { firstOutputChunk, resultStr } = await injectSplitHtmlAfterFirstFlush(
+      ['before<spa', 'n>after'],
+      splitHtmlStylesheetOptions,
+    );
 
-    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
-      rscClientChunkStylesheetHrefsByChunkName: new Map([
-        ['client1', ['/webpack/test/css/client1-46072b81.css']],
-      ]),
-    });
-    const { allData, firstChunk } = collectStreamDataByChunk(result);
-
-    await expect(firstChunk).resolves.toContain('before<spa');
-    await expect(firstChunk).resolves.not.toContain('n>after');
-    await expect(allData).resolves.toContain('before<spa');
-    await expect(allData).resolves.toContain('n>after');
+    expect(firstOutputChunk).toContain('before<spa');
+    expect(firstOutputChunk).not.toContain('n>after');
+    expect(resultStr).toContain('before<span>after');
+    expect(resultStr).toContain(expectedPayloadPushScript(splitHtmlFlightData));
   });
 
   it('does not hold non-link tag names that start with link during stylesheet gating', async () => {
-    const mockRSC = createMockRSCStream(['{"test": "data"}']);
-    const mockHTML = createMockHTMLStream({
-      0: 'before<linked',
-      10: '>after',
-    });
-    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+    const { firstOutputChunk, resultStr } = await injectSplitHtmlAfterFirstFlush(
+      ['before<linked', '>after'],
+      splitHtmlStylesheetOptions,
+    );
 
-    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
-      rscClientChunkStylesheetHrefsByChunkName: new Map([
-        ['client1', ['/webpack/test/css/client1-46072b81.css']],
-      ]),
-    });
-    const { allData, firstChunk } = collectStreamDataByChunk(result);
-
-    await expect(firstChunk).resolves.toContain('before<linked');
-    await expect(firstChunk).resolves.not.toContain('>after');
-    await expect(allData).resolves.toContain('before<linked');
-    await expect(allData).resolves.toContain('>after');
+    expect(firstOutputChunk).toContain('before<linked');
+    expect(firstOutputChunk).not.toContain('>after');
+    expect(resultStr).toContain('before<linked>after');
+    expect(resultStr).toContain(expectedPayloadPushScript(splitHtmlFlightData));
   });
 
+  // Opt-in observability holds every split tag tail, so the payload released between the
+  // two HTML chunks must land after `before` and before the reassembled `<script>`.
   it('keeps opt-in observability flush marks out of non-link split tags during stylesheet gating', async () => {
-    const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream([flightData]);
-    const mockHTML = createMockHTMLStream({
-      0: 'before<scr',
-      10: 'ipt>after</script>',
-    });
-    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
-
-    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
-      rscClientChunkStylesheetHrefsByChunkName: new Map([
-        ['client1', ['/webpack/test/css/client1-46072b81.css']],
-      ]),
-      rscStreamObservability: true,
-    });
-    const resultStr = await collectStreamData(result);
+    const { resultStr } = await injectSplitHtmlAfterFirstFlush(
+      ['before<scr', 'ipt>after</script>'],
+      { ...splitHtmlStylesheetOptions, rscStreamObservability: true },
+      { rscBeforeSecondHtmlChunk: true },
+    );
     const prefixIndex = resultStr.indexOf('before');
-    const payloadIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    const payloadIndex = resultStr.indexOf(expectedPayloadPushScript(splitHtmlFlightData));
     const originalScriptIndex = resultStr.lastIndexOf('<script>after</script>');
 
     expect(prefixIndex).toBeGreaterThanOrEqual(0);
