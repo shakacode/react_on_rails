@@ -13,6 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { runInNewContext } from 'node:vm';
 import * as React from 'react';
 import {
   Outlet,
@@ -86,14 +87,22 @@ describe('TanStack SSR serialization', () => {
     const html = renderToString(server.appElement);
     expect(html).toContain('TypeError: boom');
     const props = JSON.parse(JSON.stringify({ __tanstackRouterDehydratedState: server.dehydratedState }));
+    const clientRouter = buildRouter(loader);
     const client = clientHydrateTanStackApp(
-      { createRouter: () => buildRouter(loader) },
+      { createRouter: () => clientRouter },
       props,
       { ...context, serverSide: false },
       provider,
       history,
     );
     expect(renderToString(client)).toBe(html);
+    expect(
+      (
+        clientRouter.state.matches.find((match) => (match as { status: string }).status === 'error') as {
+          error: unknown;
+        }
+      ).error,
+    ).toBeInstanceOf(Error);
     const container = document.createElement('div');
     container.innerHTML = html;
     document.body.appendChild(container);
@@ -111,6 +120,15 @@ describe('TanStack SSR serialization', () => {
       });
       container.remove();
     }
+  });
+
+  it('preserves errors created by another JavaScript realm', async () => {
+    const error: unknown = runInNewContext('new Error("cross-realm failure")');
+    expect(error).not.toBeInstanceOf(Error);
+    const server = await render(() => {
+      throw error;
+    });
+    expect(JSON.stringify(server.dehydratedState)).toContain('cross-realm failure');
   });
 
   it('does not put production error stacks or custom error properties on the wire', async () => {
@@ -168,13 +186,21 @@ describe('TanStack SSR serialization', () => {
 
   it('leaves ordinary JSON loader data unchanged and does not warn', async () => {
     const data = { products: ['hammer'], nullable: null, nested: { n: 1, enabled: true } };
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       const server = await render(() => data);
-      expect(server.dehydratedState.ssrRouter?.matches.some((match) => match.l === data)).toBe(true);
+      const wire = JSON.parse(JSON.stringify(server.dehydratedState));
+      expect(
+        wire.ssrRouter.matches.some(
+          (match: { l?: unknown }) => JSON.stringify(match.l) === JSON.stringify(data),
+        ),
+      ).toBe(true);
       expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
+      process.env.NODE_ENV = previous;
     }
   });
 });

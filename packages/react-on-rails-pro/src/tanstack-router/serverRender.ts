@@ -56,6 +56,11 @@ function dehydrateSsrMatchId(id: string): string {
   return id.split('/').join('\0');
 }
 
+function isRouteError(value: unknown): value is Error {
+  // Node APIs can create errors outside the renderer's JavaScript realm.
+  return value instanceof Error || Object.prototype.toString.call(value) === '[object Error]';
+}
+
 function isJsonSafe(value: unknown, ancestors = new Set<object>()): boolean {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
@@ -107,7 +112,7 @@ function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
     dehydratedMatch.l = candidate.loaderData;
   }
   if (candidate.error !== undefined) {
-    if (candidate.error instanceof Error) {
+    if (isRouteError(candidate.error)) {
       dehydratedMatch.er = true;
       dehydratedMatch.e = {
         name: candidate.error.name,
