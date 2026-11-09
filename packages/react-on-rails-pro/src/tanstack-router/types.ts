@@ -75,9 +75,9 @@ export interface TanStackRouter {
     resolvedLocation: unknown;
     matches: unknown[];
   };
-  dehydrate?: () => unknown;
-  hydrate?: (data: unknown) => void;
   options?: {
+    /** Called once on the server after router.load(); the result is passed to `hydrate` on the client. */
+    dehydrate?: () => Promise<unknown> | unknown;
     hydrate?: (dehydratedData: unknown) => Promise<unknown> | unknown;
   };
   // TanStack Router's Transitioner checks this field (truthiness only) to skip
@@ -154,8 +154,11 @@ export interface TanStackRouterOptions {
 export interface DehydratedRouterState {
   /** The URL that was server-rendered */
   url: string;
-  /** Router dehydrated state from router.dehydrate() */
-  dehydratedRouter: unknown;
+  /**
+   * `{ dehydratedData }` holding the return value of `RouterOptions.dehydrate()`, or null when
+   * the router defines no `dehydrate` option (or it returned undefined).
+   */
+  dehydratedRouter: { dehydratedData: unknown } | null;
   /** Legacy TanStack SSR match payload used for compatibility and match-data restoration during hydration */
   ssrRouter?: TanStackSsrRouterState;
 }

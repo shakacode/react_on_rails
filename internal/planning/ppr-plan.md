@@ -82,10 +82,10 @@ These are evidence, not plan. They stay as-is:
   The only document describing the architecture we actually built: layer
   diagram, delimiter protocol, key design decisions, Production Readiness Gap
   table.
-- P6 spike results — `react_on_rails_pro/spec/dummy/spike/prerender-resume/RESULTS.md`
-  on PR [#4851](https://github.com/shakacode/react_on_rails/pull/4851) (open,
-  CHANGES_REQUESTED; landing it is a child work item because this plan cites
-  it and it is not yet on `main`).
+- P6 spike results — [`RESULTS.md`](https://github.com/shakacode/react_on_rails/blob/af5841a8d9f2a201eb4795d90d05e741561c1edd/react_on_rails_pro/spec/dummy/spike/prerender-resume/RESULTS.md)
+  at PR #4851's final head commit `af5841a8d`, not on `main`. PR
+  [#4851](https://github.com/shakacode/react_on_rails/pull/4851) closed
+  unmerged on 2026-11-04; §1.3 notes which of its claims are unproven.
 
 ---
 
@@ -160,9 +160,12 @@ react-dom 19.2.7, with every step in a **separate OS process**:
 - Bytes ×1.0 — every content marker crosses the wire exactly once; no
   duplicate `B:`/`S:` ids; zero recoverable hydration errors; all 10
   interactive sections hydrate and respond.
-- **Priority ordering:** boundary emission order tracks **data-resolution**
-  order, not document order — a scroll-priority signal that reorders data
-  resolution reorders delivery, with no per-section resume units required.
+- **Priority ordering (unproven):** the spike recorded boundary emission
+  order tracking **data-resolution** order, not document order. But
+  `resume.mjs` pipes only from `onAllReady`, so it shows final order, not
+  progressive delivery, and the order comparison is never asserted. Its
+  "append and pipe arms are byte-identical" check is also tautological, so
+  client-side append was never tested on its own.
 - `postponed` must be serialized only after the prelude fully flushes
   (react#36779).
 - Replay identity: the resume tree must be structurally identical (component
@@ -220,8 +223,9 @@ Facts the previous plans and #3571 do not reflect, re-verified against
    encryption) moves entirely to v2.
 
 2. **Fizz prerender/resume is no longer unproven.** The P6 spike (§1.3) shows
-   it works outside Next.js, across OS processes, on stable React, with a
-   working priority signal. Old Phase 6's risk discount is obsolete.
+   it works outside Next.js, across OS processes, on stable React. Old Phase
+   6's risk discount is obsolete. Its priority-signal result is unproven
+   (§1.3).
 
 3. **#4581 is closed** (fixed by #4722, merged 2026-07-18; verified closed
    2026-07-18T06:29Z). The "active Track-A caching risk" in earlier reviews is
@@ -443,7 +447,7 @@ Owners and dates are **proposals for maintainer confirmation** (review under
 | D6  | CSS in a cached shell                   | **Deferred-to-child with v1-blocking priority — the hardest unsolved item.** Prerender and resume are separate renderer requests with independent `RSCRequestTracker`/`injectRSCPayload` instances; the resume pass re-emits init scripts + CSS links into a page whose shell already declared them, and CSS-before-HTML flush order is the entire FOUC defense — a PPR page is the CRITICAL streamed-`$RC()`-reveal case: #4885's D6 rates it CRITICAL, citing a FOUC gap analysis not present in this repo (see Stale reference note). Child issue must produce a dedupe/coordination design (shared asset manifest between phases; resume pass suppresses links already in the shell) and prove it with the FOUC gate. Interacts #4557, #4049, #4474. | @AbanoubGhadban                                      | design proposed 2026-09-15; v1-blocking    |
 | D7  | Where the `"use cache"` transform lives | **Deferred with v2 (gate: D1's v2 go-decision).** The directive transform belongs in the external `react-on-rails-rsc` package (delegates to React's vendored Flight node-loader) — cross-repo; sequencing interacts with #3497 (monorepo move: prefer transform work after any move to avoid double migration) and #4874 (Server Functions uses the same machinery).                                                                                                                                                                                                                                                                                                                                                                                    | @AbanoubGhadban                                      | gate: v2 go/no-go (proposed 2026-11-01)    |
 | D8  | Tag-invalidation ownership              | **Resolved for v1:** PPR shells live **entirely in the Rails-cache namespace** — the mature Ruby `ReactOnRailsPro::Cache`/`TagIndex`/`Revalidates` system (`rorp:tag:v1:*`) already covers them (the spike used it via tags). **No JS bridge in v1.** The bridge to the JS byte cache (`rorp:rsc-cache:*`) is required only when `unstable_cache` entries participate (v2); until then `ReactOnRailsPro.revalidate_tag` not evicting `unstable_cache` entries is a documented limitation (part of the `unstable_cache` docs child item).                                                                                                                                                                                                                 | @AbanoubGhadban                                      | v1: resolved; bridge with v2               |
-| D9  | Scroll-priority relationship            | **Resolved: shared foundation, separate lanes.** PPR v1 owns productizing prerender/resume; the scroll-priority cluster (#4770–#4778) consumes the same foundation and adds the data-resolution priority signal the P6 spike proved needs no per-section resume units. Labeling the cluster `roadmap:17x` + milestone is a child work item (issue edits out of this PR's scope). PR #4769 disposition (merge / re-scope against #4835 / close) is a named child decision.                                                                                                                                                                                                                                                                                | @AbanoubGhadban (lanes), @justin808 (roadmap labels) | proposed 2026-09-01                        |
+| D9  | Scroll-priority relationship            | **Resolved: shared foundation, separate lanes.** PPR v1 owns productizing prerender/resume; the scroll-priority cluster (#4770–#4778) consumes the same foundation and adds the data-resolution priority signal (the P6 spike suggests it needs no per-section resume units; unproven, see §1.3). Labeling the cluster `roadmap:17x` + milestone is a child work item (issue edits out of this PR's scope). PR #4769 closed unmerged on 2026-11-04, superseded by the #4841 evaluation.                                                                                                                                                                                                                                                                  | @AbanoubGhadban (lanes), @justin808 (roadmap labels) | proposed 2026-09-01                        |
 
 ---
 
@@ -457,8 +461,8 @@ Owners and dates are **proposals for maintainer confirmation** (review under
 
 ### Land the evidence first (already written, blocking)
 
-- [ ] Land PR #4851 (P6 spike) — this plan cites its `RESULTS.md`, which is not on `main`
-- [ ] Decide PR #4769 (scroll-priority design spec): merge, re-scope against #4835, or close (D9)
+- [x] Resolved, not landed: PR #4851 (P6 spike) closed unmerged on 2026-11-04. Its `RESULTS.md` is not on `main`; cite the commit-pinned link in the evidence base, with the §1.3 caveats
+- [x] Resolved, not landed: PR #4769 (scroll-priority design spec) closed unmerged on 2026-11-04, superseded by #4841 (D9)
 - [ ] ~~Port `ppr-spike-findings.md` out of closed `react_on_rails_rsc` PR #194~~ — **done in this PR** (`internal/analysis/ppr-spike-findings.md`)
 
 ### PPR v1 — productize the spike

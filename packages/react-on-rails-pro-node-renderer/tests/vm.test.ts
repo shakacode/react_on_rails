@@ -33,6 +33,7 @@ import {
 } from './helper';
 import {
   buildExecutionContext,
+  getVMContext,
   getVMPoolDiagnostics,
   hasVMContextForBundle,
   isDeclaredCurrentGenerationReady,
@@ -408,6 +409,135 @@ describe('buildVM and runInVM', () => {
 
       const result = await runInVM('typeof testString !== "undefined"', uploadedBundlePathForTest());
       expect(result).toBe('true');
+    });
+  });
+
+  // The context is built with `vm.constants.DONT_CONTEXTIFY` when the Node version has it, and
+  // with a contextified sandbox otherwise. The two must be observationally identical here.
+  describe.each([
+    ['vanilla global (DONT_CONTEXTIFY)', true],
+    ['contextified sandbox (older-Node fallback)', false],
+  ])('VM context flavor: %s', (_label, preferVanilla) => {
+    const runtimeHasDontContextify = vm.constants?.DONT_CONTEXTIFY !== undefined;
+
+    // `vm.constants` is a process-wide singleton, and this package's jest config sets
+    // `clearMocks`/`resetMocks` but not `restoreMocks` -- neither of which undoes a
+    // `replaceProperty`. Without the explicit restore below, the fallback case would leave
+    // `vm.constants` undefined for every later test in this file, silently forcing them all
+    // onto the older-Node path.
+    let constantsOverride: ReturnType<typeof jest.replaceProperty> | undefined;
+
+    beforeEach(() => {
+      // `vm.constants` is frozen, but `vm`'s own `constants` property is writable, so swapping
+      // the whole object forces the module down the older-Node fallback path.
+      // On Node versions without `vm.constants` the fallback runs naturally, and Jest cannot
+      // replace a property that does not exist.
+      if (!preferVanilla && Object.hasOwn(vm, 'constants')) {
+        constantsOverride = jest.replaceProperty(
+          vm,
+          'constants',
+          undefined as unknown as typeof vm.constants,
+        );
+      }
+      resetVM();
+    });
+
+    afterEach(() => {
+      constantsOverride?.restore();
+      constantsOverride = undefined;
+    });
+
+    test('creates the expected flavor without changing VM semantics', async () => {
+      getConfig().supportModules = true;
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      const vmContext = getVMContext(bundlePath);
+      if (!vmContext) throw new Error(`no VM context built for ${bundlePath}`);
+      const { context } = vmContext;
+
+      // A vanilla context's handle IS its `globalThis`; a contextified sandbox is a separate object.
+      expect(vm.runInContext('globalThis', context) === context).toBe(
+        preferVanilla && runtimeHasDontContextify,
+      );
+
+      // Injected globals reach the bundle, and `global = this` still aliases.
+      expect(await runInVM('typeof Buffer !== "undefined"', bundlePath)).toBe('true');
+      expect(await runInVM('global === globalThis', bundlePath)).toBe('true');
+      // Per-request state is visible during execution, and cleared afterwards so it cannot leak
+      // into a later request sharing this pooled context.
+      expect(await runInVM('typeof renderingRequest', bundlePath)).toBe('string');
+      expect(vm.runInContext('typeof renderingRequest', context)).toBe('undefined');
+      // Nothing escaped into the worker's own realm.
+      expect(global.ReactOnRails).toBeUndefined();
+    });
+
+    test('keeps host bridges non-enumerable and tamper-proof inside the bundle', async () => {
+      getConfig().supportModules = false;
+      // An application key may not replace a host bridge installed after it.
+      getConfig().additionalContext = { __reactOnRailsProBundleId: 'from-config' };
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      const expectedBundleId = path.basename(bundlePath, '.js');
+
+      const probe = await runInVM(
+        `(function () {
+          var key = '__reactOnRailsProBundleId';
+          var before = globalThis[key];
+          try { globalThis[key] = 'overwritten'; } catch (e) {}
+          var redefined = true;
+          try { Object.defineProperty(globalThis, key, { value: 'redefined' }); } catch (e) { redefined = false; }
+          return JSON.stringify({
+            before: before,
+            after: globalThis[key],
+            redefined: redefined,
+            enumerable: Object.keys(globalThis).indexOf(key) !== -1,
+            storeScope: typeof globalThis.reactOnRailsHydratedStoreScope,
+            mismatchReporter: typeof globalThis.__reactOnRailsProReportBuildIdMismatch,
+          });
+        })()`,
+        bundlePath,
+      );
+
+      expect(JSON.parse(probe as string)).toEqual({
+        before: expectedBundleId,
+        after: expectedBundleId,
+        redefined: false,
+        enumerable: false,
+        storeScope: 'object',
+        mismatchReporter: 'function',
+      });
+    });
+
+    test('replaces injected timers with stubs when stubTimers is on (the production default)', async () => {
+      getConfig().supportModules = true;
+      getConfig().stubTimers = true;
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      // The stubs are bundle-realm declarations that do nothing and return undefined, unlike
+      // the host `setTimeout` injected by supportModules, which returns a Timeout object.
+      expect(await runInVM('setTimeout === global.setTimeout', bundlePath)).toBe('true');
+      expect(await runInVM('typeof setTimeout(function () {}, 0)', bundlePath)).toBe('undefined');
+      expect(await runInVM('typeof queueMicrotask(function () {})', bundlePath)).toBe('undefined');
+      expect(await runInVM('typeof Buffer', bundlePath)).toBe('function');
+    });
+
+    test('accepts additionalContext keys that collide with non-configurable globals', async () => {
+      getConfig().supportModules = false;
+      getConfig().additionalContext = { NaN: 'shadowed', testString: 'a string' };
+      await createUploadedBundleForTest();
+      const bundlePath = uploadedBundlePathForTest();
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+      const { context } = getVMContext(bundlePath)!;
+
+      // The ordinary global cannot take this key, so the build keeps the contextified sandbox.
+      expect(vm.runInContext('globalThis', context) === context).toBe(false);
+      expect(await runInVM('testString', bundlePath)).toBe('a string');
+      expect(await runInVM('NaN', bundlePath)).toBe('shadowed');
     });
   });
 

@@ -8,46 +8,19 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                                                                                  | Expected                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                                                                                   |
-| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                                                                                   |
-| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                        |
-| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.3.x (the line the generator's `react-on-rails-rsc@19.3.1` requires)                     |
-| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                 |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Not installed yet, or 19.3.x from 19.3.1                                                   |
-| Node.js                  | `node --version`                                                                                                               | Node 20+ by default (Fastify 5); >= 18.19.0 with documented Fastify 4-compatible overrides |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                       |
+| Requirement              | Check command                                                                                                                  | Expected                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                                                               |
+| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                                                               |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                    |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.3.x (the line the generator's `react-on-rails-rsc@19.3.1` requires) |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                             |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Not installed yet, or 19.3.x from 19.3.1                               |
+| Node.js                  | `node --version`                                                                                                               | Node 20.19+                                                            |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                            |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                   |
 
-For Node 18.19, override the renderer's Fastify dependencies according to your package manager. Yarn uses
-`resolutions`, as shown in the
-[Node Renderer 4.0 release notes](../release-notes/4.0.md#packagejson-resolutions-for-node--20).
-npm and Bun use the same dependency map under `overrides`:
-
-```json
-{
-  "overrides": {
-    "@fastify/formbody": "^7.4.0",
-    "@fastify/multipart": "^8.3.1",
-    "fastify": "^4.29.0"
-  }
-}
-```
-
-pnpm uses that map under `pnpm.overrides`:
-
-```json
-{
-  "pnpm": {
-    "overrides": {
-      "@fastify/formbody": "^7.4.0",
-      "@fastify/multipart": "^8.3.1",
-      "fastify": "^4.29.0"
-    }
-  }
-}
-```
+The Node renderer requires Node 20.19 or later. Earlier guides suggested overriding Fastify to 4.x for Node 18.19. That path is no longer supported, because Fastify 4 is affected by [GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7). Remove any such overrides.
 
 If React is not on the 19.3.x line, upgrade it first:
 

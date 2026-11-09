@@ -6,6 +6,7 @@ require "io/wait"
 require "open3"
 require "optparse"
 require "rubygems/version"
+require "tempfile"
 require_relative "../rakelib/release_changelog_selector"
 require_relative "../rakelib/release_lease_guard"
 
@@ -22,6 +23,8 @@ class ReleaseSupervisor
   SIGNALS = %w[INT TERM HUP].freeze
   RELEASE_START = "S"
   PR_SET_CHILD_SUBREAPER = 36
+  NPM_REGISTRY = "https://registry.npmjs.org/"
+  SIGN_IN_CHECK_TIMEOUT = 20.0
 
   ReleaseScope = Data.define(:version, :base_version, :repo, :target, :branch)
   TerminalHandoff = Data.define(:fd, :supervisor_pgid, :release_pgid)
@@ -71,6 +74,7 @@ class ReleaseSupervisor
 
   def run_live(scope)
     doctor_tools!
+    doctor_publishing_auth!(publishing: !@options.fetch(:reconcile_accelerated_rc))
     verify_live_terminal_foreground!
     intervals = supervisor_intervals
 
@@ -159,6 +163,7 @@ class ReleaseSupervisor
     raise UsageError, "--doctor does not accept positional arguments" unless @remaining_args.empty?
 
     doctor_tools!
+    doctor_publishing_auth!
     print_doctor_success
     0
   end
@@ -170,9 +175,125 @@ class ReleaseSupervisor
     raise UsageError, "install required release tool(s) on PATH: #{missing_tools.join(', ')}"
   end
 
+  # Without this, a live release stops mid-pre-flight at an interactive npm login, or later at a
+  # missing RubyGems key. Check the sign-ins this run needs up front and name each fix.
+  # Accelerated RC reconciliation only writes GitHub tracker records, so it needs only gh.
+  def doctor_publishing_auth!(publishing: true)
+    missing = []
+    unless gh_signed_in?
+      missing << "GitHub CLI: run `gh auth status` and fix every account it reports (or `gh auth login`)"
+    end
+    if publishing
+      missing << "npm: run `npm login --registry #{NPM_REGISTRY}`" unless npm_signed_in?
+      rubygems_problem = rubygems_credentials_problem
+      missing << rubygems_problem if rubygems_problem
+    end
+    return if missing.empty?
+
+    raise SupervisorError, "sign in before releasing:\n  #{missing.join("\n  ")}"
+  end
+
+  # The same command the release's own pre-flight (`verify_gh_auth` in rakelib/release.rake)
+  # runs, so this check predicts that gate: plain `gh auth status` fails when any account has a
+  # problem, and the release would then abort there.
+  def gh_signed_in?
+    command_succeeds?("gh", "auth", "status")
+  end
+
+  def npm_signed_in?
+    command_succeeds?("npm", "whoami", "--registry", NPM_REGISTRY)
+  end
+
+  def command_succeeds?(*command)
+    exit_status, _stderr = run_sign_in_check(*command)
+    exit_status&.zero? || false
+  end
+
+  # No stdin, so a prompt cannot block, and a bounded wait, so a hung registry fails the check.
+  # Returns [exit status or nil on timeout or spawn failure, stderr text].
+  def run_sign_in_check(*command)
+    Tempfile.create("release-sign-in-check") do |stderr_file|
+      pid = Process.spawn(@env.to_h, *command, in: File::NULL, out: File::NULL, err: stderr_file.path, pgroup: true)
+      begin
+        [wait_for_sign_in_check(pid), File.read(stderr_file.path).strip]
+      rescue SignalException
+        # INT, TERM, and HUP all arrive here before the supervisor's own handlers are installed;
+        # the check runs in its own process group, so kill it before the supervisor exits.
+        kill_sign_in_check(pid)
+        raise
+      end
+    end
+  rescue SystemCallError
+    [nil, ""]
+  end
+
+  def wait_for_sign_in_check(pid)
+    timeout = bounded_interval!(
+      "REACT_ON_RAILS_RELEASE_SIGN_IN_TIMEOUT", SIGN_IN_CHECK_TIMEOUT, maximum: SIGN_IN_CHECK_TIMEOUT
+    )
+    deadline = monotonic_time + timeout
+    loop do
+      _pid, status = Process.wait2(pid, Process::WNOHANG)
+      return status.exitstatus if status
+      break if monotonic_time >= deadline
+
+      sleep(POLL_INTERVAL)
+    end
+    kill_sign_in_check(pid)
+    nil
+  end
+
+  # Kill the whole group so a wrapper such as an npm shim leaves no grandchildren behind.
+  def kill_sign_in_check(pid)
+    Process.kill("KILL", -pid)
+    Process.wait(pid)
+  rescue SystemCallError
+    nil
+  end
+
+  # Ask RubyGems for the key `gem push` would use instead of re-implementing its rules. Its
+  # api_key covers GEM_HOST_API_KEY (even blank), host-specific keys, the legacy and XDG
+  # credentials files, and the 0600 permission check, which ends the child process on failure.
+  # Exit 0: a usable key. Exit 1: no key, or RubyGems refused the credentials file (its message
+  # is on stderr). Exit 3: the probe itself broke, for example after a RubyGems internals change.
+  RUBYGEMS_PROBE_BROKEN = 3
+  RUBYGEMS_KEY_PROBE = <<~RUBY.freeze
+    begin
+      require "rubygems/gemcutter_utilities"
+      probe = Object.new.extend(Gem::GemcutterUtilities)
+      # `gem release` passes GEM_RELEASE_KEY to `gem push --key`, which selects a named key.
+      named_key = ENV.fetch("GEM_RELEASE_KEY", "")
+      # `gem push --key` parses the name as a Symbol, the type credentials-file keys load as.
+      probe.define_singleton_method(:options) { named_key.empty? ? {} : { key: named_key.to_sym } }
+      key = probe.api_key
+    rescue Gem::SystemExitException
+      raise
+    rescue StandardError, ScriptError => e
+      warn "RubyGems key probe failed: \#{e.class}: \#{e.message}"
+      exit #{RUBYGEMS_PROBE_BROKEN}
+    end
+    exit(key.is_a?(String) && !key.strip.empty? ? 0 : 1)
+  RUBY
+
+  # Returns nil when RubyGems has a usable key, otherwise the line to show the operator.
+  def rubygems_credentials_problem
+    exit_status, stderr = run_sign_in_check(RbConfig.ruby, "-e", RUBYGEMS_KEY_PROBE)
+    return nil if exit_status&.zero?
+
+    detail = stderr.lines.map(&:strip).reject(&:empty?).first(3).join(" ")
+    if exit_status == RUBYGEMS_PROBE_BROKEN
+      "RubyGems: could not check the API key (#{detail}); report this, then run `gem signin` only if needed"
+    elsif detail.empty?
+      "RubyGems: run `gem signin`"
+    else
+      "RubyGems: run `gem signin` (RubyGems said: #{detail})"
+    end
+  end
+
   def print_doctor_success
     @stdout.puts "Release machine doctor: PASS"
     @stdout.puts "  local release tools: ready"
+    @stdout.puts "  publishing sign-in: npm and GitHub CLI signed in, RubyGems API key present"
     @stdout.puts "  publication supervision: local process guard ready"
   end
 
