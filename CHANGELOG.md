@@ -53,7 +53,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `react-on-rails-rsc` 19.3.1 keep working with React 19.3.0, and Doctor still warns about a vulnerable lockfile.
   **Action required for upgraders:** upgrade `react-on-rails-rsc` to 19.3.2 together with `react` and `react-dom`
   19.3.1.
-  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by [justin808](https://github.com/justin808).
+  [PR 5339](https://github.com/shakacode/react_on_rails/pull/5339) by [justin808](https://github.com/justin808).
 
 #### Improved
 
