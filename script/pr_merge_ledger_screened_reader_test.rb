@@ -128,30 +128,6 @@ class PrMergeLedgerScreenedReaderTest < Minitest::Test
     assert_includes violation_codes(JSON.parse(stdout)), "changes_requested_review_object"
   end
 
-  def test_reader_failure_does_not_fall_back_to_raw_comment_collection
-    collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails",
-                                                   shaka_reader: "/trusted/shaka", trusted_ref: HEAD)
-    collector.define_singleton_method(:fetch_metadata_and_files) { |_number| [{ "headRefOid" => HEAD }, []] }
-    collector.define_singleton_method(:fetch_labels) { |_number| [] }
-    collector.define_singleton_method(:fetch_review_threads) { |_number| raise "raw fallback attempted" }
-    failed = Struct.new(:success?).new(false)
-    test_context = self
-    capture = lambda do |args, **_options|
-      test_context.assert_equal ["/trusted/shaka", "comments", "shakacode/react_on_rails", "5182"], args.first(4)
-      test_context.assert_equal HEAD, args[args.index("--head") + 1]
-      test_context.assert_equal HEAD, args[args.index("--ref") + 1]
-      ["", "reader unavailable", failed]
-    end
-    original = PrMergeLedger.method(:capture_command_with_timeout)
-    PrMergeLedger.define_singleton_method(:capture_command_with_timeout, &capture)
-    begin
-      error = assert_raises(PrMergeLedger::Error) { collector.fetch(5182) }
-      assert_match(/screened comment reader failed/, error.message)
-    ensure
-      PrMergeLedger.define_singleton_method(:capture_command_with_timeout, original)
-    end
-  end
-
   def test_push_during_screened_collection_is_rejected
     collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
     collector.define_singleton_method(:graphql) do |_query, _variables|
@@ -221,6 +197,53 @@ class PrMergeLedgerScreenedCollectionTest < Minitest::Test
     assert_empty collector.screened_collections
   end
 
+  def test_reader_failure_reports_exit_status_and_reason
+    collector = screened_collector(push_during_ci: false)
+    collector.define_singleton_method(:fetch_ci_readiness) { |*_args, **_options| raise "collection continued" }
+    failed = Struct.new(:success?, :exitstatus).new(false, 3)
+    stderr = "shaka: GitHub rate limit exceeded\n#{'x' * 500}\nsecond line"
+    calls = []
+    error = assert_raises(PrMergeLedger::Error) do
+      stub_reader(["", stderr, failed], on_call: ->(args) { calls << args }) { collector.fetch(5182) }
+    end
+    assert_equal "Shaka screened comment reader failed (exit 3): shaka: GitHub rate limit exceeded", error.message
+    args = calls.fetch(0)
+    assert_equal ["/trusted/shaka", "comments", "shakacode/react_on_rails", "5182"], args.first(4)
+    assert_equal [HEAD, HEAD], [args[args.index("--head") + 1], args[args.index("--ref") + 1]]
+  end
+
+  def test_unparseable_reader_output_is_a_ledger_error
+    collector = screened_collector(push_during_ci: false)
+    error = assert_raises(PrMergeLedger::Error) do
+      stub_reader(["not json", "", Struct.new(:success?, :exitstatus).new(true, 0)]) { collector.fetch(5182) }
+    end
+    assert_equal "Shaka screened comment reader returned invalid JSON", error.message
+  end
+
+  # Reading the packet last means a comment edited during collection carries its newer text,
+  # and a comment added during collection appears only in the packet and fails closed.
+  def test_reader_runs_after_the_live_comment_reads
+    collector = screened_collector(push_during_ci: false)
+    order = []
+    %i[fetch_review_threads fetch_reviews fetch_comments].each do |method|
+      previous = collector.method(method)
+      collector.define_singleton_method(method) do |number|
+        order << method
+        previous.call(number)
+      end
+    end
+    with_reader_packet(on_call: -> { order << :reader }) { collector.fetch(5182) }
+    assert_equal %i[fetch_review_threads fetch_reviews fetch_comments reader], order
+  end
+
+  def test_comment_added_after_the_live_reads_fails_closed
+    collector = screened_collector(push_during_ci: false)
+    late = { "url" => "#{URL}2", "author" => "maintainer", "body" => "P1: added late" }
+    data = packet.merge("issue_comments" => packet.fetch("issue_comments") + [late])
+    error = assert_raises(PrMergeLedger::Error) { with_reader_packet(data) { collector.fetch(5182) } }
+    assert_equal "screened interactions do not match live metadata", error.message
+  end
+
   private
 
   # A collector whose GitHub calls return body-free rows; CI collection can simulate a push.
@@ -246,11 +269,17 @@ class PrMergeLedgerScreenedCollectionTest < Minitest::Test
     collector
   end
 
-  def with_reader_packet
-    ok = Struct.new(:success?).new(true)
-    stdout = JSON.generate(packet)
+  def with_reader_packet(data = packet, on_call: nil, &)
+    ok = Struct.new(:success?, :exitstatus).new(true, 0)
+    stub_reader([JSON.generate(data), "", ok], on_call: on_call && ->(_args) { on_call.call }, &)
+  end
+
+  def stub_reader(result, on_call: nil)
     original = PrMergeLedger.method(:capture_command_with_timeout)
-    PrMergeLedger.define_singleton_method(:capture_command_with_timeout) { |*_args, **_options| [stdout, "", ok] }
+    PrMergeLedger.define_singleton_method(:capture_command_with_timeout) do |args, **_options|
+      on_call&.call(args)
+      result
+    end
     yield
   ensure
     PrMergeLedger.define_singleton_method(:capture_command_with_timeout, original)

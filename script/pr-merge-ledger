@@ -2363,10 +2363,11 @@ class PrMergeLedger
       hosted_ci_requested = hosted_ci_requested?(metadata)
       expected_hosted_workflows = expected_hosted_workflows(metadata)
       allow_pull_request_hosted_ci = PrMergeLedger.allow_pull_request_hosted_ci?(metadata)
-      screened = fetch_screened_comments(pr_number, metadata.fetch("headRefOid")) if @shaka_reader
       review_threads = fetch_review_threads(pr_number)
       reviews = fetch_reviews(pr_number)
       comments = fetch_comments(pr_number)
+      # Read the packet last: an edit during collection then reaches it, and a new comment fails closed.
+      screened = fetch_screened_comments(pr_number, metadata.fetch("headRefOid")) if @shaka_reader
       reconcile_screened!(screened, reviews:, comments:, review_threads:) if screened
       ci_readiness = fetch_ci_readiness(
         pr_number,
@@ -2437,12 +2438,25 @@ class PrMergeLedger
     def fetch_screened_comments(pr_number, head)
       args = [@shaka_reader, "comments", "#{@owner}/#{@name}", pr_number.to_s,
               "--head", head, "--root", PrMergeLedger::CHECKOUT_ROOT, "--ref", @trusted_ref]
-      stdout, _stderr, status = PrMergeLedger.capture_command_with_timeout(
+      stdout, stderr, status = PrMergeLedger.capture_command_with_timeout(
         args, timeout: 120, timeout_message: "Shaka screened comment reader timed out"
       )
-      raise Error, "Shaka screened comment reader failed" unless status.success?
+      raise Error, reader_failure(status, stderr) unless status.success?
 
-      ShakaScreenedComments.new(JSON.parse(stdout), head)
+      ShakaScreenedComments.new(parse_reader_packet(stdout), head)
+    end
+
+    # The reader's own first error line, trimmed, never comment text: it prints prose only on success.
+    def reader_failure(status, stderr)
+      reason = stderr.to_s.lines.first.to_s.gsub(/[^[:print:]]/, "").strip[0, 200]
+      message = "Shaka screened comment reader failed (exit #{status.exitstatus})"
+      reason.empty? ? message : "#{message}: #{reason}"
+    end
+
+    def parse_reader_packet(stdout)
+      JSON.parse(stdout)
+    rescue JSON::ParserError
+      raise Error, "Shaka screened comment reader returned invalid JSON"
     end
 
     def reconcile_screened!(screened, reviews:, comments:, review_threads:)
