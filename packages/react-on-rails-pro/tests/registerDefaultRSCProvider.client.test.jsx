@@ -22,6 +22,9 @@ import * as React from 'react';
 describe('registerDefaultRSCProvider/client hydration parity', () => {
   beforeEach(() => {
     jest.resetModules();
+    jest.dontMock('../src/RSCProvider.tsx');
+    jest.dontMock('../src/getReactServerComponent.client.ts');
+    jest.dontMock('react-on-rails-rsc/client.browser');
   });
 
   afterEach(() => {
@@ -65,5 +68,51 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
 
     expect(wrappedByDefaultRSCProvider).toBe(true);
     expect(reactElement.props.children).toBe(appElement);
+  });
+  it('preserves stream health through the registered lazy HTTP loader without wrapping scalar roots', async () => {
+    let finish;
+    const state = {
+      completion: new Promise((resolve) => {
+        finish = resolve;
+      }),
+    };
+    const inner = Promise.resolve('same scalar');
+    const observe = jest.fn();
+    jest.doMock('../src/RSCProvider.tsx', () => ({
+      createRSCProvider: jest.fn(
+        () =>
+          ({ children }) =>
+            children,
+      ),
+    }));
+    jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
+    jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+      __esModule: true,
+      default: jest.fn(() =>
+        jest.fn((_args, onStreamState) => {
+          onStreamState?.(state);
+          return inner;
+        }),
+      ),
+    }));
+    const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
+    require('../src/registerDefaultRSCProvider.client.tsx');
+    maybeWrapWithDefaultRSCProviderWithStatus(
+      <section />,
+      { rscPayloadGenerationUrlPath: '/rsc_payload' },
+      'default-provider-test',
+    );
+    const { createRSCProvider } = require('../src/RSCProvider.tsx');
+    const { getServerComponent } = createRSCProvider.mock.calls[0][0];
+    const request = getServerComponent({ componentName: 'Card', enforceRefetch: true }, observe);
+
+    await expect(request).resolves.toBe('same scalar');
+    expect(request).not.toBe(inner);
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(observe).toHaveBeenCalledWith(state);
+    state.error = new Error('late descendant failure');
+    finish(false);
+    await expect(observe.mock.calls[0][0].completion).resolves.toBe(false);
+    expect(observe.mock.calls[0][0].error).toBe(state.error);
   });
 });

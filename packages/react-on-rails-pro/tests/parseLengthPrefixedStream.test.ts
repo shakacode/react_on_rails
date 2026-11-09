@@ -155,7 +155,7 @@ describe('LengthPrefixedStreamParser', () => {
         records.push({ content: decoder.decode(content), metadata });
       });
 
-      parser.flush();
+      expect(parser.flush()).toBe(true);
 
       expect(records).toEqual([{ content: 'hello', metadata: { index: 0 } }]);
       expect(warnSpy).not.toHaveBeenCalled();
