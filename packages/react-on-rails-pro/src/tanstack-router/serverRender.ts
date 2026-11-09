@@ -56,6 +56,22 @@ function dehydrateSsrMatchId(id: string): string {
   return id.split('/').join('\0');
 }
 
+function isJsonSafe(value: unknown, ancestors = new Set<object>()): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || ancestors.has(value)) return false;
+  if (
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) !== Object.prototype &&
+    Object.getPrototypeOf(value) !== null
+  )
+    return false;
+  ancestors.add(value);
+  const safe = Object.values(value).every((child) => isJsonSafe(child, ancestors));
+  ancestors.delete(value);
+  return safe;
+}
+
 function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
   if (!match || typeof match !== 'object') {
     return null;
@@ -82,10 +98,25 @@ function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
     dehydratedMatch.b = candidate.__beforeLoadContext;
   }
   if (candidate.loaderData !== undefined) {
+    if (process.env.NODE_ENV === 'development' && !isJsonSafe(candidate.loaderData)) {
+      console.warn(
+        'react-on-rails-pro/tanstack-router: Loader data must be JSON-safe. ' +
+          'Convert Date and other non-JSON values before returning them from a loader to avoid hydration mismatches.',
+      );
+    }
     dehydratedMatch.l = candidate.loaderData;
   }
   if (candidate.error !== undefined) {
-    dehydratedMatch.e = candidate.error;
+    if (candidate.error instanceof Error) {
+      dehydratedMatch.er = true;
+      dehydratedMatch.e = {
+        name: candidate.error.name,
+        message: candidate.error.message,
+        ...(process.env.NODE_ENV === 'development' ? { stack: candidate.error.stack } : {}),
+      };
+    } else {
+      dehydratedMatch.e = candidate.error;
+    }
   }
   if (candidate.ssr !== undefined) {
     dehydratedMatch.ssr = candidate.ssr;

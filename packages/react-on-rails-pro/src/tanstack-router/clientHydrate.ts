@@ -229,6 +229,18 @@ function rehydrateMatchId(dehydratedId: string): string {
   return dehydratedId.split('\0').join('/');
 }
 
+function restoreRouteError(match: TanStackSsrMatch): unknown {
+  if (!match.er || !match.e || typeof match.e !== 'object') return match.e;
+  const data = match.e as { name?: unknown; message?: unknown; stack?: unknown };
+  if (typeof data.name !== 'string' || typeof data.message !== 'string') return match.e;
+  const error = new Error(data.message);
+  error.name = data.name;
+  // Never invent a client stack for an error that happened on the server.
+  error.stack =
+    process.env.NODE_ENV === 'development' && typeof data.stack === 'string' ? data.stack : undefined;
+  return error;
+}
+
 /**
  * Applies server-rendered match data (loaderData, beforeLoadContext, status, etc.)
  * from the dehydrated SSR payload to fresh client matches. This ensures the first
@@ -251,7 +263,7 @@ function applyDehydratedMatchData(
         updatedAt: ssrMatch.u,
         ...(ssrMatch.l !== undefined ? { loaderData: ssrMatch.l } : {}),
         ...(ssrMatch.b !== undefined ? { __beforeLoadContext: ssrMatch.b } : {}),
-        ...(ssrMatch.e !== undefined ? { error: ssrMatch.e } : {}),
+        ...(ssrMatch.e !== undefined ? { error: restoreRouteError(ssrMatch) } : {}),
         ...(ssrMatch.ssr !== undefined ? { ssr: ssrMatch.ssr } : {}),
       };
     }

@@ -76,6 +76,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** TanStack Router loader errors now preserve their name and message during JSON hydration, without production stacks or custom error properties. Development renders warn about non-JSON loader data such as Date values.
+
 - **Server rendering works when Bun is installed**: ExecJS 2.9+ picks Bun ahead of Node.js, and Bun fails to
   evaluate some server bundles ("Expected CommonJS module to have a function wrapper"), so a freshly generated
   `--standard` app returned HTTP 500 on its server-rendered page. When ExecJS autodetects Bun and Node.js is

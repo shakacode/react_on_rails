@@ -2650,7 +2650,7 @@ _Also, see [our React server-rendering documentation](../core-concepts/react-ser
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
-Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. ExecJS auto-detects the best available runtime, preferring mini_racer and Bun over Node.js when installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes. For details on ExecJS constraints with timers, async, and browser APIs, see [ExecJS Limitations](./execjs-limitations.md).
+Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. ExecJS auto-detects the best available runtime, preferring mini_racer and Bun over Node.js when installed. Because Bun cannot evaluate some server bundles, React on Rails renders with Node.js when ExecJS autodetects Bun and Node.js is installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes. For details on ExecJS constraints with timers, async, and browser APIs, see [ExecJS Limitations](./execjs-limitations.md).
 
 > [!WARNING]
 > Since React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), `mini_racer` is effectively unsupported for server rendering with modern React. Consider using the Node.js ExecJS runtime or upgrading to the [Node Renderer](../building-features/node-renderer/basics.md). If you cannot switch runtimes immediately and need a temporary `TextEncoder` polyfill, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717).
@@ -4618,7 +4618,7 @@ React on Rails uses [ExecJS](https://github.com/rails/execjs) as the default ser
 
 ExecJS evaluates your server bundle in an isolated JavaScript context. It calls your render function synchronously, collects the resulting HTML string, and returns it to Rails. This synchronous model is the root of most limitations — ExecJS cannot wait for asynchronous operations to complete.
 
-ExecJS auto-detects the best available runtime via its `best_available` method, checking runtimes such as mini_racer, Bun, and Node.js. The exact priority can vary by ExecJS version (for example, Bun support was added in newer releases), so verify against the version you're running. Node.js is not guaranteed: ExecJS may choose a higher-priority runtime when one is available. You can override runtime selection with the `EXECJS_RUNTIME` environment variable. All runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for available runtimes.
+ExecJS auto-detects the best available runtime via its `best_available` method, checking runtimes such as mini_racer, Bun, and Node.js. The exact priority can vary by ExecJS version (for example, Bun support was added in newer releases), so verify against the version you're running. Node.js is not guaranteed: ExecJS may choose a higher-priority runtime when one is available. The exception is Bun: because Bun cannot evaluate some server bundles, React on Rails server rendering uses Node.js when ExecJS autodetects Bun and Node.js is installed. You can override runtime selection with the `EXECJS_RUNTIME` environment variable. All runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for available runtimes.
 
 ## Timer and Async Limitations
 
@@ -5610,6 +5610,18 @@ Create a new `QueryClient` in each `createRouter` call so server renders never s
 The dehydrated value reaches the client as JSON inside the `react_component` props. Values JSON cannot represent
 lose their type on the way: a `Date` arrives as a string, and an `Error` or `Map` arrives as a plain object.
 Convert such values to JSON-safe data in `dehydrate` and rebuild them in `hydrate`.
+
+### Loader Data and Route Errors
+
+Loader data and `beforeLoad` context travel through JSON and must be JSON-safe. Return strings instead of
+`Date` instances (for example, `date.toISOString()`), arrays instead of `Set`, and plain objects instead of
+`Map`. Convert values before rendering on the server so the first client render sees the same types.
+In development, the helper warns when loader data contains non-JSON values; it does not convert them.
+
+A route match's thrown `Error` is transported separately using its `name` and `message`, then restored as an
+`Error` before the first client render. The original stack is included only in development. Custom error
+properties, subclasses, and `cause` are not preserved. Plain thrown objects, including TanStack Router's
+not-found objects, retain their existing JSON representation. Keep error messages suitable for clients.
 
 ## Props Requirement
 
@@ -22636,6 +22648,14 @@ gem 'mini_racer', platforms: :ruby
 # Or use Node.js runtime
 export EXECJS_RUNTIME=Node
 ```
+
+### "Expected CommonJS module to have a function wrapper"
+
+**Error:** Server rendering fails with this Bun error, or `bin/rails react_on_rails:doctor` warns that server rendering uses `Bun.sh`
+
+**Cause:** Bun cannot evaluate some server bundles. React on Rails already renders with Node.js when ExecJS autodetects Bun, so this error means Bun was chosen explicitly (`EXECJS_RUNTIME=Bun`) or the Rails server process cannot find `node` on its `PATH`.
+
+**Solution:** Make sure `node` is on the `PATH` of the process that runs Rails, then set `EXECJS_RUNTIME=Node`.
 
 ## ⚡ Runtime Issues
 

@@ -114,6 +114,8 @@ export interface TanStackSsrMatch {
   l?: unknown;
   /** error */
   e?: unknown;
+  /** The error payload holds an Error's name/message and optional development stack. */
+  er?: true;
   ssr?: unknown;
 }
 
