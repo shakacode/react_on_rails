@@ -227,6 +227,34 @@ describe('TanStack SSR serialization', () => {
     },
   );
 
+  it('sanitizes through modern match stores when updateMatch is unavailable', async () => {
+    process.env.NODE_ENV = 'production';
+    const original = new Error('PRIVATE_MESSAGE');
+    const router = buildRouter(() => {
+      throw original;
+    });
+    await router.load();
+    router.load = async () => undefined;
+    const legacyStore = router.__store;
+    if (!legacyStore) throw new Error('This legacy-router fixture requires __store');
+    router.stores = {
+      status: { set: jest.fn() },
+      resolvedLocation: { set: jest.fn() },
+      setMatches: (matches) => legacyStore.setState((state) => ({ ...state, matches })),
+    };
+    delete (router as unknown as { updateMatch?: unknown }).updateMatch;
+    const server = await serverRenderTanStackAppAsync(
+      { createRouter: () => router },
+      {},
+      context,
+      provider,
+      createMemoryHistory,
+    );
+    expect(renderToString(server.appElement)).toBe('<p>Error: An unexpected error occurred.</p>');
+    expect(JSON.stringify(server.dehydratedState)).not.toContain('PRIVATE');
+    expect(original.message).toBe('PRIVATE_MESSAGE');
+  });
+
   it('fails closed with a clear diagnostic if a custom router cannot update production error matches', async () => {
     process.env.NODE_ENV = 'production';
     const router = buildRouter(() => {

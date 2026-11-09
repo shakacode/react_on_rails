@@ -87,14 +87,26 @@ function sanitizeProductionErrors(router: TanStackRouter): void {
     if (!match || typeof match !== 'object') return;
     const candidate = match as Record<string, unknown>;
     if (!isRouteError(candidate.error)) return;
-    if (typeof candidate.id !== 'string' || typeof mutableRouter.updateMatch !== 'function') {
+    if (typeof candidate.id !== 'string') {
       throw new Error(
-        'react-on-rails-pro/tanstack-router: Production error rendering requires router.updateMatch().',
+        'react-on-rails-pro/tanstack-router: Production error rendering requires string match IDs.',
       );
     }
     // Replace the per-request match, preserving an Error that may be shared by application code.
     const error = createHydrationError({ name: 'Error', message: 'An unexpected error occurred.' });
-    mutableRouter.updateMatch(candidate.id, (current) => ({ ...current, error }));
+    if (typeof mutableRouter.updateMatch === 'function') {
+      mutableRouter.updateMatch(candidate.id, (current) => ({ ...current, error }));
+      return;
+    }
+    if (typeof router.stores?.setMatches === 'function') {
+      router.stores.setMatches(
+        router.state.matches.map((current) => (current === match ? { ...candidate, error } : current)),
+      );
+      return;
+    }
+    throw new Error(
+      'react-on-rails-pro/tanstack-router: Production error rendering requires router.updateMatch() or router.stores.setMatches().',
+    );
   });
 }
 
