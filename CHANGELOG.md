@@ -40,6 +40,21 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808). Part of
   [Issue 5305](https://github.com/shakacode/react_on_rails/issues/5305).
 
+#### Security
+
+- **[Pro]** **The RSC generator pins `react-on-rails-rsc` 19.3.2, which requires the patched Flight runtime**:
+  Published `react-on-rails-rsc` 19.3.1 depends on `react-server-dom-webpack` `~19.3.0`, so an existing app could
+  upgrade and still resolve Flight 19.3.0, which React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect.
+  `react-on-rails-rsc` [19.3.2](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.2) depends on
+  `~19.3.1` and peers on React `^19.3.1`. New RSC apps now install it, and Doctor and the Node renderer's startup
+  check now require React 19.3.1 or later with `react-on-rails-rsc` 19.3.2 and newer. Apps on
+  `react-on-rails-rsc` 19.3.1 keep working with React 19.3.0, and Doctor still warns about a vulnerable lockfile.
+  **Action required for upgraders:** upgrade `react-on-rails-rsc` to 19.3.2 together with `react` and `react-dom`
+  19.3.1.
+  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by [justin808](https://github.com/justin808).
+
 #### Improved
 
 - **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5

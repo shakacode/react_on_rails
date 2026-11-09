@@ -33,7 +33,7 @@ Pro RSC runtime line in v17 because the generator, peer metadata, and
 node-renderer startup check target the coordinated React 19.2 and 19.3 package
 lines.
 
-The React on Rails Pro 17.2 generator pins stable `react-on-rails-rsc@19.3.1`
+The React on Rails Pro generator pins stable `react-on-rails-rsc@19.3.2`
 for both webpack and rspack projects. Keep React, React DOM, and
 `react-on-rails-rsc` upgraded as a coordinated set.
 

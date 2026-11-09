@@ -5119,11 +5119,13 @@ module ReactOnRails
     # Each row covers react-on-rails-rsc patches rsc_min_patch..rsc_max_patch (nil = open-ended)
     # on rsc_minor. React must match the Flight line the RSC package bundles:
     # 19.2.x ships Flight 19.2, published 19.3.0 ships Flight 19.2.8 (React on Rails 17.1.0),
-    # and 19.3.1+ ships Flight 19.3.0. Only stable react-on-rails-rsc releases are supported.
+    # 19.3.1 ships Flight ~19.3.0, and 19.3.2+ ships the patched Flight ~19.3.1, whose own peers
+    # require React 19.3.1+. Only stable react-on-rails-rsc releases are supported.
     RSC_REACT_SUPPORT_RANGES = [
       { rsc_minor: 2, rsc_min_patch: 1, rsc_max_patch: nil, minor: 2, min_patch: 7 },
       { rsc_minor: 3, rsc_min_patch: 0, rsc_max_patch: 0, minor: 2, min_patch: 8 },
-      { rsc_minor: 3, rsc_min_patch: 1, rsc_max_patch: nil, minor: 3, min_patch: 0 }
+      { rsc_minor: 3, rsc_min_patch: 1, rsc_max_patch: 1, minor: 3, min_patch: 0 },
+      { rsc_minor: 3, rsc_min_patch: 2, rsc_max_patch: nil, minor: 3, min_patch: 1 }
     ].freeze
     RSC_SUPPORTED_PACKAGE_MINORS = RSC_REACT_SUPPORT_RANGES.map { |range| range.fetch(:rsc_minor) }.uniq.freeze
     RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
