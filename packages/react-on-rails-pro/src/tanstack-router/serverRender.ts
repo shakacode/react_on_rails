@@ -60,15 +60,15 @@ function isRouteError(value: unknown): value is Error {
   if (value instanceof Error) return true;
   if (value === null || typeof value !== 'object') return false;
 
-  // Native Error constructors have the same source across realms. Inspect the
-  // prototype chain because toStringTag can hide a real Error or spoof a plain object.
-  const nativeErrorSource = Function.prototype.toString.call(Error);
+  // Inspect native Error constructors independently of a possibly wrapped global Error.
+  // toStringTag can hide a real Error or spoof a plain object.
+  const nativeErrorConstructor = /^function\s+Error\s*\([^)]*\)\s*\{\s*\[native code\]\s*\}$/;
   let prototype = Object.getPrototypeOf(value);
   while (prototype !== null) {
     const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
     if (
       typeof constructor === 'function' &&
-      Function.prototype.toString.call(constructor) === nativeErrorSource
+      nativeErrorConstructor.test(Function.prototype.toString.call(constructor))
     ) {
       return true;
     }

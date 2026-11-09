@@ -259,6 +259,29 @@ describe('TanStack SSR serialization', () => {
     expect(renderToString(server.appElement)).toBe('<p>Error: An unexpected error occurred.</p>');
   });
 
+  it('sanitizes native cross-realm Errors when an application wraps the global Error constructor', async () => {
+    process.env.NODE_ENV = 'production';
+    const NativeError = globalThis.Error;
+    function WrappedError(message?: string) {
+      return new NativeError(message);
+    }
+    WrappedError.prototype = NativeError.prototype;
+    Object.setPrototypeOf(WrappedError, NativeError);
+    globalThis.Error = WrappedError as ErrorConstructor;
+    try {
+      const error: unknown = runInNewContext(
+        'Object.assign(new Error("PRIVATE_MESSAGE"), { token: "PRIVATE_TOKEN" })',
+      );
+      const server = await render(() => {
+        throw error;
+      });
+      expect(JSON.stringify(server.dehydratedState)).not.toContain('PRIVATE');
+      expect(renderToString(server.appElement)).toBe('<p>Error: An unexpected error occurred.</p>');
+    } finally {
+      globalThis.Error = NativeError;
+    }
+  });
+
   it('does not reinterpret a plain thrown object with an Error toStringTag', async () => {
     const thrown = { name: 'Custom', message: 'application value', [Symbol.toStringTag]: 'Error' };
     const server = await render(() => {
