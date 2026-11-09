@@ -13,11 +13,18 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-// eslint-disable-next-line import/prefer-default-export -- Keeping named export for consistency with the module's API.
 export function normalizeSearch(search: string | null | undefined): string {
   if (!search || search === '?') {
     return '';
   }
 
   return search.startsWith('?') ? search : `?${search}`;
+}
+
+export function createHydrationError(data: { name: string; message: string; stack?: string }): Error {
+  const production = process.env.NODE_ENV === 'production';
+  const error = new Error(production ? 'An unexpected error occurred.' : data.message);
+  error.name = production ? 'Error' : data.name;
+  error.stack = process.env.NODE_ENV === 'development' ? data.stack : undefined;
+  return error;
 }

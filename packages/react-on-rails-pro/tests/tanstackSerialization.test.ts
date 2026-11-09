@@ -139,9 +139,40 @@ describe('TanStack SSR serialization', () => {
         throw Object.assign(new Error('boom'), { stack: 'PRIVATE_STACK', token: 'PRIVATE_TOKEN' });
       });
       const json = JSON.stringify(server.dehydratedState);
-      expect(json).toContain('boom');
+      expect(json).toContain('An unexpected error occurred.');
+      expect(json).not.toContain('boom');
       expect(json).not.toContain('PRIVATE_STACK');
       expect(json).not.toContain('PRIVATE_TOKEN');
+    } finally {
+      process.env.NODE_ENV = previous;
+    }
+  });
+
+  it('uses the same sanitized production error for SSR and the first client render without mutating the original error', async () => {
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    const original = Object.assign(new TypeError('PRIVATE_MESSAGE'), { stack: 'PRIVATE_STACK' });
+    try {
+      const server = await render(() => {
+        throw original;
+      });
+      const html = renderToString(server.appElement);
+      expect(html).toBe('<p>Error: An unexpected error occurred.</p>');
+      expect(html).not.toContain('PRIVATE');
+      const props = JSON.parse(JSON.stringify({ __tanstackRouterDehydratedState: server.dehydratedState }));
+      const router = buildRouter(() => {
+        throw original;
+      });
+      const client = clientHydrateTanStackApp(
+        { createRouter: () => router },
+        props,
+        { ...context, serverSide: false },
+        provider,
+        history,
+      );
+      expect(renderToString(client)).toBe(html);
+      expect(original.message).toBe('PRIVATE_MESSAGE');
+      expect(original.stack).toBe('PRIVATE_STACK');
     } finally {
       process.env.NODE_ENV = previous;
     }

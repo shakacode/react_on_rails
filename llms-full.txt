@@ -5618,10 +5618,15 @@ Loader data and `beforeLoad` context travel through JSON and must be JSON-safe. 
 `Map`. Convert values before rendering on the server so the first client render sees the same types.
 In development, the helper warns when loader data contains non-JSON values; it does not convert them.
 
-A route match's thrown `Error` is transported separately using its `name` and `message`, then restored as an
-`Error` before the first client render. The original stack is included only in development. Custom error
-properties, subclasses, and `cause` are not preserved. Plain thrown objects, including TanStack Router's
-not-found objects, retain their existing JSON representation. Keep error messages suitable for clients.
+A route match's thrown `Error` is restored as an `Error` before the first client render. In production,
+the server replaces it with `Error: An unexpected error occurred.` before rendering and dehydration.
+The browser applies the same policy during hydration. Original names, messages, stacks, and custom properties
+are omitted from the production error payload. Capture private details on the server before error rendering
+if your application needs them for diagnostics.
+
+Development preserves the original name, message, and stack. Custom error subclasses, additional properties,
+and `cause` are not transported. Plain thrown objects, including TanStack Router's not-found objects,
+retain their existing JSON representation; applications must keep those objects suitable for clients.
 
 ## Props Requirement
 

@@ -23,7 +23,7 @@ import type {
   TanStackRouterOptions,
 } from './types.ts';
 import type { RailsContext } from 'react-on-rails/types';
-import { normalizeSearch } from './utils.ts';
+import { createHydrationError, normalizeSearch } from './utils.ts';
 
 /**
  * Builds a React element tree with RouterProvider and optional AppWrapper.
@@ -59,6 +59,27 @@ function dehydrateSsrMatchId(id: string): string {
 function isRouteError(value: unknown): value is Error {
   // Node APIs can create errors outside the renderer's JavaScript realm.
   return value instanceof Error || Object.prototype.toString.call(value) === '[object Error]';
+}
+
+function sanitizeProductionErrors(router: TanStackRouter): void {
+  if (process.env.NODE_ENV !== 'production') return;
+
+  const mutableRouter = router as TanStackRouter & {
+    updateMatch?: (id: string, updater: (match: Record<string, unknown>) => Record<string, unknown>) => void;
+  };
+  router.state.matches.forEach((match) => {
+    if (!match || typeof match !== 'object') return;
+    const candidate = match as Record<string, unknown>;
+    if (!isRouteError(candidate.error)) return;
+    if (typeof candidate.id !== 'string' || typeof mutableRouter.updateMatch !== 'function') {
+      throw new Error(
+        'react-on-rails-pro/tanstack-router: Production error rendering requires router.updateMatch().',
+      );
+    }
+    // Replace the per-request match, preserving an Error that may be shared by application code.
+    const error = createHydrationError(candidate.error);
+    mutableRouter.updateMatch(candidate.id, (current) => ({ ...current, error }));
+  });
 }
 
 function isJsonSafe(value: unknown, ancestors = new Set<object>()): boolean {
@@ -170,6 +191,9 @@ export async function serverRenderTanStackAppAsync(
   // No router.ssr flag is set here: React effects (including Transitioner's auto-load)
   // do not execute during server-side renderToString.
   await router.load();
+
+  // Sanitize before both rendering and dehydration so the initial HTML and props agree.
+  sanitizeProductionErrors(router);
 
   // TanStack Router has no router.dehydrate() method; external state (for example a
   // TanStack Query cache) is shipped through RouterOptions.dehydrate, which TanStack's

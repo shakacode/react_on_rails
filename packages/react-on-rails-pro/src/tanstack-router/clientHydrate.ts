@@ -22,6 +22,7 @@ import type {
   TanStackSsrMatch,
 } from './types.ts';
 import type { RailsContext } from 'react-on-rails/types';
+import { createHydrationError } from './utils.ts';
 
 /* eslint-disable import/prefer-default-export, no-underscore-dangle */
 
@@ -233,12 +234,11 @@ function restoreRouteError(match: TanStackSsrMatch): unknown {
   if (!match.er || !match.e || typeof match.e !== 'object') return match.e;
   const data = match.e as { name?: unknown; message?: unknown; stack?: unknown };
   if (typeof data.name !== 'string' || typeof data.message !== 'string') return match.e;
-  const error = new Error(data.message);
-  error.name = data.name;
-  // Never invent a client stack for an error that happened on the server.
-  error.stack =
-    process.env.NODE_ENV === 'development' && typeof data.stack === 'string' ? data.stack : undefined;
-  return error;
+  return createHydrationError({
+    name: data.name,
+    message: data.message,
+    ...(typeof data.stack === 'string' ? { stack: data.stack } : {}),
+  });
 }
 
 /**
