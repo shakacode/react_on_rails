@@ -573,8 +573,74 @@ jobs:
               return removed;
             }
 
+            const requiredGateRerunAttempts = 40;
+            const requiredGateRerunPollMs = 15000;
+
             async function removeHostedCiLabels() {
               return removeLabels([hostedCiLabel, forceFullHostedCiLabel]);
+            }
+
+            // ci-required skips label events, this token's label changes fire none, and only
+            // checks from pull_request-event runs count for a PR. So after changing hosted-CI
+            // labels, rerun the head's latest pull_request run of ci-required: the rerun
+            // re-reads the live labels for the commit it already checked.
+            async function rerunRequiredGate(pr) {
+              // A fork PR's gate never reads hosted-CI labels, and rerunning its run would
+              // skip the approval GitHub requires before fork code runs.
+              if (!isSameRepositoryPullRequest(pr)) {
+                return 'Skipped the `ci-required` rerun on a fork PR; its gate never reads hosted CI labels.';
+              }
+              if (pr.state !== 'open') {
+                return 'Skipped the `ci-required` rerun because the PR is not open.';
+              }
+
+              try {
+                for (let attempt = 1; attempt <= requiredGateRerunAttempts; attempt += 1) {
+                  const { data } = await github.rest.actions.listWorkflowRuns({
+                    owner,
+                    repo,
+                    workflow_id: 'ci-required.yml',
+                    event: 'pull_request',
+                    head_sha: pr.head.sha,
+                    per_page: 20
+                  });
+                  // Another PR can share this head commit; only this PR's runs count for it.
+                  const ownRuns = data.workflow_runs.filter((run) =>
+                    run.pull_requests?.some((runPullRequest) => runPullRequest.number === issueNumber)
+                  );
+                  if (ownRuns.length === 0 && data.workflow_runs.length > 0) {
+                    throw new Error('no ci-required run for this head belongs to this PR');
+                  }
+                  const latest = ownRuns.sort((left, right) => right.id - left.id)[0];
+                  if (!latest) {
+                    return 'No `ci-required` run exists for this head yet; its first run reads the current labels.';
+                  }
+                  if (latest.status === 'completed') {
+                    // A newer head has its own run, which reads the current labels; rerunning
+                    // the old head's run would cancel it in the shared concurrency group.
+                    const current = await getPullRequest();
+                    if (current.head.sha !== pr.head.sha) {
+                      return 'The PR head moved, so `ci-required` was not rerun; the run for the new head reads the current labels.';
+                    }
+                    try {
+                      await github.rest.actions.reRunWorkflow({ owner, repo, run_id: latest.id });
+                    } catch (error) {
+                      // Another workflow may have just rerun the same run; that rerun reads the labels too.
+                      const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: latest.id });
+                      if (!activeWorkflowStatuses.has(run?.status)) {
+                        throw error;
+                      }
+                    }
+                    return 'Reran `ci-required` so the required gate reads the current hosted CI labels.';
+                  }
+                  await sleep(requiredGateRerunPollMs);
+                }
+                throw new Error('the current ci-required run did not finish in time');
+              } catch (error) {
+                core.warning(`Unable to rerun ci-required: ${error.message || error}`);
+                core.setFailed('Hosted CI labels changed, but ci-required could not be rerun.');
+                return 'Unable to rerun `ci-required`; push a commit or rerun its latest pull_request run.';
+              }
             }
 
             async function removeForceFullHostedCiLabel() {
@@ -1304,6 +1370,12 @@ jobs:
                 }
               }
 
+              // Rerun the gate only after the result comment is saved: Dependabot gates read
+              // that comment as their trusted dispatch proof.
+              if (labelAdded) {
+                core.info(await rerunRequiredGate(pr));
+              }
+
               if (failed.length > 0) {
                 core.setFailed(`Failed to trigger: ${failed.map((failure) => failure.workflow).join(', ')}`);
               }
@@ -1321,6 +1393,9 @@ jobs:
               }
 
               const removedHostedCi = await removeHostedCiLabels();
+              const requiredGateMessage = removedHostedCi
+                ? await rerunRequiredGate(pr)
+                : '';
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
 
@@ -1333,11 +1408,11 @@ jobs:
                 '',
                 'This waiver is bound to the current head SHA and does not apply after another push.',
                 'The required fast gate still applies for this PR.',
-                ...(removedHostedCi ? ['', 'Removed hosted CI labels from this PR.'] : [])
+                ...(removedHostedCi ? ['', 'Removed hosted CI labels from this PR.', requiredGateMessage] : [])
               ].join('\n'));
             }
 
-            async function handleStopHosted() {
+            async function handleStopHosted(pr) {
               if (await hasNewerCiCommand(['+ci-run-hosted', '+ci-force-full'])) {
                 await postComment('Skipped hosted CI label removal because a newer hosted-CI request command was posted after this command.');
                 return;
@@ -1349,18 +1424,20 @@ jobs:
               }
 
               const removed = await removeHostedCiLabels();
+              const requiredGateMessage = removed ? await rerunRequiredGate(pr) : '';
               await postComment([
                 '## Hosted CI Mode Disabled',
                 '',
                 removed
                   ? 'Removed hosted CI labels. Future commits will use only the required gate until hosted CI is requested again.'
                   : 'No hosted CI labels were present. Future commits are already using only the required gate.',
+                ...(requiredGateMessage ? [requiredGateMessage] : []),
                 '',
                 'Use `+ci-run-hosted` to re-enable optimized hosted CI.'
               ].join('\n'));
             }
 
-            async function handleStopFull() {
+            async function handleStopFull(pr) {
               if (await hasNewerCiCommand(['+ci-force-full'])) {
                 await postComment('Skipped force-full label removal because a newer `+ci-force-full` command was posted after this command.');
                 return;
@@ -1372,12 +1449,14 @@ jobs:
               }
 
               const removed = await removeForceFullHostedCiLabel();
+              const requiredGateMessage = removed ? await rerunRequiredGate(pr) : '';
               await postComment([
                 '## Force-Full Hosted CI Disabled',
                 '',
                 removed
                   ? 'Removed `force-full-hosted-ci`. If `ready-for-hosted-ci` is still present, future commits keep running optimized hosted CI.'
                   : 'No force-full hosted CI label was present.',
+                ...(requiredGateMessage ? [requiredGateMessage] : []),
                 '',
                 'Use `+ci-force-full` to re-enable the force-full hosted override.'
               ].join('\n'));
@@ -1479,11 +1558,11 @@ jobs:
                 break;
               case '+ci-stop-hosted':
                 await addReaction('eyes');
-                await handleStopHosted();
+                await handleStopHosted(pr);
                 break;
               case '+ci-stop-full':
                 await addReaction('eyes');
-                await handleStopFull();
+                await handleStopFull(pr);
                 break;
               case '+ci-skip-hosted':
                 await addReaction('eyes');
