@@ -72,6 +72,14 @@ async function render(loader: () => unknown) {
 
 describe('TanStack SSR serialization', () => {
   const originalResponse = globalThis.Response;
+  const originalEnvironment = process.env.NODE_ENV;
+  beforeEach(() => {
+    process.env.NODE_ENV = 'development';
+  });
+  afterEach(() => {
+    if (originalEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalEnvironment;
+  });
   beforeAll(() => {
     if (!originalResponse) globalThis.Response = class Response {} as typeof Response;
   });
@@ -176,6 +184,76 @@ describe('TanStack SSR serialization', () => {
     } finally {
       process.env.NODE_ENV = previous;
     }
+  });
+
+  it.each(['production', 'staging', 'test', undefined])(
+    'sanitizes cross-realm errors outside explicit development (%s)',
+    async (environment) => {
+      if (environment === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = environment;
+      const original: unknown = runInNewContext('new Error("PRIVATE_CROSS_REALM")');
+      const server = await render(() => {
+        throw original;
+      });
+      const wire = JSON.stringify(server.dehydratedState);
+      expect(wire).toContain('An unexpected error occurred.');
+      expect(wire).not.toContain('PRIVATE_CROSS_REALM');
+      expect(renderToString(server.appElement)).toBe('<p>Error: An unexpected error occurred.</p>');
+    },
+  );
+
+  it.each([
+    ['development', 'production'],
+    ['production', 'development'],
+  ])(
+    'hydrates the server-selected error when server/client modes differ (%s/%s)',
+    async (serverMode, clientMode) => {
+      process.env.NODE_ENV = serverMode;
+      const server = await render(() => {
+        throw new Error('development diagnostic');
+      });
+      const html = renderToString(server.appElement);
+      const props = JSON.parse(JSON.stringify({ __tanstackRouterDehydratedState: server.dehydratedState }));
+      process.env.NODE_ENV = clientMode;
+      const router = buildRouter(() => undefined);
+      const client = clientHydrateTanStackApp(
+        { createRouter: () => router },
+        props,
+        { ...context, serverSide: false },
+        provider,
+        history,
+      );
+      expect(renderToString(client)).toBe(html);
+    },
+  );
+
+  it('fails closed with a clear diagnostic if a custom router cannot update production error matches', async () => {
+    process.env.NODE_ENV = 'production';
+    const router = buildRouter(() => {
+      throw new Error('PRIVATE_MESSAGE');
+    });
+    await router.load();
+    router.load = async () => undefined;
+    delete (router as unknown as { updateMatch?: unknown }).updateMatch;
+    await expect(
+      serverRenderTanStackAppAsync(
+        { createRouter: () => router },
+        {},
+        context,
+        provider,
+        createMemoryHistory,
+      ),
+    ).rejects.toThrow('Production error rendering requires router.updateMatch()');
+  });
+
+  it('does not reinterpret a plain thrown object with an Error toStringTag', async () => {
+    const thrown = { name: 'Custom', message: 'application value', [Symbol.toStringTag]: 'Error' };
+    const server = await render(() => {
+      throw thrown;
+    });
+    const match = server.dehydratedState.ssrRouter?.matches.find((candidate) => candidate.e !== undefined);
+    expect(match?.er).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(match?.e))).toEqual({ name: 'Custom', message: 'application value' });
   });
 
   it('warns about a nested non-JSON loader value in development without logging its contents', async () => {

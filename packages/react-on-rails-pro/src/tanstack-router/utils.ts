@@ -22,9 +22,9 @@ export function normalizeSearch(search: string | null | undefined): string {
 }
 
 export function createHydrationError(data: { name: string; message: string; stack?: string }): Error {
-  const production = process.env.NODE_ENV === 'production';
-  const error = new Error(production ? 'An unexpected error occurred.' : data.message);
-  error.name = production ? 'Error' : data.name;
-  error.stack = process.env.NODE_ENV === 'development' ? data.stack : undefined;
+  const error = new Error(data.message);
+  error.name = data.name;
+  // The server chooses public fields before rendering; hydration must reproduce that choice.
+  error.stack = data.stack;
   return error;
 }
