@@ -49,10 +49,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect.
   `react-on-rails-rsc` [19.3.2](https://github.com/shakacode/react_on_rails_rsc/releases/tag/19.3.2) depends on
   `~19.3.1` and peers on React `^19.3.1`. New RSC apps now install it, and Doctor and the Node renderer's startup
-  check now require React 19.3.1 or later with `react-on-rails-rsc` 19.3.2 and newer. Apps on
+  check now require React 19.3.x at 19.3.1 or later with `react-on-rails-rsc` 19.3.x at 19.3.2 or later. Apps on
   `react-on-rails-rsc` 19.3.1 keep working with React 19.3.0, and Doctor still warns about a vulnerable lockfile.
   **Action required for upgraders:** upgrade `react-on-rails-rsc` to 19.3.2 together with `react` and `react-dom`
-  19.3.1.
+  19.3.1, remove or update any override or resolution that pins `react-server-dom-webpack` below 19.3.1, and confirm
+  the refreshed lockfile resolves only patched `react-server-dom-webpack` copies.
   [PR 5339](https://github.com/shakacode/react_on_rails/pull/5339) by [justin808](https://github.com/justin808).
 
 #### Improved

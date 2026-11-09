@@ -283,10 +283,12 @@ packages therefore apply to this stack, and the project's response is enforced i
   ([GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3)) and a
   Server Functions denial-of-service advisory
   ([GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)). Both affect
-  `react-server-dom-webpack` 19.0.0 through 19.3.0; the patched releases are 19.0.9, 19.1.10, 19.2.9, and
-  19.3.1. `react-on-rails-rsc` 19.3.2 is the first release that requires the patched Flight runtime
-  (`~19.3.1`), so upgrade to it with React and React DOM 19.3.1. `rake react_on_rails:doctor` also warns
-  when your lockfile still resolves an affected `react-server-dom-webpack`.
+  `react-server-dom-webpack` releases on the 19.0 through 19.3 lines below each line's patched release: 19.0.9,
+  19.1.10, 19.2.9, and 19.3.1. `react-on-rails-rsc` 19.3.2 is the first release that requires the patched Flight runtime
+  (`~19.3.1`), so upgrade to it with React and React DOM 19.3.1. With RSC enabled,
+  `rake react_on_rails:doctor` also warns when your lockfile still resolves an affected
+  `react-server-dom-webpack`; otherwise inspect the resolved versions with `npm ls react-server-dom-webpack` or your
+  package manager's equivalent.
 - **The patched-version requirement is checked, not just documented.** For React on Rails Pro 17 RSC, the
   supported React floor depends on the stable `react-on-rails-rsc` package: React `19.2.7` or later on
   `19.2.x` for 19.2.x (patch >= 19.2.1), React `19.2.8` or later on `19.2.x` for 19.3.0, React `19.3.0` or later

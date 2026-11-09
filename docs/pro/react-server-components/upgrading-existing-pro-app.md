@@ -33,7 +33,7 @@ pnpm add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
 > **React must match the installed `react-on-rails-rsc` line** for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
 
 > [!NOTE]
-> The RSC generator installs stable `react-on-rails-rsc@19.3.2`, which requires React 19.3.x at 19.3.1 or later, and it does not upgrade React for you. If `rails g react_on_rails:rsc` warns that React is on another line, run the install command above. Apps that already use RSC on an earlier set (`react-on-rails-rsc` 19.2.x with React 19.2.x at 19.2.7 or later, 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.3.1 with React 19.3.x) stay supported and do not need to re-run the generator.
+> The RSC generator installs stable `react-on-rails-rsc@19.3.2`, which requires React 19.3.x at 19.3.1 or later, and it does not upgrade React for you. If React is below 19.3.1 or on another line (`rails g react_on_rails:rsc` warns about both), run the install command above. Apps that already use RSC on an earlier set (`react-on-rails-rsc` 19.2.x with React 19.2.x at 19.2.7 or later, 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.3.1 with React 19.3.x) stay supported and do not need to re-run the generator.
 
 > [!NOTE]
 > Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set. The RSC bundler APIs are version-coupled, so do not bump `react-on-rails-rsc` by itself.
