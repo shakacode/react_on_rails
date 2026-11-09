@@ -42,6 +42,11 @@ class PrMergeLedgerScreenedReaderTest < Minitest::Test
     assert_equal 64, reader.provenance.fetch("packet_sha256").length
   end
 
+  def test_help_states_that_withheld_text_is_not_scanned
+    help = PrMergeLedger.new([]).send(:build_option_parser).help
+    assert_match(/withholds is not scanned for findings or \+ci commands/, help)
+  end
+
   def test_excluded_body_is_not_required_and_metadata_is_preserved
     data = packet
     data["issue_comments"] = []

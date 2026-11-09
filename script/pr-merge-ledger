@@ -885,7 +885,10 @@ class PrMergeLedger
 
   def add_screened_reader_options(opts)
     opts.on("--shaka-reader PATH",
-            "Read live comment prose only through this trusted external Shaka executable.") do |path|
+            "Read live comment prose only through this trusted external Shaka executable.",
+            "Text the reader withholds is not scanned for findings or +ci commands; withheld",
+            "items are listed under source.screened_comments, and their threads and review",
+            "states still gate the ledger.") do |path|
       @options[:shaka_reader] = path
     end
     opts.on("--trusted-ref SHA", "Full trusted default-branch SHA used by the Shaka reader.") do |sha|
