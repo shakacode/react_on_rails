@@ -5148,10 +5148,18 @@ module ReactOnRails
       [19, 2] => "19.2.9",
       [19, 3] => "19.3.1"
     }.freeze
-    # Rejected prerelease lines with a known published stable successor: the 19.3.0-rc.4 pin that
-    # React on Rails 17.1.0 generated, and the 19.3.1-rc.x soak that 17.2.0.rc.0 and rc.1 admitted.
-    # Mirrors prereleaseLinesWithStableSuccessor in rscPeerSupport.ts.
-    RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR = [[19, 3, 0], [19, 3, 1]].freeze
+    # Rejected prerelease lines with a known published stable successor, and the React version to
+    # install with it. Each React version is at or above the patched Flight release for its line, so
+    # a fresh install cannot resolve vulnerable react-server-dom-webpack:
+    # - The 19.3.0-rc.4 pin that React on Rails 17.1.0 generated moves to stable 19.3.0, whose Flight
+    #   range ~19.2.8 resolves to patched 19.2.9 with React 19.2.9.
+    # - The 19.3.1-rc.x soak that 17.2.0.rc.0 and rc.1 admitted skips stable 19.3.1 (Flight ~19.3.0)
+    #   for 19.3.2, which requires patched Flight ~19.3.1.
+    # Mirrors prereleaseSuccessors in rscPeerSupport.ts.
+    RSC_PRERELEASE_STABLE_SUCCESSORS = {
+      [19, 3, 0] => { rsc: "19.3.0", react: "19.2.9" },
+      [19, 3, 1] => { rsc: "19.3.2", react: "19.3.1" }
+    }.freeze
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
@@ -5581,17 +5589,14 @@ module ReactOnRails
       false
     end
 
-    # Only the lines in RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR have a known published stable
-    # successor. Compatibility does not establish publication for other rejected prereleases; use the
-    # generator pin for those versions.
+    # Only the lines in RSC_PRERELEASE_STABLE_SUCCESSORS have a known published stable successor.
+    # Compatibility does not establish publication for other rejected prereleases; use the generator
+    # pin for those versions.
     # Returns [rsc_version_to_install, react_version_to_install].
     def rsc_package_floor_install_versions(rsc_version)
-      if npm_prerelease(rsc_version).present? &&
-         RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR.include?(npm_version_tuple(rsc_version))
-        stable_version = npm_version_tuple(rsc_version).join(".")
-        if rsc_stable_package_version_supported?(stable_version)
-          return [stable_version, recommended_react_install_version_for_rsc_package(stable_version)]
-        end
+      if npm_prerelease(rsc_version).present?
+        successor = RSC_PRERELEASE_STABLE_SUCCESSORS[npm_version_tuple(rsc_version)]
+        return [successor.fetch(:rsc), successor.fetch(:react)] if successor
       end
 
       [RSC_PACKAGE_INSTALL_VERSION, recommended_react_install_version_for_rsc_package(RSC_PACKAGE_INSTALL_VERSION)]

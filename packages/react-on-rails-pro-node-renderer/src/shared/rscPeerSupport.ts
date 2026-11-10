@@ -28,21 +28,25 @@
 // - 19.3.1 ships Flight ~19.3.0 and pairs with React 19.3.0+.
 // - 19.3.2+ ships the patched Flight ~19.3.1 (GHSA-xqc2-xf4c-x3h3, GHSA-h3gv-c5rc-p453), whose
 //   own peers require React 19.3.1+.
-// Only stable react-on-rails-rsc releases are supported. The 19.3.1-rc.x soak prereleases that
-// React on Rails 17.2.0.rc.0 and rc.1 admitted are superseded by stable 19.3.1 and are rejected.
-// `prereleaseLinesWithStableSuccessor` lists the rejected prerelease lines whose stable release is
-// known to be published, so the error can name it: the 19.3.0-rc.4 pin that React on Rails 17.1.0
-// generated, and the 19.3.1-rc.x soak. Compatibility alone does not establish publication for
-// other rejected prereleases.
+// Only stable react-on-rails-rsc releases are supported, so the 19.3.1-rc.x soak prereleases that
+// React on Rails 17.2.0.rc.0 and rc.1 admitted are rejected.
+// `prereleaseSuccessors` lists the rejected prerelease lines whose stable successor is known to be
+// published, so the error can name it with a React version at or above the patched Flight release
+// for its line:
+// - The 19.3.0-rc.4 pin that React on Rails 17.1.0 generated moves to stable 19.3.0, whose Flight
+//   range ~19.2.8 resolves to patched 19.2.9 with React 19.2.9.
+// - The 19.3.1-rc.x soak skips stable 19.3.1 (Flight ~19.3.0) for 19.3.2, which requires patched
+//   Flight ~19.3.1.
+// Compatibility alone does not establish publication for other rejected prereleases.
 export const RSC_PEER_SUPPORT = {
   reactOnRailsRsc: {
     minimumVersion: '19.2.1',
-    prereleaseLinesWithStableSuccessor: [
-      [19, 3, 0],
-      [19, 3, 1],
-    ],
     supportedMajor: 19,
   },
+  prereleaseSuccessors: [
+    { prereleaseLine: [19, 3, 0], rscVersion: '19.3.0', reactVersion: '19.2.9' },
+    { prereleaseLine: [19, 3, 1], rscVersion: '19.3.2', reactVersion: '19.3.1' },
+  ],
   react: {
     supportedMajor: 19,
     supportedRanges: [
