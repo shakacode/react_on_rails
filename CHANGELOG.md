@@ -59,8 +59,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   for a rejected `react-on-rails-rsc` 19.3.1-rc.x soak prerelease used to recommend stable 19.3.1 with React
   19.3.0, which can keep vulnerable Flight 19.3.0. It now recommends 19.3.2 with React 19.3.1. The error for the
   19.3.0-rc.4 pin that React on Rails 17.1.0 generated still recommends stable 19.3.0, now with React 19.2.9 so
-  its `~19.2.8` Flight range resolves the patched 19.2.9. Both errors now end by telling you to refresh the
-  lockfile so every `react-server-dom-webpack` copy reaches that patched release.
+  its `~19.2.8` Flight range resolves the patched 19.2.9. Both errors now tell you to refresh the
+  lockfile so every `react-server-dom-webpack` copy is patched for its React line.
   **Action required for upgraders:** apps still on the 17.0 `react-on-rails-rsc` 19.2.1 set should move React and
   React DOM to 19.2.9 together and refresh the lockfile so every `react-server-dom-webpack` copy is patched: 19.2.9 or later on
   19.2.x, or 19.3.1 or later on 19.3.x.
