@@ -92,6 +92,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Every published Pro JavaScript file carries the Pro license header**: The compiled
+  `registerServerComponent/client.js` and `registerServerComponent/server.js` in `react-on-rails-pro` shipped
+  without the header because TypeScript dropped it with an unused import. CI now packs both Pro npm packages and
+  fails if any packed `.js` file lacks the header. Fixes [Issue 5308](https://github.com/shakacode/react_on_rails/issues/5308).
+  [PR 5316](https://github.com/shakacode/react_on_rails/pull/5316) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Production refetch recovery handles streamed boundary errors.** HTTP 200 Flight
   responses whose root resolves before a descendant fails now restore the previous route content,
   report `refetchError` and `onRefetchError`, and keep Retry available. Restoring content can remount
