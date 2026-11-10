@@ -170,7 +170,7 @@ const stableReleaseAdvice = (
 
   const { rscVersion, reactVersion } = successor;
   const [reactMajor, reactMinor] = reactVersion.split('.');
-  return `Upgrade react-on-rails-rsc to the stable ${rscVersion} release, with react and react-dom ${reactMajor}.${reactMinor}.x with patch >= ${reactVersion} (stable releases only).`;
+  return `Upgrade react-on-rails-rsc to the stable ${rscVersion} release, with react and react-dom ${reactMajor}.${reactMinor}.x with patch >= ${reactVersion} (stable releases only), then refresh the lockfile so every react-server-dom-webpack copy is ${reactVersion} or later.`;
 };
 
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {

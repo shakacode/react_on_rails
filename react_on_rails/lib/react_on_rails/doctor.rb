@@ -5585,6 +5585,7 @@ module ReactOnRails
         with React/React DOM #{react_install}+.
 
         Fix: npm install react@~#{react_install} react-dom@~#{react_install} #{RSC_PACKAGE_NAME}@#{rsc_install} --save-exact
+        Then refresh the lockfile so every #{RSC_FLIGHT_PACKAGE_NAME} copy is #{react_install} or later.
       MSG
       false
     end

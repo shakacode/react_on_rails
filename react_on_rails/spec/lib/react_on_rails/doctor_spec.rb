@@ -12348,7 +12348,8 @@ RSpec.describe ReactOnRails::Doctor do
                 "react-on-rails-rsc #{rsc_version} is not supported by React on Rails Pro 17 RSC",
                 "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
                 "with React/React DOM 19.3.1+.",
-                "Fix: npm install react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2 --save-exact"
+                "Fix: npm install react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2 --save-exact",
+                "Then refresh the lockfile so every react-server-dom-webpack copy is 19.3.1 or later."
               )
             )
             expect(errors.none? { |error| error.include?("RC soak") }).to be true
@@ -12444,7 +12445,8 @@ RSpec.describe ReactOnRails::Doctor do
               "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
               "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
               "with React/React DOM 19.2.9+.",
-              "Fix: npm install react@~19.2.9 react-dom@~19.2.9 react-on-rails-rsc@19.3.0 --save-exact"
+              "Fix: npm install react@~19.2.9 react-dom@~19.2.9 react-on-rails-rsc@19.3.0 --save-exact",
+              "Then refresh the lockfile so every react-server-dom-webpack copy is 19.2.9 or later."
             )
           )
         end
