@@ -236,6 +236,14 @@ describe('checkRscPeerCompatibility', () => {
     );
   });
 
+  it.each(
+    RSC_PEER_SUPPORT.prereleaseSuccessors.map(({ rscVersion, reactVersion }) => [rscVersion, reactVersion]),
+  )('accepts the recommended successor react-on-rails-rsc %s with React %s', (rscVersion, reactVersion) => {
+    expect(checkRscPeerCompatibility({ rscVersion, reactVersion, reactDomVersion: reactVersion })).toEqual({
+      level: 'ok',
+    });
+  });
+
   it.each(['19.3.2-rc.0', '19.3.3-beta.0', '19.2.2-beta.0', '19.4.0-rc.0'])(
     'does not infer a published stable release from compatibility for %s',
     (rscVersion) => {
