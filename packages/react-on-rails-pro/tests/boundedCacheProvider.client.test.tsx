@@ -1108,6 +1108,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // The provider releases a settled load's pin in a setTimeout(0). Flush
+        // it before the next load so eviction does not depend on runner timing.
+        await flushMacrotasks();
       });
     };
 
@@ -1123,6 +1126,9 @@ describe('RSCRoute successful-version error reset', () => {
     // Start id 0's replacement load while its marker is present, but keep it
     // pending. The provider must latch that marker for this in-flight load.
     const replacement = await startLoad(0);
+    // A cache hit here would mean id 0 was never evicted, making the
+    // assertions below vacuous; require a fresh replacement fetch.
+    expect(fetchCount(0)).toBe(2);
 
     // Churn enough additional successful keys to push id 0 out of the bounded
     // evicted-marker LRU before the replacement resolves. The in-flight marker
@@ -1176,6 +1182,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // The provider releases a settled load's pin in a setTimeout(0). Flush
+        // it before the next load so eviction does not depend on runner timing.
+        await flushMacrotasks();
       });
     };
 
@@ -1196,6 +1205,9 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     const replacement = await startLoad(0);
+    // A cache hit here would mean id 0 was never evicted, making the
+    // assertions below vacuous; require a fresh replacement fetch.
+    expect(fetchCount(0)).toBe(2);
     await resolveLoad(replacement, <span>replacement 0</span>);
 
     const key = createRSCPayloadKey('Card', { id: 0 });
@@ -1238,6 +1250,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // The provider releases a settled load's pin in a setTimeout(0). Flush
+        // it before the next load so eviction does not depend on runner timing.
+        await flushMacrotasks();
       });
     };
 
@@ -1249,6 +1264,9 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     const replacement = await startLoad(0);
+    // A cache hit here would mean id 0 was never evicted, making the
+    // assertions below vacuous; require a fresh replacement fetch.
+    expect(fetchCount(0)).toBe(2);
     let refetchPromise!: Promise<React.ReactNode>;
     await act(async () => {
       refetchPromise = rscApi.refetchComponent('Card', { id: 0 });
@@ -1312,6 +1330,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // The provider releases a settled load's pin in a setTimeout(0). Flush
+        // it before the next load so eviction does not depend on runner timing.
+        await flushMacrotasks();
       });
     };
 
@@ -1323,6 +1344,9 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     const staleReplacement = await startLoad(0);
+    // A cache hit here would mean id 0 was never evicted, making the
+    // assertions below vacuous; require a fresh replacement fetch.
+    expect(fetchCount(0)).toBe(2);
     let refetchPromise!: Promise<React.ReactNode>;
     await act(async () => {
       refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
@@ -1387,6 +1411,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // The provider releases a settled load's pin in a setTimeout(0). Flush
+        // it before the next load so eviction does not depend on runner timing.
+        await flushMacrotasks();
       });
     };
 
@@ -1398,6 +1425,9 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     const staleReplacement = await startLoad(0);
+    // A cache hit here would mean id 0 was never evicted, making the
+    // assertions below vacuous; require a fresh replacement fetch.
+    expect(fetchCount(0)).toBe(2);
     let refetchPromise!: Promise<React.ReactNode>;
     await act(async () => {
       refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
@@ -1476,6 +1506,9 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     const staleReplacement = await startLoad(0);
+    // A cache hit here would mean id 0 was never evicted, making the
+    // assertions below vacuous; require a fresh replacement fetch.
+    expect(fetchCount(0)).toBe(2);
     let refetchPromise!: Promise<React.ReactNode>;
     await act(async () => {
       refetchPromise = rscApi.refetchComponent('Card', { id: 0 }, true);
@@ -1505,6 +1538,9 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     const replacementAfterMarkerChurn = await startLoad(0);
+    // initial + stale replacement + refetch + this replacement. A cache hit
+    // would make the zero-version assertion below vacuous.
+    expect(fetchCount(0)).toBe(4);
     await resolveLoad(replacementAfterMarkerChurn, <span>replacement after marker churn</span>);
 
     const key = createRSCPayloadKey('Card', { id: 0 });
@@ -1554,6 +1590,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // The provider releases a settled load's pin in a setTimeout(0). Flush
+        // it before the next load so eviction does not depend on runner timing.
+        await flushMacrotasks();
       });
     };
 
@@ -1626,9 +1665,9 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
-        // Unlike peers k-o, flush the timer-scheduled unpin after each resolve;
-        // otherwise the fill loop keeps every entry pinned and never records
-        // the evicted-success marker that the retry assertions depend on.
+        // Flush the timer-scheduled unpin after each resolve; otherwise the
+        // fill loop keeps every entry pinned and never records the
+        // evicted-success marker that the retry assertions depend on.
         await flushMacrotasks();
       });
     };
