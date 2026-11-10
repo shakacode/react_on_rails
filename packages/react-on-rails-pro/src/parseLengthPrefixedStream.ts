@@ -74,6 +74,9 @@ export default class LengthPrefixedStreamParser {
                 `Malformed length-prefixed header: invalid metadata JSON: ${JSON.stringify(metaStr)}`,
               );
             }
+            if (this.metadata === null || typeof this.metadata !== 'object' || Array.isArray(this.metadata)) {
+              throw new Error('Malformed length-prefixed header: metadata JSON must be an object');
+            }
             const lenHex = decoder.decode(header.subarray(tabIdx + 1));
             if (!/^[0-9a-fA-F]+$/.test(lenHex)) {
               throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
