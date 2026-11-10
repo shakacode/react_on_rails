@@ -167,6 +167,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `bin/shakapacker-watch`, and ignores commented-out commands.
   [PR 5304](https://github.com/shakacode/react_on_rails/pull/5304) by [justin808](https://github.com/justin808).
 
+- **Single render results reject incomplete trailing records**: Server rendering now raises
+  `ReactOnRails::JsonParseError` when a complete result is followed by a partial length-prefixed record, instead
+  of silently discarding the remainder.
+  Valid producer responses and warning-only streaming flush behavior are unchanged.
+  [PR 5206](https://github.com/shakacode/react_on_rails/pull/5206) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **Streams reject non-object metadata**: The TypeScript length-prefixed parser now rejects JSON
+  null, arrays, and scalar metadata before yielding a chunk, matching Ruby's existing object requirement.
+  Valid object metadata, control frames, and blank or CRLF separators retain their behavior.
+  [PR 5206](https://github.com/shakacode/react_on_rails/pull/5206) by [justin808](https://github.com/justin808).
+
 #### Security
 
 - **`create-react-on-rails-app` no longer commits the Rails master key**: The CLI runs `rails new --skip-git` and then
