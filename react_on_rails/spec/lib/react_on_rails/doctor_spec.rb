@@ -12244,12 +12244,13 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       describe "React 19.3 support table" do
-        # Peer ranges match the published packages: 19.3.0 bundles Flight 19.2.8 and
-        # 19.3.1 bundles Flight 19.3.0.
+        # Peer ranges match the published packages: 19.3.0 bundles Flight 19.2.8,
+        # 19.3.1 bundles Flight ~19.3.0, and 19.3.2 bundles the patched Flight ~19.3.1.
         published_rsc_react_peers = {
           "19.2.1" => "^19.2.7",
           "19.3.0" => "^19.2.8",
-          "19.3.1" => "^19.3.0"
+          "19.3.1" => "^19.3.0",
+          "19.3.2" => "^19.3.1"
         }
 
         def rsc_errors_for(rsc_version:, react_version:, react_peer:, react_dom_version: react_version)
@@ -12284,7 +12285,9 @@ RSpec.describe ReactOnRails::Doctor do
 
         [
           %w[19.3.0 19.2.8],
-          %w[19.3.1 19.3.0]
+          %w[19.3.1 19.3.0],
+          %w[19.3.1 19.3.1],
+          %w[19.3.2 19.3.1]
         ].each do |rsc_version, react_version|
           it "accepts react-on-rails-rsc #{rsc_version} with React #{react_version}" do
             errors = rsc_errors_for(rsc_version:, react_version:,
@@ -12341,6 +12344,18 @@ RSpec.describe ReactOnRails::Doctor do
           )
         end
 
+        it "rejects react-on-rails-rsc 19.3.2 with React 19.3.0 when the package peers would allow it" do
+          errors = rsc_errors_for(rsc_version: "19.3.2", react_version: "19.3.0", react_peer: "^19.3.0")
+
+          expect(errors).to contain_exactly(
+            a_string_including(
+              "react-on-rails-rsc 19.3.2 is installed with unsupported React 19.3.0",
+              "React/React DOM 19.3.x with patch >= 19.3.1 (stable releases only).",
+              "Fix: npm install react@~19.3.1 react-dom@~19.3.1 --save-exact"
+            )
+          )
+        end
+
         it "rejects a prerelease React build even when the package peers would allow it" do
           canary = "19.3.0-canary-d083ec1d-20260922"
           errors = rsc_errors_for(rsc_version: "19.3.1", react_version: canary, react_peer: ">=19.3.0-0")
@@ -12390,9 +12405,9 @@ RSpec.describe ReactOnRails::Doctor do
             expect(errors).to contain_exactly(
               a_string_including(
                 "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
-                "with React/React DOM 19.3.0+.",
-                "Fix: npm install react@~19.3.0 react-dom@~19.3.0 " \
-                "react-on-rails-rsc@19.3.1 --save-exact"
+                "with React/React DOM 19.3.1+.",
+                "Fix: npm install react@~19.3.1 react-dom@~19.3.1 " \
+                "react-on-rails-rsc@19.3.2 --save-exact"
               )
             )
           end

@@ -26,16 +26,16 @@ bundle add react_on_rails_pro --version="= VERSION"
 Also, install React 19.3.x, React DOM 19.3.x, and the `react-on-rails-rsc` release currently used by the generator:
 
 ```bash
-yarn add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
-# npm install react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
-# pnpm add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
-# bun add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+yarn add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
+# npm install react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
+# pnpm add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
+# bun add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
 ```
 
 > [!NOTE]
-> React on Rails Pro 17 RSC requires React to match the installed `react-on-rails-rsc` line: 19.3.x starting at 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.2.x with React 19.2.x at 19.2.7 or later. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
+> React on Rails Pro 17 RSC requires React to match the installed `react-on-rails-rsc` line: 19.3.x at 19.3.2 or newer with React 19.3.x at 19.3.1 or later, 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.2.x with React 19.2.x at 19.2.7 or later. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
-> Starting with React on Rails Pro 17.2, the generator pins stable `react-on-rails-rsc@19.3.1` with `react@~19.3.0` and `react-dom@~19.3.0`. The 17.0 generator pinned `react-on-rails-rsc@19.2.1` with React 19.2.7, and apps on that set keep working unchanged. The 17.1.0 generator pinned the superseded `react-on-rails-rsc@19.3.0-rc.4`; move those apps to stable 19.3.0 with React 19.2.x at 19.2.8 or later, or to 19.3.1 with React 19.3.x. Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
+> The generator now pins stable `react-on-rails-rsc@19.3.2` with `react@~19.3.1` and `react-dom@~19.3.1`; 19.3.2 is the first release that requires the patched Flight runtime for React's GHSA-xqc2-xf4c-x3h3 and GHSA-h3gv-c5rc-p453 advisories. The 17.2 generator pinned `react-on-rails-rsc@19.3.1` with React 19.3.x; upgrade those apps to 19.3.2 with React 19.3.1. The 17.0 generator pinned `react-on-rails-rsc@19.2.1` with React 19.2.7, and apps on that set keep working unchanged. The 17.1.0 generator pinned the superseded `react-on-rails-rsc@19.3.0-rc.4`; move those apps to stable 19.3.0 with React 19.2.x at 19.2.8 or later, or to 19.3.2 with React 19.3.x at 19.3.1 or later. Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 

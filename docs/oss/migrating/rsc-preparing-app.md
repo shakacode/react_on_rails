@@ -32,9 +32,9 @@ Before starting, ensure you have:
 Install `react-on-rails-rsc`, which provides the webpack loader, webpack plugin, and RSC client/server runtime:
 
 ```bash
-yarn add react-on-rails-rsc
-# or: npm install react-on-rails-rsc
-# or: pnpm add react-on-rails-rsc
+yarn add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
+# or: npm install react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
+# or: pnpm add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
 ```
 
 Verify that `react` and `react-dom` are on a supported line (19.3.x or 19.2.x) and that the versions match:
@@ -45,11 +45,16 @@ yarn why react
 
 yarn why react-on-rails-rsc
 # Check the package's README or changelog for React version compatibility
+
+yarn why react-server-dom-webpack
+# Every copy should be 19.3.1 or later on 19.3.x (19.2.9 or later on 19.2.x)
 ```
+
+If an override or resolution pins `react-server-dom-webpack` below its patched release, remove or update it and reinstall before you deploy.
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Version requirements:** React on Rails Pro 17 RSC requires a stable `react-on-rails-rsc` 19.3.x starting at 19.3.1 with React 19.3.x (what the 17.2 generator installs), 19.3.0 with React 19.2.x at 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.x at 19.2.7 or newer. Older 19.0.x packages and prerelease `react-on-rails-rsc` versions no longer satisfy the Pro 17 runtime check.
+> **Version requirements:** React on Rails Pro 17 RSC requires a stable `react-on-rails-rsc` 19.3.x at 19.3.2 or newer with React 19.3.x at 19.3.1 or newer (what the generator installs), 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or newer, or 19.2.x (patch 19.2.1 or newer) with React 19.2.x at 19.2.7 or newer. Older 19.0.x packages and prerelease `react-on-rails-rsc` versions no longer satisfy the Pro 17 runtime check.
 
 ## Step 2: Configure Rails for RSC
 
@@ -631,12 +636,12 @@ These are the most frequent mistakes encountered during RSC infrastructure setup
 
 ### Mistake 1: Wrong `react-on-rails-rsc` version
 
-React on Rails Pro 17 RSC requires React and `react-on-rails-rsc` from one coordinated set: `react-on-rails-rsc` 19.3.x starting at 19.3.1 with React 19.3.x (new apps), 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.2.x with React 19.2.x at 19.2.7 or later. Older 19.0.x RSC packages can pass older setup guides but now fail the Pro 17 runtime and Doctor checks.
+React on Rails Pro 17 RSC requires React and `react-on-rails-rsc` from one coordinated set: `react-on-rails-rsc` 19.3.x at 19.3.2 or newer with React 19.3.x at 19.3.1 or later (new apps), 19.3.1 with React 19.3.x, 19.3.0 with React 19.2.x at 19.2.8 or later, or 19.2.x at 19.2.1 or later with React 19.2.x at 19.2.7 or later. Older 19.0.x RSC packages can pass older setup guides but now fail the Pro 17 runtime and Doctor checks.
 
 **Fix:** Upgrade React, React DOM, and `react-on-rails-rsc` together:
 
 ```bash
-yarn add react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1
+yarn add react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2
 ```
 
 ### Mistake 2: Forgetting the RSC bundle watcher in development

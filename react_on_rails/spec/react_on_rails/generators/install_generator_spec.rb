@@ -6210,7 +6210,7 @@ describe InstallGenerator, type: :generator do
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("RSC requires React 19.3.x")
       expect(warning_text).to include("detected: 19.2.7")
-      expect(warning_text).to include("This generator installs react-on-rails-rsc@19.3.1")
+      expect(warning_text).to include("This generator installs react-on-rails-rsc@19.3.2")
       expect(warning_text).to include("react@~19.3.1 react-dom@~19.3.1 react-server-dom-webpack@~19.3.1")
       expect(warning_text.tr("\n", " ")).to include("react-server-dom-webpack below 19.3.1 on the 19.3.x line")
       expect(warning_text).to include("npm `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`")
