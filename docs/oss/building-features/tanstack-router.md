@@ -116,6 +116,23 @@ The dehydrated value reaches the client as JSON inside the `react_component` pro
 lose their type on the way: a `Date` arrives as a string, and an `Error` or `Map` arrives as a plain object.
 Convert such values to JSON-safe data in `dehydrate` and rebuild them in `hydrate`.
 
+### Loader Data and Route Errors
+
+Loader data and `beforeLoad` context travel through JSON and must be JSON-safe. Return strings instead of
+`Date` instances (for example, `date.toISOString()`), arrays instead of `Set`, and plain objects instead of
+`Map`. Convert values before rendering on the server so the first client render sees the same types.
+In development, the helper warns when loader data contains non-JSON values; it does not convert them.
+
+A route match's thrown `Error` is restored as an `Error` before the first client render. Outside explicit development (`NODE_ENV=development`),
+the server replaces it with `Error: An unexpected error occurred.` before rendering and dehydration.
+The browser restores the server's chosen fields during hydration, even when bundle modes differ. Original names, messages, stacks, and custom properties
+are omitted from the production error payload. Capture private details on the server before error rendering
+if your application needs them for diagnostics.
+
+Development preserves the original name, message, and stack. Custom error subclass identity, additional properties,
+and `cause` are not transported. Plain thrown objects, including TanStack Router's not-found objects,
+retain their existing JSON representation; applications must keep those objects suitable for clients.
+
 ## Props Requirement
 
 When using this helper with `prerender: true`, pass `props:` as a Ruby `Hash` or a JSON object string.

@@ -23,7 +23,7 @@ import type {
   TanStackRouterOptions,
 } from './types.ts';
 import type { RailsContext } from 'react-on-rails/types';
-import { normalizeSearch } from './utils.ts';
+import { createHydrationError, normalizeSearch } from './utils.ts';
 
 /**
  * Builds a React element tree with RouterProvider and optional AppWrapper.
@@ -56,6 +56,76 @@ function dehydrateSsrMatchId(id: string): string {
   return id.split('/').join('\0');
 }
 
+function isRouteError(value: unknown): value is Error {
+  if (value instanceof Error) return true;
+  if (value === null || typeof value !== 'object') return false;
+
+  // Inspect native Error constructors independently of a possibly wrapped global Error.
+  // toStringTag can hide a real Error or spoof a plain object.
+  const nativeErrorConstructor = /^function\s+Error\s*\([^)]*\)\s*\{\s*\[native code\]\s*\}$/;
+  let prototype = Object.getPrototypeOf(value);
+  while (prototype !== null) {
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    if (
+      typeof constructor === 'function' &&
+      nativeErrorConstructor.test(Function.prototype.toString.call(constructor))
+    ) {
+      return true;
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return false;
+}
+
+function sanitizeProductionErrors(router: TanStackRouter): void {
+  if (process.env.NODE_ENV === 'development') return;
+
+  const mutableRouter = router as TanStackRouter & {
+    updateMatch?: (id: string, updater: (match: Record<string, unknown>) => Record<string, unknown>) => void;
+  };
+  router.state.matches.forEach((match) => {
+    if (!match || typeof match !== 'object') return;
+    const candidate = match as Record<string, unknown>;
+    if (!isRouteError(candidate.error)) return;
+    if (typeof candidate.id !== 'string') {
+      throw new Error(
+        'react-on-rails-pro/tanstack-router: Production error rendering requires string match IDs.',
+      );
+    }
+    // Replace the per-request match, preserving an Error that may be shared by application code.
+    const error = createHydrationError({ name: 'Error', message: 'An unexpected error occurred.' });
+    if (typeof mutableRouter.updateMatch === 'function') {
+      mutableRouter.updateMatch(candidate.id, (current) => ({ ...current, error }));
+      return;
+    }
+    if (typeof router.stores?.setMatches === 'function') {
+      router.stores.setMatches(
+        router.state.matches.map((current) => (current === match ? { ...candidate, error } : current)),
+      );
+      return;
+    }
+    throw new Error(
+      'react-on-rails-pro/tanstack-router: Production error rendering requires router.updateMatch() or router.stores.setMatches().',
+    );
+  });
+}
+
+function isJsonSafe(value: unknown, ancestors = new Set<object>()): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || ancestors.has(value)) return false;
+  if (
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) !== Object.prototype &&
+    Object.getPrototypeOf(value) !== null
+  )
+    return false;
+  ancestors.add(value);
+  const safe = Object.values(value).every((child) => isJsonSafe(child, ancestors));
+  ancestors.delete(value);
+  return safe;
+}
+
 function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
   if (!match || typeof match !== 'object') {
     return null;
@@ -82,10 +152,25 @@ function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
     dehydratedMatch.b = candidate.__beforeLoadContext;
   }
   if (candidate.loaderData !== undefined) {
+    if (process.env.NODE_ENV === 'development' && !isJsonSafe(candidate.loaderData)) {
+      console.warn(
+        'react-on-rails-pro/tanstack-router: Loader data must be JSON-safe. ' +
+          'Convert Date and other non-JSON values before returning them from a loader to avoid hydration mismatches.',
+      );
+    }
     dehydratedMatch.l = candidate.loaderData;
   }
   if (candidate.error !== undefined) {
-    dehydratedMatch.e = candidate.error;
+    if (isRouteError(candidate.error)) {
+      dehydratedMatch.er = true;
+      dehydratedMatch.e = {
+        name: candidate.error.name,
+        message: candidate.error.message,
+        ...(process.env.NODE_ENV === 'development' ? { stack: candidate.error.stack } : {}),
+      };
+    } else {
+      dehydratedMatch.e = candidate.error;
+    }
   }
   if (candidate.ssr !== undefined) {
     dehydratedMatch.ssr = candidate.ssr;
@@ -134,6 +219,9 @@ export async function serverRenderTanStackAppAsync(
   // No router.ssr flag is set here: React effects (including Transitioner's auto-load)
   // do not execute during server-side renderToString.
   await router.load();
+
+  // Sanitize before both rendering and dehydration so the initial HTML and props agree.
+  sanitizeProductionErrors(router);
 
   // TanStack Router has no router.dehydrate() method; external state (for example a
   // TanStack Query cache) is shipped through RouterOptions.dehydrate, which TanStack's

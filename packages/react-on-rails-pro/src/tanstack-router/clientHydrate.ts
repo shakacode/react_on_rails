@@ -22,6 +22,7 @@ import type {
   TanStackSsrMatch,
 } from './types.ts';
 import type { RailsContext } from 'react-on-rails/types';
+import { createHydrationError } from './utils.ts';
 
 /* eslint-disable import/prefer-default-export, no-underscore-dangle */
 
@@ -229,6 +230,17 @@ function rehydrateMatchId(dehydratedId: string): string {
   return dehydratedId.split('\0').join('/');
 }
 
+function restoreRouteError(match: TanStackSsrMatch): unknown {
+  if (!match.er || !match.e || typeof match.e !== 'object') return match.e;
+  const data = match.e as { name?: unknown; message?: unknown; stack?: unknown };
+  if (typeof data.name !== 'string' || typeof data.message !== 'string') return match.e;
+  return createHydrationError({
+    name: data.name,
+    message: data.message,
+    ...(typeof data.stack === 'string' ? { stack: data.stack } : {}),
+  });
+}
+
 /**
  * Applies server-rendered match data (loaderData, beforeLoadContext, status, etc.)
  * from the dehydrated SSR payload to fresh client matches. This ensures the first
@@ -251,7 +263,7 @@ function applyDehydratedMatchData(
         updatedAt: ssrMatch.u,
         ...(ssrMatch.l !== undefined ? { loaderData: ssrMatch.l } : {}),
         ...(ssrMatch.b !== undefined ? { __beforeLoadContext: ssrMatch.b } : {}),
-        ...(ssrMatch.e !== undefined ? { error: ssrMatch.e } : {}),
+        ...(ssrMatch.e !== undefined ? { error: restoreRouteError(ssrMatch) } : {}),
         ...(ssrMatch.ssr !== undefined ? { ssr: ssrMatch.ssr } : {}),
       };
     }

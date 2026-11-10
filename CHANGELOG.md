@@ -92,6 +92,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** TanStack Router loader errors now hydrate consistently after JSON transport. Production SSR and hydration use a generic error message, omitting private error details. Development preserves names, messages, and stacks, and warns about non-JSON loader data such as Date values.
+  [PR 5340](https://github.com/shakacode/react_on_rails/pull/5340) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Every published Pro JavaScript file carries the Pro license header**: The compiled
   `registerServerComponent/client.js` and `registerServerComponent/server.js` in `react-on-rails-pro` shipped
   without the header because TypeScript dropped it with an unused import. CI now packs both Pro npm packages and
