@@ -13,11 +13,11 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import * as React from 'react';
-import { ReactComponentOrRenderFunction } from 'react-on-rails/types';
 import ReactOnRails from '../ReactOnRails.client.ts';
 import RSCRoute from '../RSCRoute.tsx';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/client.tsx';
+import * as React from 'react';
+import type { ReactComponentOrRenderFunction } from 'react-on-rails/types';
 
 /**
  * Registers React Server Components (RSC) with React on Rails.

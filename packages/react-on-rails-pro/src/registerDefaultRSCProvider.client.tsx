@@ -28,11 +28,11 @@ if (typeof window !== 'undefined') {
     const RSCProvider = createRSCProvider({
       domNodeId,
       retryRejectedPayloads: true,
-      getServerComponent: async (args) => {
+      getServerComponent: async (args, onStreamState) => {
         // Keep the RSC browser runtime visible to the RSC Webpack plugin while still loading it lazily.
         await import('react-on-rails-rsc/client.browser');
         const { default: getReactServerComponent } = await import('./getReactServerComponent.client.ts');
-        return getReactServerComponent(domNodeId, railsContext)(args);
+        return getReactServerComponent(domNodeId, railsContext)(args, onStreamState);
       },
     });
 

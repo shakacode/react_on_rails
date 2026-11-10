@@ -138,10 +138,25 @@ describe('checkRscPeerCompatibility', () => {
 
   it.each([
     ['19.3.1', '19.3.0'],
+    ['19.3.1', '19.3.1'],
+    ['19.3.2', '19.3.1'],
     ['19.3.4', '19.3.2'],
   ])('returns ok for react-on-rails-rsc %s with React %s', (rscVersion, reactVersion) => {
     expect(checkRscPeerCompatibility({ rscVersion, reactVersion, reactDomVersion: reactVersion }).level).toBe(
       'ok',
+    );
+  });
+
+  it('errors when react-on-rails-rsc 19.3.2 (patched Flight 19.3.1) is paired with React 19.3.0', () => {
+    const r = checkRscPeerCompatibility({
+      rscVersion: '19.3.2',
+      reactVersion: '19.3.0',
+      reactDomVersion: '19.3.0',
+    });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('Incompatible react version');
+    expect(r.message).toContain(
+      'requires react 19.3.x with patch >= 19.3.1 (stable releases only) (found 19.3.0)',
     );
   });
 

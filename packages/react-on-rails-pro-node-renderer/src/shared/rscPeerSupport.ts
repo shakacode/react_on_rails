@@ -25,7 +25,9 @@
 // matching React line, so React must match the Flight line, not just the package minor:
 // - 19.2.x ships Flight 19.2 and pairs with React 19.2.7+.
 // - Published 19.3.0 ships Flight 19.2.8 and pairs with React 19.2.8+ (React on Rails 17.1.0).
-// - 19.3.1+ ships Flight 19.3.0 and pairs with React 19.3.
+// - 19.3.1 ships Flight ~19.3.0 and pairs with React 19.3.0+.
+// - 19.3.2+ ships the patched Flight ~19.3.1 (GHSA-xqc2-xf4c-x3h3, GHSA-h3gv-c5rc-p453), whose
+//   own peers require React 19.3.1+.
 // Only stable react-on-rails-rsc releases are supported. The 19.3.1-rc.x soak prereleases that
 // React on Rails 17.2.0.rc.0 and rc.1 admitted are superseded by stable 19.3.1 and are rejected.
 // `prereleaseLinesWithStableSuccessor` lists the rejected prerelease lines whose stable release is
@@ -46,7 +48,8 @@ export const RSC_PEER_SUPPORT = {
     supportedRanges: [
       { rscMinor: 2, rscMinPatch: 1, rscMaxPatch: null, minor: 2, minPatch: 7 },
       { rscMinor: 3, rscMinPatch: 0, rscMaxPatch: 0, minor: 2, minPatch: 8 },
-      { rscMinor: 3, rscMinPatch: 1, rscMaxPatch: null, minor: 3, minPatch: 0 },
+      { rscMinor: 3, rscMinPatch: 1, rscMaxPatch: 1, minor: 3, minPatch: 0 },
+      { rscMinor: 3, rscMinPatch: 2, rscMaxPatch: null, minor: 3, minPatch: 1 },
     ],
   },
 } as const;
