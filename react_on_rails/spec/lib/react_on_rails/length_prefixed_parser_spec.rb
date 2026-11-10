@@ -125,6 +125,30 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       )
     end
 
+    it "rejects an empty result" do
+      expect { described_class.parse_one_chunk_result("") }.to raise_error(
+        described_class::ParseError, /expected exactly one length-prefixed chunk but found none/
+      )
+    end
+
+    ["{", "{}\t", "{}\t5", "{}\t5\n", "{}\t5\nhi"].each do |trailing_record|
+      it "rejects a complete chunk followed by #{trailing_record.inspect}" do
+        payload = length_prefixed_payload("caf\u00E9") + trailing_record
+
+        expect { described_class.parse_one_chunk_result(payload) }.to raise_error(
+          described_class::ParseError, /incomplete length-prefixed chunk/
+        )
+      end
+    end
+
+    [nil, [], 42, true, "metadata"].each do |metadata|
+      it "rejects #{metadata.inspect} metadata" do
+        expect { described_class.parse_one_chunk_result("#{metadata.to_json}\t0\n") }.to raise_error(
+          described_class::ParseError, /metadata JSON must be an object/
+        )
+      end
+    end
+
     # A single backslash, so "#{bs}ud83d" is the literal six-character JSON escape \ud83d
     # a JS renderer emits when a string is truncated mid-surrogate-pair. The lone surrogate
     # must not crash the render; the exact repair is covered in lenient_json_spec.rb. See #4710.
@@ -225,7 +249,36 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     end
   end
 
+  describe "#flush" do
+    ["{", "{}\t5\n", "{}\t5\nhi"].each do |tail|
+      it "warns without raising on a truncated streaming tail #{tail.inspect}" do
+        parser = described_class.new
+        logger = instance_double(ActiveSupport::Logger, warn: nil)
+        allow(Rails).to receive(:logger).and_return(logger)
+        results = []
+        parser.feed(length_prefixed_payload("hello") + tail) { |chunk| results << chunk }
+
+        expect { parser.flush }.not_to raise_error
+        expect(results.size).to eq(1)
+        expect(logger).to have_received(:warn).with(/Incomplete length-prefixed stream/)
+      end
+    end
+  end
+
   describe "#feed" do
+    it "parses adjacent Unicode records at every byte split" do
+      payload = (length_prefixed_payload("caf\u00E9") + length_prefixed_payload("\u{1F604}")).b
+
+      (0..payload.bytesize).each do |split|
+        parser = described_class.new
+        results = []
+        parser.feed(payload.byteslice(0, split)) { |chunk| results << chunk }
+        parser.feed(payload.byteslice(split, payload.bytesize - split)) { |chunk| results << chunk }
+
+        expect(results.map { |chunk| chunk["html"] }).to eq(["caf\u00E9", "\u{1F604}"])
+      end
+    end
+
     it "parses multibyte payloads split across streaming chunks" do
       content = "\u3053\u3093\u306B\u3061\u306F"
       payload = length_prefixed_payload(content).b
