@@ -1,6 +1,8 @@
 module ReactOnRails
   module Dev
     class PackGenerator
+      BUNDLER_MANAGED_ENV_KEYS: Array[String]
+
       def self.generate: (?verbose: bool) -> void
 
       private
@@ -14,6 +16,8 @@ module ReactOnRails
       def self.capture_output: (bool) { () -> bool } -> bool
       def self.handle_rake_error: (Exception, bool) -> void
       def self.run_via_bundle_exec: (?silent: bool, ?verbose: bool) -> (bool | nil)
+      def self.runtime_env_changes: () -> Hash[String, String?]
+      def self.bundler_managed_env_key?: (String) -> bool
     end
   end
 end

@@ -58,7 +58,10 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js 20+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**. The default setup bundles Fastify 5, which requires Node.js 20+ — on Node.js 18 the renderer exits at startup unless you pin Fastify 4 via your package manager's dependency-override mechanism (npm [`overrides`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#overrides), Yarn/Bun [`resolutions`](https://yarnpkg.com/configuration/manifest#resolutions), or pnpm [`pnpm.overrides`](https://pnpm.io/package_json#pnpmoverrides)). (The package's `engines.node` floor is `>=18.19.0`, which applies only to that Fastify 4 path.)
+2. Make sure you have **Node.js 20.19+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**. The renderer uses Fastify 5, and its `engines.node` floor is `>=20.19.0`; on Node.js 18 it exits at startup. Pinning Fastify 4 is no longer a supported workaround, because Fastify 4 is affected by [GHSA-p68q-wchp-6fh7](https://github.com/advisories/GHSA-p68q-wchp-6fh7).
+
+   On Node.js 20 with npm's `engine-strict` enabled, a fresh install can fail on `cookie` 2.x, which Fastify's test-injection helper `light-my-request` 6.8+ pulls in and which declares Node.js 22+. The renderer does not load it at runtime. To keep `engine-strict`, pin it with an npm [`overrides`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#overrides) entry such as `"light-my-request": "6.6.0"` (Yarn/Bun [`resolutions`](https://yarnpkg.com/configuration/manifest#resolutions), pnpm [`pnpm.overrides`](https://pnpm.io/package_json#pnpmoverrides)), or use Node.js 22+.
+
 3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
    npm init -y

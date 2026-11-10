@@ -3324,6 +3324,12 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "ignores the bundle cache that renderer/node-renderer.js writes" do
+      assert_file ".gitignore" do |content|
+        expect(content.lines.map(&:strip)).to include(".node-renderer-bundles")
+      end
+    end
+
     it "adds node-renderer process to every bin/dev Procfile that can serve SSR pages" do
       %w[Procfile.dev Procfile.dev-static-assets Procfile.dev-prod-assets].each do |procfile|
         assert_file procfile do |content|
@@ -3610,6 +3616,12 @@ describe InstallGenerator, type: :generator do
       assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
+      end
+    end
+
+    it "ignores the bundle cache that renderer/node-renderer.js writes" do
+      assert_file ".gitignore" do |content|
+        expect(content.lines.map(&:strip)).to include(".node-renderer-bundles")
       end
     end
 

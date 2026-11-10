@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { excludeFromStrictMode } from '../strictModeSupport';
 
 type HydrationSchedulingEvent = {
   event: 'hydrated' | 'unmounted';
@@ -25,7 +26,7 @@ const recordHydrationSchedulingEvent = (event: HydrationSchedulingEvent) => {
   window[hydrationSchedulingEventsKey].push(event);
 };
 
-export default function HydrationSchedulingProbe({ label, mode, testId }: HydrationSchedulingProbeProps) {
+function HydrationSchedulingProbe({ label, mode, testId }: HydrationSchedulingProbeProps) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -47,3 +48,9 @@ export default function HydrationSchedulingProbe({ label, mode, testId }: Hydrat
     </section>
   );
 }
+
+// Specs count this probe's events, so they must match real mounts and unmounts. React 18 replays
+// effects (mount, unmount, mount) under the dummy's StrictMode register wrapper, which would log a
+// simulated unmount at page load. React 19 skips that replay because the wrapper component itself
+// is not strict. Leaving the probe unwrapped keeps its counts the same on both. Refs #5266.
+export default excludeFromStrictMode(HydrationSchedulingProbe);

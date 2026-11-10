@@ -25,7 +25,7 @@ Before starting, ensure you have:
 - **React 19.3.x or 19.2.x** (`react` and `react-dom` both at 19.3.x, which the RSC generator installs, or at 19.2.x with patch `>= 19.2.7`, for the React on Rails Pro 17 RSC path)
 - **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../building-features/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)
-- **Node.js 20+**
+- **Node.js 20.19+** (the Node renderer's `engines.node` floor)
 
 ## Step 1: Install the RSC Package
 

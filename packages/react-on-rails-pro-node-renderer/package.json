@@ -4,7 +4,7 @@
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
   "engines": {
-    "node": ">=18.19.0"
+    "node": ">=20.19.0"
   },
   "main": "lib/ReactOnRailsProNodeRenderer.js",
   "directories": {
@@ -39,7 +39,7 @@
   "dependencies": {
     "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
-    "fastify": "^5.12.5",
+    "fastify": "^5.12.6",
     "fs-extra": "^11.2.0",
     "jsonwebtoken": "^9.0.3",
     "lockfile": "^1.0.4",

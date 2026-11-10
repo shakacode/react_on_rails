@@ -44,19 +44,15 @@ export async function reactOnRailsProNodeRenderer(config: Partial<Config> = {}) 
   if (fastify5OrNewer && !fastify5Supported) {
     log.error(
       `Node.js version ${process.versions.node} is not supported by Fastify ${fastifyVersion}.
-Please either use Node.js v20 or higher or downgrade Fastify by setting the following resolutions in your package.json:
-{
-  "@fastify/formbody": "^7.4.0",
-  "@fastify/multipart": "^8.3.1",
-  "fastify": "^4.29.0",
-}`,
+react-on-rails-pro-node-renderer requires Node.js 20.19.0 or later. Upgrade Node.js; Fastify 4 is no longer a supported workaround.`,
     );
     process.exit(1);
   } else if (!fastify5OrNewer && fastify5Supported) {
     log.warn(
       `Fastify 5+ supports Node.js ${process.versions.node}, but the current version of Fastify is ${fastifyVersion}.
 You have probably forced an older version of Fastify by adding resolutions for it
-and for "@fastify/..." dependencies in your package.json. Consider removing them.`,
+and for "@fastify/..." dependencies in your package.json. Remove them: Fastify 4 is no longer supported
+and is affected by security advisory GHSA-p68q-wchp-6fh7.`,
     );
   }
 

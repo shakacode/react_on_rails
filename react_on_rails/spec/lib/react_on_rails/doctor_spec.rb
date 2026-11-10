@@ -5102,6 +5102,77 @@ RSpec.describe ReactOnRails::Doctor do
         expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
       end
     end
+
+    # Issue #5288: Bun fails to evaluate some server bundles.
+    context "when ExecJS selected Bun" do
+      let(:bun_runtime) { Struct.new(:name).new("Bun.sh") }
+      let(:node_runtime) { Struct.new(:name).new("Node.js (V8)") }
+      let(:info_messages) { checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] } }
+      let(:warning_messages) { checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] } }
+
+      around do |example|
+        original = ENV.fetch("EXECJS_RUNTIME", nil)
+        ENV.delete("EXECJS_RUNTIME")
+        example.run
+      ensure
+        original.nil? ? ENV.delete("EXECJS_RUNTIME") : ENV["EXECJS_RUNTIME"] = original
+      end
+
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        stub_const("ExecJS", Struct.new(:runtime).new(bun_runtime))
+      end
+
+      it "reports Node.js as the server rendering runtime when React on Rails switches to it" do
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(node_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(info_messages).to include(a_string_including("ExecJS Runtime: Node.js (V8)"))
+        expect(info_messages).to include(a_string_including("ExecJS autodetected Bun.sh"))
+        expect(warning_messages).to be_empty
+      end
+
+      it "warns and suggests installing Node.js when Bun stays selected" do
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(bun_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(warning_messages).to include(a_string_including("Server rendering uses Bun.sh"))
+        expect(info_messages).to include(a_string_including("Put node on the PATH"))
+      end
+
+      it "reports Node.js as the Pro NodeRenderer fallback runtime when React on Rails switches to it" do
+        allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(node_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback: Node.js (V8)"))
+        expect(info_messages).to include(a_string_including("ExecJS autodetected Bun.sh"))
+      end
+
+      it "does not warn about Bun when the Pro NodeRenderer fallback is disabled" do
+        allow(doctor).to receive_messages(resolved_pro_server_renderer: "NodeRenderer",
+                                          pro_execjs_fallback_enabled?: false)
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(bun_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback: Bun.sh"))
+        expect(warning_messages).to be_empty
+      end
+
+      it "suggests EXECJS_RUNTIME=Node when EXECJS_RUNTIME explicitly selects Bun" do
+        ENV["EXECJS_RUNTIME"] = "Bun"
+        allow(ReactOnRails::ExecJSRuntime).to receive(:for_server_rendering).and_return(bun_runtime)
+
+        doctor.send(:check_server_rendering_engine)
+
+        expect(warning_messages).to include(a_string_including("Server rendering uses Bun.sh"))
+        expect(info_messages).to include(a_string_including("Set EXECJS_RUNTIME=Node"))
+      end
+    end
   end
 
   describe "#check_bin_dev_launcher_setup" do

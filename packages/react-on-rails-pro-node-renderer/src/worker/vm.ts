@@ -632,6 +632,43 @@ export class VMContextNotFoundError extends Error {
   }
 }
 
+// `vm.constants.DONT_CONTEXTIFY` (Node 20.18+ / 22.8+) creates a context whose global object is
+// an ordinary one rather than being wrapped in V8 property interceptors, so global lookups inside
+// the bundle (`React`, `process`, `Buffer`, ...) hit V8's normal fast paths. It is passed *instead
+// of* the sandbox object and returns the new context's global; that object is reference-equal to
+// `globalThis` inside the context, so the per-request injection/cleanup in `runInVM` is unaffected.
+//
+// The sandbox's own properties are copied with their full descriptors, not `Object.assign`: the
+// host bridges installed with `Object.defineProperty` are non-enumerable and must stay
+// non-writable and non-configurable inside the bundle. If a sandbox key would collide with a
+// non-configurable global of the fresh context (`undefined`, `NaN`, `Infinity`), which the
+// contextified sandbox accepts, the older path is kept so no configuration starts failing.
+//
+// `?.` because `vm.constants` itself only exists from Node 20.12/21.7; both it and the fallback
+// can go once 20.18/22.8 are the floor.
+function createVMContext(contextObject: object): vm.Context {
+  const dontContextify: typeof vm.constants.DONT_CONTEXTIFY | undefined = vm.constants?.DONT_CONTEXTIFY;
+  if (dontContextify === undefined) {
+    return vm.createContext(contextObject);
+  }
+
+  const context = vm.createContext(dontContextify);
+  const descriptors = Object.getOwnPropertyDescriptors(contextObject);
+  const collidingKey = Reflect.ownKeys(descriptors).find((key) => {
+    const existing = Object.getOwnPropertyDescriptor(context, key);
+    return existing !== undefined && !existing.configurable;
+  });
+  if (collidingKey !== undefined) {
+    log.debug(
+      'VM context key %s collides with a non-configurable global; using a contextified sandbox',
+      String(collidingKey),
+    );
+    return vm.createContext(contextObject);
+  }
+  Object.defineProperties(context, descriptors);
+  return context;
+}
+
 async function buildVM(filePath: string): Promise<VMContext> {
   // Return existing promise if VM is already being created
   const existingVmCreationPromise = vmCreationPromises.get(filePath);
@@ -760,7 +797,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
         value: reportBuildIdMismatch,
         writable: false,
       });
-      const context = vm.createContext(contextObject);
+      const context = createVMContext(contextObject);
 
       // Create explicit reference to global context, just in case (some libs can use it):
       vm.runInContext('global = this', context);

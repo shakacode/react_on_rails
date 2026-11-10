@@ -39,6 +39,7 @@ require "rails/test_help"
 Rails.backtrace_cleaner.remove_silencers!
 
 require_relative "simplecov_helper"
+require_relative "support/system_exit_guard"
 
 # Prevent Test::Unit's AutoRunner from executing during RSpec runs.
 Test::Unit.run = true if defined?(Test::Unit) && Test::Unit.respond_to?(:run=)
