@@ -43,6 +43,9 @@ export const RSC_PEER_SUPPORT = {
     minimumVersion: '19.2.1',
     supportedMajor: 19,
   },
+  // First Flight release with the GHSA-xqc2-xf4c-x3h3 and GHSA-h3gv-c5rc-p453 fixes on each supported
+  // React line. Advice names the floor per line because 19.3.0 sorts after 19.2.9 yet is still affected.
+  patchedFlightVersions: ['19.2.9', '19.3.1'],
   prereleaseSuccessors: [
     { prereleaseLine: [19, 3, 0], rscVersion: '19.3.0', reactVersion: '19.2.9' },
     { prereleaseLine: [19, 3, 1], rscVersion: '19.3.2', reactVersion: '19.3.1' },

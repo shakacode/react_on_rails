@@ -11857,6 +11857,12 @@ RSpec.describe ReactOnRails::Doctor do
         /x
       )
       expect(successors).not_to be_empty
+      patched_flight = support_source.match(/patchedFlightVersions:\s*\[(?<versions>[^\]]+)\]/)[:versions]
+      expect(patched_flight.scan(/'([^']+)'/).flatten).to eq(
+        described_class::RSC_SUPPORTED_REACT_MINORS.map do |minor|
+          described_class::RSC_FLIGHT_PATCHED_VERSIONS.fetch([described_class::RSC_SUPPORTED_REACT_MAJOR, minor])
+        end
+      )
       expect(described_class::RSC_PRERELEASE_STABLE_SUCCESSORS).to eq(
         successors.to_h do |major, minor, patch, rsc, react|
           [[major.to_i, minor.to_i, patch.to_i], { rsc:, react: }]
@@ -12349,7 +12355,8 @@ RSpec.describe ReactOnRails::Doctor do
                 "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
                 "with React/React DOM 19.3.1+.",
                 "Fix: npm install react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2 --save-exact",
-                "Then refresh the lockfile so every react-server-dom-webpack copy is 19.3.1 or later."
+                "Then refresh the lockfile so every react-server-dom-webpack copy is patched: " \
+                "19.2.9 or later on 19.2.x, 19.3.1 or later on 19.3.x."
               )
             )
             expect(errors.none? { |error| error.include?("RC soak") }).to be true
@@ -12446,7 +12453,8 @@ RSpec.describe ReactOnRails::Doctor do
               "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
               "with React/React DOM 19.2.9+.",
               "Fix: npm install react@~19.2.9 react-dom@~19.2.9 react-on-rails-rsc@19.3.0 --save-exact",
-              "Then refresh the lockfile so every react-server-dom-webpack copy is 19.2.9 or later."
+              "Then refresh the lockfile so every react-server-dom-webpack copy is patched: " \
+              "19.2.9 or later on 19.2.x, 19.3.1 or later on 19.3.x."
             )
           )
         end

@@ -5167,6 +5167,12 @@ module ReactOnRails
     RSC_SUPPORTED_REACT_LINE = RSC_REACT_SUPPORT_RANGES.map do |range|
       "#{RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x"
     end.uniq.join(" or ")
+    # Numerically later is not enough: Flight 19.3.0 sorts after 19.2.9 and is still vulnerable, so name
+    # the patched floor for each supported React line. Mirrors patchedFlightVersions in rscPeerSupport.ts.
+    RSC_FLIGHT_PATCHED_FLOORS = RSC_SUPPORTED_REACT_MINORS.map do |minor|
+      "#{RSC_FLIGHT_PATCHED_VERSIONS.fetch([RSC_SUPPORTED_REACT_MAJOR, minor])} or later on " \
+        "#{RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
+    end.join(", ").freeze
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
@@ -5585,7 +5591,7 @@ module ReactOnRails
         with React/React DOM #{react_install}+.
 
         Fix: npm install react@~#{react_install} react-dom@~#{react_install} #{RSC_PACKAGE_NAME}@#{rsc_install} --save-exact
-        Then refresh the lockfile so every #{RSC_FLIGHT_PACKAGE_NAME} copy is #{react_install} or later.
+        Then refresh the lockfile so every #{RSC_FLIGHT_PACKAGE_NAME} copy is patched: #{RSC_FLIGHT_PATCHED_FLOORS}.
       MSG
       false
     end

@@ -159,6 +159,13 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
 
 // Only the prerelease lines in `prereleaseSuccessors` have a known published stable successor.
 // Compatibility alone does not establish publication for other rejected prereleases.
+const patchedFlightFloors = RSC_PEER_SUPPORT.patchedFlightVersions
+  .map((version) => {
+    const [major, minor] = version.split('.');
+    return `${version} or later on ${major}.${minor}.x`;
+  })
+  .join(', ');
+
 const stableReleaseAdvice = (
   { tuple, prerelease }: ParsedVersion,
   successors: typeof RSC_PEER_SUPPORT.prereleaseSuccessors,
@@ -170,7 +177,7 @@ const stableReleaseAdvice = (
 
   const { rscVersion, reactVersion } = successor;
   const [reactMajor, reactMinor] = reactVersion.split('.');
-  return `Upgrade react-on-rails-rsc to the stable ${rscVersion} release, with react and react-dom ${reactMajor}.${reactMinor}.x with patch >= ${reactVersion} (stable releases only), then refresh the lockfile so every react-server-dom-webpack copy is ${reactVersion} or later.`;
+  return `Upgrade react-on-rails-rsc to the stable ${rscVersion} release, with react and react-dom ${reactMajor}.${reactMinor}.x with patch >= ${reactVersion} (stable releases only), then refresh the lockfile so every react-server-dom-webpack copy is patched: ${patchedFlightFloors}.`;
 };
 
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
