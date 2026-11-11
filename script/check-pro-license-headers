@@ -169,12 +169,20 @@ def split_preamble(style, content)
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
+MULTILINE_IMPORT = /
+  \A[ \t]*import[ \t]+(?:type[ \t]+)?
+  (?:[A-Za-z_$][\w$]*[ \t]*,[ \t]*)?
+  \{[^\}]*\}[ \t]*from[ \t]*
+  (['"])[^'"\r\n]+\1;?[ \t]*(?:\r?\n|\z)
+/x
+
 LEADING_BLOCK_REGION = [
   /\A[ \t]*\r?\n/,
   /\A#![^\n]*\r?\n/,
   %r{\A[ \t]*//[^\n]*(?:\r?\n|\z)},
   %r{\A[ \t]*/\*.*?\*/[ \t]*(?:\r?\n|\z)}m,
   /\A[ \t]*(['"])use (?:client|server|strict)\1;?[ \t]*(?:\r?\n|\z)/,
+  MULTILINE_IMPORT,
   /\A[ \t]*import[ \t]+[^;\n]*;?[ \t]*(?:\r?\n|\z)/,
   /\A[ \t]*@import[ \t]+[^;\n]*;?[ \t]*(?:\r?\n|\z)/
 ].freeze
@@ -475,6 +483,14 @@ def run_self_test
   embedded_after_import = "import x from 'x'; const sample = `before\n#{legacy}after`;\n"
   assert apply_header("f.js", embedded_after_import).end_with?(embedded_after_import),
          "code after an import blocks header removal"
+
+  multiline_imported = "import {\n  first,\n  second,\n} from 'x';\n\n#{legacy}"
+  after_multiline_import = apply_header("g.js", multiline_imported)
+  assert after_multiline_import.scan(SENTINEL).size == 1, "header after multiline import is replaced"
+  assert after_multiline_import.include?("import {\n  first,\n  second,\n} from 'x';"),
+         "multiline import preserved"
+  assert apply_header("g.js", after_multiline_import) == after_multiline_import,
+         "multiline import header idempotent"
 
   # Out-of-scope inputs untouched.
   assert apply_header("data.json", "{}\n") == "{}\n", "json untouched"
