@@ -20,7 +20,7 @@
   <a href="https://reactonrails.com/docs/getting-started/quick-start/">Quick Start</a> ·
   <a href="https://reactonrails.com/examples/">Examples</a> ·
   <a href="https://reactonrails.com/docs/pro/">Pro</a> ·
-  <a href="https://reactonrails.com/pricing/">Pricing</a>
+  <a href="https://reactonrails.com/pricing/">Free & Pro</a>
 </p>
 
 ## React on Rails
@@ -36,15 +36,15 @@ React on Rails is maintained by [ShakaCode](https://www.shakacode.com).
 
 ## Start Here
 
-- [Documentation home](https://reactonrails.com/docs/)
-- [Quick Start](https://reactonrails.com/docs/getting-started/quick-start/)
-- [Create a new app](https://reactonrails.com/docs/getting-started/create-react-on-rails-app/)
-- [Install into an existing Rails app](https://reactonrails.com/docs/getting-started/existing-rails-app/)
-- [Examples](https://reactonrails.com/examples/)
-- [Compare OSS and Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
-- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
-- [Compare with alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/)
-- [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
+1. [Documentation home](https://reactonrails.com/docs/)
+2. [Quick Start](https://reactonrails.com/docs/getting-started/quick-start/)
+3. [Create a new app](https://reactonrails.com/docs/getting-started/create-react-on-rails-app/)
+4. [Install into an existing Rails app](https://reactonrails.com/docs/getting-started/existing-rails-app/)
+5. [Examples](https://reactonrails.com/examples/)
+6. [Compare OSS and Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
+7. [Free & Pro](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
+8. [Compare with alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/)
+9. [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
 
 These docs are for React on Rails 17. Historical docs and code are available for
 [v15](https://github.com/shakacode/react_on_rails/tree/15.0.0/docs)
@@ -104,22 +104,30 @@ React on Rails Pro adds higher-throughput SSR and advanced rendering features on
 top of the open-source gem, including Node renderer support, streaming SSR,
 React Server Components, fragment caching, and TanStack Router SSR.
 
-**ShakaCode Trust-Based Commercial Licensing:** React on Rails Pro is free in
-development, test, CI, and staging for everyone, and free in production for
-small organizations (under 10 people, under $1M revenue, under $1M raised) and
-for charities, schools, and hospitals at any size. Larger organizations
-subscribe for production use at
-[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
-the whole organization. No license key is needed to run it; a key from your
-subscription only marks your pages `Licensed`. See
-[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+React on Rails Pro is free in development, test, CI, and staging for everyone.
+Production use that serves real users or supports a live application requires
+ShakaStack Pro unless the organization qualifies for a free use. Organizations
+qualify when they meet all three limits across their affiliates: fewer than 10
+people, under $1M revenue in the last twelve months, and under $1M in outside
+capital raised ever. Charities, educational institutions, and hospitals are free
+at any size.
+
+ShakaStack Pro includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache
+for every affiliate, application, environment, repository, and developer in your
+organization, with Slack support and no limit on headcount or revenue. It costs
+$1,800 per year per organization at
+[pro.reactonrails.com](https://pro.reactonrails.com/). An active React on Rails Pro
+subscription already counts as ShakaStack Pro. ShakaPerf follows its own free use
+rules, including for CI. No license key is needed to run React on Rails Pro; a key
+only marks your pages `Licensed`. See
+[The ShakaStack License](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 Start with the docs here:
 
-- [React on Rails Pro docs](https://reactonrails.com/docs/pro/)
-- [OSS vs Pro feature comparison](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
-- [Upgrade to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
-- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
+1. [React on Rails Pro docs](https://reactonrails.com/docs/pro/)
+2. [OSS vs Pro feature comparison](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
+3. [Upgrade to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
+4. [Free & Pro](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
 
 ## Requirements
 
@@ -161,13 +169,12 @@ React on Rails is available as open source under the terms of the
 [MIT License](https://github.com/shakacode/react_on_rails/blob/main/LICENSE.md).
 
 React on Rails Pro is offered under
-[The React on Rails Pro License](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md),
-an application of ShakaCode Trust-Based Commercial Licensing. TL;DR: free in
-development, test, CI, and staging for everyone; free in production for
-organizations under 10 people, $1M revenue, and $1M raised, and for charities,
-schools, and hospitals at any size. Otherwise a
-[subscription](https://pro.reactonrails.com/): $1,800 per year covers your whole
-organization. No license key is needed to run it. Questions:
+[The ShakaStack License, version 1.0, applied to React on Rails Pro](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+React on Rails Pro development, test, CI, and staging use is free for everyone.
+Production use requires [ShakaStack Pro](https://pro.reactonrails.com/) unless a
+free use applies. One $1,800 yearly subscription covers your whole organization
+across React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache. No license key
+is needed to run React on Rails Pro. Questions:
 [contact@shakacode.com](mailto:contact@shakacode.com).
 
 ## Supporters

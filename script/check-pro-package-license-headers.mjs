@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 // Keep in sync with SENTINEL in script/check-pro-license-headers.
 export const SENTINEL = 'NOT licensed under the MIT';
+export const LICENSE_MARKER = 'valid ShakaStack Pro subscription';
 
 export const PRO_PACKAGES = ['packages/react-on-rails-pro', 'packages/react-on-rails-pro-node-renderer'];
 
@@ -28,7 +29,7 @@ export const PRO_PACKAGES = ['packages/react-on-rails-pro', 'packages/react-on-r
 export const findMissingHeaders = (files) =>
   files
     .filter(({ path }) => path.endsWith('.js'))
-    .filter(({ content }) => !content.includes(SENTINEL))
+    .filter(({ content }) => !content.includes(SENTINEL) || !content.includes(LICENSE_MARKER))
     .map(({ path }) => path);
 
 const packPackage = (packageDir, destination) => {
@@ -75,7 +76,9 @@ const main = () => {
       console.error(`${packageDir}: ${error}`);
     } else if (missing.length > 0) {
       failed = true;
-      console.error(`${packageDir}: ${missing.length} of ${checked} packed .js file(s) lack "${SENTINEL}":`);
+      console.error(
+        `${packageDir}: ${missing.length} of ${checked} packed .js file(s) lack the Pro license header:`,
+      );
       missing.forEach((path) => console.error(`  ${path}`));
     } else {
       console.log(`${packageDir}: all ${checked} packed .js files carry the Pro license header.`);

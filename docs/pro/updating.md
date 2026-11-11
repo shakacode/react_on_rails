@@ -358,11 +358,11 @@ The license key is optional in every environment. It identifies your
 organization, marks rendered pages `Licensed`, and changes the license status
 in logs. Without a key, Pro keeps running and rendered pages read `UNLICENSED`.
 
-Production without a key is fine for the free uses and for organizations below
-the free line. Larger organizations subscribe at
-[pro.reactonrails.com](https://pro.reactonrails.com/) and receive a key with
-their subscription. In production, a missing or invalid key produces a warning
-that reminds larger organizations to subscribe.
+The key is optional even when production use requires ShakaStack Pro. An
+organization that does not qualify for free production use subscribes at
+[pro.reactonrails.com](https://pro.reactonrails.com/). An active React on Rails
+Pro subscription already counts. In production, a missing or invalid key
+produces a warning that reminds the organization to check its coverage.
 
 Configure the token through Rails credentials or another application-owned secret provider:
 
@@ -560,7 +560,7 @@ React on Rails Pro license validated successfully
 ```
 
 If no license key is set, the app still runs. Non-production environments log informational status. Production logs a
-warning that reminds larger organizations to subscribe. Subscribing organizations can confirm that their configured
+warning that reminds the organization to check its subscription coverage. Subscribing organizations can confirm that their configured
 key reports a valid status.
 
 #### 4. Test Your Application

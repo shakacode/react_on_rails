@@ -1,13 +1,22 @@
 # Installation
 
-React on Rails Pro is free in development, test, CI, and staging for everyone,
-and free in production for small organizations (under 10 people, under $1M
-revenue, under $1M raised) and for charities, schools, and hospitals at any
-size. Larger organizations subscribe for production use at
-[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
-the whole organization. No license key is needed to run it; a key from your
-subscription only marks your pages `Licensed`. See
-[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+React on Rails Pro is free in development, test, CI, and staging for everyone.
+Production use that serves real users or supports a live application requires
+ShakaStack Pro unless a free use applies. To qualify for free production use,
+your whole organization, including affiliates, must meet all three limits:
+fewer than 10 people, under US $1M revenue in the last twelve months, and under
+US $1M in outside capital raised ever. Charities, educational institutions,
+and hospitals are free at any size.
+
+ShakaStack Pro includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR
+Cache for every affiliate, application, environment, repository, and developer.
+There is no limit on headcount or revenue. It costs US $1,800 per year per
+organization at [pro.reactonrails.com](https://pro.reactonrails.com/) with Slack
+support. An active React on Rails Pro subscription already counts as ShakaStack
+Pro. ShakaPerf has its own free use rules, including for CI. No key is needed
+to run React on Rails Pro; a key only marks pages `Licensed`. See
+[The ShakaStack License, version 1.0, applied to React on Rails Pro](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md)
+and the [ShakaStack Pro coverage notice](https://github.com/shakacode/commercial-licensing/blob/main/license/notices/2026-11-shakastack-pro-coverage.md).
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
@@ -143,10 +152,10 @@ The license key is optional in every environment. It identifies your
 organization, marks rendered pages `Licensed`, and changes the license status
 in logs. Without a key, Pro keeps running and rendered pages read `UNLICENSED`.
 
-Production without a key is fine for the free uses and for organizations below
-the free line. Larger organizations subscribe at
-[pro.reactonrails.com](https://pro.reactonrails.com/) and receive a key with
-their subscription.
+The key is optional even when production use requires a subscription. An
+organization that does not qualify for free production use subscribes to
+[ShakaStack Pro](https://pro.reactonrails.com/). An active React on Rails Pro
+subscription already counts. The key only changes attribution status.
 
 To configure a key, provide it to Rails through application configuration or
 the environment. Explicit nonblank configuration takes precedence over the
@@ -194,7 +203,7 @@ License validation happens in these places:
 - The browser receives `railsContext.rorPro` as a Pro-installed signal only; it does not validate the license.
 
 A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, that
-log message is a warning that reminds larger organizations to subscribe. Rails includes an HTML attribution comment
+log message is a warning that reminds the organization to check its subscription coverage. Rails includes an HTML attribution comment
 indicating the license state.
 
 ### Check Subscription Key Status

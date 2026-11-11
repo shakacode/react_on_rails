@@ -9,11 +9,11 @@ feature beside the generated RSC example, and verifies the result with automated
 tests and a production asset build.
 
 > [!NOTE]
-> Free in development, test, CI, and staging, and in production for small
-> organizations, charities, schools, and hospitals; larger organizations
-> subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
-> No license key is needed to run Pro. See [Pro Installation](../installation.md)
-> for licensing and optional key configuration details.
+> React on Rails Pro is free in development, test, CI, and staging when preparing
+> an application before production. Covered production use requires ShakaStack
+> Pro unless a free use applies. No key is needed to run Pro. See
+> [Pro Installation](../installation.md) for the complete license terms and
+> optional key configuration details.
 
 ### 1. Prepare the prerequisites
 
