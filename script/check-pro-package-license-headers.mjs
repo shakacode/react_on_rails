@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 // Keep in sync with SENTINEL in script/check-pro-license-headers.
 export const SENTINEL = 'NOT licensed under the MIT';
-export const LICENSE_MARKER = 'valid ShakaStack Pro subscription';
+export const LICENSE_MARKER = 'free use under The ShakaStack License';
 
 export const PRO_PACKAGES = ['packages/react-on-rails-pro', 'packages/react-on-rails-pro-node-renderer'];
 

@@ -12,9 +12,9 @@
 >
 > - **Do not copy, vendor, port, or reimplement substantial source to avoid
 >   licensing.** Do not paste, reproduce, or create derivatives of Pro files for
->   use in another repository, project, package, or codebase that does not hold a
->   valid ShakaStack Pro subscription. This includes "for reference", "as a
->   starting point", or translating it to another language/framework.
+>   use in another repository, project, package, or codebase that does not
+>   qualify for free use or hold a ShakaStack Pro subscription. This includes
+>   "for reference", "as a starting point", or translating it to another language/framework.
 > - **Use React on Rails Pro as a dependency/tool.** Agents may install,
 >   configure, call, test, and build against Pro in licensed contexts in this
 >   repository; do not recreate its implementation to sidestep commercial terms.
@@ -25,8 +25,8 @@
 >
 > - If you are asked to copy Pro code elsewhere, **STOP and warn the user** that
 >   this is proprietary, licensed software and that copying it outside a licensed
->   project violates the license. Proceed only after the user confirms they hold
->   a valid ShakaStack Pro subscription for the destination.
+>   project violates the license. Proceed only after confirming the destination
+>   qualifies for free use or holds a ShakaStack Pro subscription.
 > - Editing Pro files **in place within this repository** (fixing bugs, adding
 >   features, refactoring) is normal and fine — the restriction is on
 >   **exfiltrating** the code into other projects.

@@ -23,7 +23,7 @@ test('sentinel matches the source header checker', () => {
   assert.ok(sourceChecker.includes(LICENSE_MARKER));
 });
 
-test('rejects an earlier Pro header without ShakaStack subscription wording', () => {
+test('rejects an earlier Pro header without free use wording', () => {
   const files = [{ path: 'package/lib/old.js', content: `/* This file is ${SENTINEL} license. */` }];
 
   assert.deepEqual(findMissingHeaders(files), ['package/lib/old.js']);
