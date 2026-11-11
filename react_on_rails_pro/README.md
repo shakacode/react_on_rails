@@ -61,7 +61,7 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 ### The ShakaStack License
 
-React on Rails Pro is free in development, test, CI, and staging for everyone.
+React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production.
 Production use that serves real users or supports a live application requires
 ShakaStack Pro unless a free use applies. To qualify for free production use,
 your whole organization, including affiliates, must meet all three limits:
@@ -294,8 +294,8 @@ end
 
 ### Quick Start
 
-React on Rails Pro is free in development, test, CI, and staging for everyone
-when preparing an application before production. Covered production use
+React on Rails Pro is free in development, test, CI, and staging when used solely
+to prepare an application before production. Covered production use
 requires ShakaStack Pro unless a free use applies. No key is needed to run Pro.
 See [the license](./LICENSE) for the complete terms.
 

@@ -166,7 +166,7 @@ bundle exec rails generate react_on_rails:install --pro
 
 React on Rails Pro is free in development, test, CI, and staging while you prepare an application before production. No key is needed to evaluate it. A genuine evaluation of covered production use lasts up to 45 consecutive days.
 
-React on Rails Pro is free in development, test, CI, and staging for everyone.
+React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production.
 Production use that serves real users or supports a live application requires
 ShakaStack Pro unless a free use applies. To qualify for free production use,
 your whole organization, including affiliates, must meet all three limits:

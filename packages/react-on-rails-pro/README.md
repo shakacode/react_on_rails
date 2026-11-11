@@ -14,7 +14,7 @@ pnpm add react-on-rails-pro
 
 **Important:** When using the `react_on_rails_pro` Ruby gem, you **must** use this package (`react-on-rails-pro`) instead of `react-on-rails`. If the Pro gem detects the base `react-on-rails` npm package at runtime, it will raise an error.
 
-React on Rails Pro is free in development, test, CI, and staging for everyone.
+React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production.
 Production use that serves real users or supports a live application requires
 ShakaStack Pro unless a free use applies. No key is needed to run Pro. See the
 [license](./LICENSE.md) for the complete terms.
@@ -101,7 +101,7 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 
 ## License
 
-React on Rails Pro is free in development, test, CI, and staging for everyone.
+React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production.
 Production use that serves real users or supports a live application requires
 ShakaStack Pro unless a free use applies. To qualify for free production use,
 your whole organization, including affiliates, must meet all three limits:

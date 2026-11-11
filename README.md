@@ -104,7 +104,7 @@ React on Rails Pro adds higher-throughput SSR and advanced rendering features on
 top of the open-source gem, including Node renderer support, streaming SSR,
 React Server Components, fragment caching, and TanStack Router SSR.
 
-React on Rails Pro is free in development, test, CI, and staging for everyone.
+React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production.
 Production use that serves real users or supports a live application requires
 ShakaStack Pro unless the organization qualifies for a free use. Organizations
 qualify when they meet all three limits across their affiliates: fewer than 10
@@ -170,7 +170,7 @@ React on Rails is available as open source under the terms of the
 
 React on Rails Pro is offered under
 [The ShakaStack License, version 1.0, applied to React on Rails Pro](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
-React on Rails Pro development, test, CI, and staging use is free for everyone.
+React on Rails Pro development, test, CI, and staging use is free when used solely to prepare an application before production.
 Production use requires [ShakaStack Pro](https://pro.reactonrails.com/) unless a
 free use applies. One $1,800 yearly subscription covers your whole organization
 across React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache. No license key

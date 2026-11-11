@@ -25,7 +25,7 @@ The following directories and all their contents are licensed under **The ShakaS
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
-**Important:** React on Rails Pro is free in development, test, CI, and staging for everyone. Production use that serves real users or supports a live application requires ShakaStack Pro unless a free use applies. An organization qualifies for free use when it meets all three limits across its affiliates: fewer than 10 people, under US $1M in revenue during the last twelve months, and under US $1M in outside capital raised ever. Charities, educational institutions, and hospitals are free at any size. ShakaStack Pro covers the whole organization with no size limit and includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache. Each product has its own free use rules.
+**Important:** React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production. Production use that serves real users or supports a live application requires ShakaStack Pro unless a free use applies. An organization qualifies for free use when it meets all three limits across its affiliates: fewer than 10 people, under US $1M in revenue during the last twelve months, and under US $1M in outside capital raised ever. Charities, educational institutions, and hospitals are free at any size. ShakaStack Pro covers the whole organization with no size limit and includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache. Each product has its own free use rules.
 
 ---
 
@@ -67,7 +67,7 @@ For Pro-licensed code (as defined in the "License Scope" section above), see:
 
 **Key Points:**
 
-1. Development, test, CI, staging, preview, and review use of React on Rails Pro is free for everyone. A genuine evaluation of covered use lasts up to 45 consecutive days.
+1. Development, test, CI, staging, preview, and review use of React on Rails Pro is free when used solely to prepare an application before production. A genuine evaluation of covered use lasts up to 45 consecutive days.
 2. Production use is free when all three answers are yes: fewer than 10 people work for the organization, revenue in the last twelve months is under US $1M, and outside capital raised ever is under US $1M, counted with affiliates. Charities, educational institutions, and hospitals are free at any size.
 3. Other production use requires ShakaStack Pro at $1,800 per year per organization. The subscription covers every affiliate, application, environment, repository, and developer with no size limit. Active React on Rails Pro subscriptions count as ShakaStack Pro.
 4. The Generated Attribution HTML comment must remain in every rendered document.
