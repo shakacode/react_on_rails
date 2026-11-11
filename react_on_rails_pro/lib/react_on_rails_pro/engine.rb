@@ -134,14 +134,19 @@ module ReactOnRailsPro
         prefix = "[React on Rails Pro] #{issue}."
 
         if Rails.env.production?
-          warning = "React on Rails Pro is free in production for small organizations, charities, schools, " \
-                    "and hospitals; other organizations need a subscription. " \
+          warning = "React on Rails Pro is free in production for organizations with fewer than 10 people, " \
+                    "under $1M revenue in the last twelve months, and under $1M raised ever, counting affiliates, " \
+                    "and for charities, educational institutions, and hospitals at any size. " \
+                    "Other production use that serves real users or supports a live application needs " \
+                    "a ShakaStack Pro subscription. " \
                     "If that is you, #{action.sub(/\A[A-Z]/, &:downcase)}"
           Rails.logger.warn "#{prefix} #{warning}"
         elsif warn_outside_production
           Rails.logger.warn "#{prefix} #{action}"
         else
-          Rails.logger.debug "#{prefix} No license required for development/test environments."
+          Rails.logger.debug "#{prefix} React on Rails Pro is free in development, test, CI, and staging for " \
+                             "everyone solely to prepare an application before production. Use that serves real " \
+                             "users or supports a live application may need a ShakaStack Pro subscription."
         end
       end
     end

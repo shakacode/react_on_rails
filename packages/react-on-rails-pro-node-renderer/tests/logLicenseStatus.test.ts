@@ -68,8 +68,11 @@ describe('logLicenseStatus', () => {
 
       expect(warn).toHaveBeenCalledWith(
         `[React on Rails Pro] ${statusMessage}. ` +
-          'React on Rails Pro is free in production for small organizations, charities, schools, and hospitals; ' +
-          `other organizations need a subscription. If that is you, ${action} at https://pro.reactonrails.com/`,
+          'React on Rails Pro is free in production for organizations with fewer than 10 people, ' +
+          'under $1M revenue in the last twelve months, and under $1M raised ever, counting affiliates, ' +
+          'and for charities, educational institutions, and hospitals at any size. ' +
+          'Other production use that serves real users or supports a live application needs ' +
+          `a ShakaStack Pro subscription. If that is you, ${action} at https://pro.reactonrails.com/`,
       );
     },
   );
@@ -78,7 +81,7 @@ describe('logLicenseStatus', () => {
     ['missing', 'No license found'],
     ['expired', 'License has expired'],
     ['invalid', 'Invalid license'],
-  ] as const)('reports %s status without implying a license is required', (licenseStatus, statusMessage) => {
+  ] as const)('reports %s status with the preparation limit', (licenseStatus, statusMessage) => {
     process.env.NODE_ENV = 'development';
     process.env.RAILS_ENV = 'test';
     const { info, logLicenseStatus, warn } = loadLogger(licenseStatus);
@@ -86,7 +89,10 @@ describe('logLicenseStatus', () => {
     logLicenseStatus();
 
     expect(info).toHaveBeenCalledWith(
-      `[React on Rails Pro] ${statusMessage}. No license required for development/test environments.`,
+      `[React on Rails Pro] ${statusMessage}. ` +
+        'React on Rails Pro is free in development, test, CI, and staging for everyone solely to prepare ' +
+        'an application before production. Use that serves real users or supports a live application ' +
+        'may need a ShakaStack Pro subscription.',
     );
     expect(warn).not.toHaveBeenCalled();
   });
@@ -98,7 +104,7 @@ describe('logLicenseStatus', () => {
 
     logLicenseStatus();
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('small organizations'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ShakaStack Pro subscription'));
   });
 
   it('logs valid licenses as information', () => {

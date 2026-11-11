@@ -169,10 +169,35 @@ def split_preamble(style, content)
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-# Remove an existing Pro header wherever it sits so --fix does not stack it.
+LEADING_BLOCK_REGION = [
+  /\A[ \t]*\r?\n/,
+  /\A#![^\n]*\r?\n/,
+  %r{\A[ \t]*//[^\n]*(?:\r?\n|\z)},
+  %r{\A[ \t]*/\*.*?\*/[ \t]*(?:\r?\n|\z)}m,
+  /\A[ \t]*(['"])use (?:client|server|strict)\1;?[ \t]*(?:\r?\n|\z)/,
+  /\A[ \t]*import[ \t]+[^;\n]*;?[ \t]*(?:\r?\n|\z)/,
+  /\A[ \t]*@import[ \t]+[^;\n]*;?[ \t]*(?:\r?\n|\z)/
+].freeze
+
+def leading_block_region?(prefix)
+  rest = prefix
+  loop do
+    pattern = LEADING_BLOCK_REGION.find { |candidate| rest.match?(candidate) }
+    return rest.empty? unless pattern
+
+    rest = rest.sub(pattern, "")
+  end
+end
+
+# Remove a Pro header from the leading comment region after directives or imports.
 def strip_legacy_block(content)
   content.gsub(%r{/\*\*?.*?\*/[ \t]*\r?\n?}m) do |comment|
-    comment.include?(SENTINEL) && comment.include?("Copyright (c)") ? "" : comment
+    prefix = Regexp.last_match.pre_match
+    if leading_block_region?(prefix) && comment.include?(SENTINEL) && comment.include?("Copyright (c)")
+      ""
+    else
+      comment
+    end
   end
 end
 
@@ -434,6 +459,22 @@ def run_self_test
   assert migrated.include?("'use client';") && migrated.end_with?("const y = 2;\n"),
          "directive and body preserved"
   assert apply_header("c.client.js", migrated) == migrated, "migrated header idempotent"
+
+  imported = "import x from 'x';\n\n#{legacy}"
+  after_import = apply_header("d.js", imported)
+  assert after_import.scan(SENTINEL).size == 1, "header after import is replaced"
+  assert after_import.include?("import x from 'x';") && after_import.end_with?("const y = 2;\n"),
+         "import and body preserved"
+
+  embedded = "const sample = `before\n#{legacy}after`;\n"
+  preserved = apply_header("e.js", embedded)
+  assert preserved.include?(legacy), "header text inside a template string is preserved"
+  assert preserved.end_with?(embedded), "template string body is preserved"
+  assert apply_header("e.js", preserved) == preserved, "embedded header idempotent"
+
+  embedded_after_import = "import x from 'x'; const sample = `before\n#{legacy}after`;\n"
+  assert apply_header("f.js", embedded_after_import).end_with?(embedded_after_import),
+         "code after an import blocks header removal"
 
   # Out-of-scope inputs untouched.
   assert apply_header("data.json", "{}\n") == "{}\n", "json untouched"

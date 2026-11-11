@@ -65,7 +65,12 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "explains which organizations need a production subscription" do
           expect(mock_logger).to receive(:warn).with(
-            /free in production.*other organizations need a subscription.*If that is you, get a license/
+            a_string_including(
+              "fewer than 10 people", "under $1M revenue", "under $1M raised ever",
+              "charities, educational institutions, and hospitals at any size",
+              "serves real users or supports a live application", "ShakaStack Pro subscription",
+              "If that is you, get a license"
+            )
           )
           described_class.log_license_status
         end
@@ -93,7 +98,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "explains which organizations need a production subscription" do
           expect(mock_logger).to receive(:warn).with(
-            /free in production.*other organizations need a subscription.*If that is you, renew your license/
+            a_string_including("ShakaStack Pro subscription", "If that is you, renew your license")
           )
           described_class.log_license_status
         end
@@ -113,7 +118,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "explains which organizations need a production subscription" do
           expect(mock_logger).to receive(:warn).with(
-            /free in production.*other organizations need a subscription.*If that is you, get a license/
+            a_string_including("ShakaStack Pro subscription", "If that is you, get a license")
           )
           described_class.log_license_status
         end
@@ -202,8 +207,14 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "includes the development/test message" do
-          expect(mock_logger).to receive(:debug).with(%r{No license required for development/test environments})
+        it "limits free development use to preparation before production" do
+          expect(mock_logger).to receive(:debug).with(
+            a_string_including(
+              "free in development, test, CI, and staging for everyone",
+              "solely to prepare an application before production",
+              "serves real users or supports a live application"
+            )
+          )
           described_class.log_license_status
         end
       end
