@@ -77,7 +77,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-1. **[Pro]** **React on Rails Pro adopts The ShakaStack License, version 1.0:** ShakaStack Pro covers React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache for the whole organization with no size limit. React on Rails Pro remains free in development, test, CI, and staging when preparing an application before production. Releases before 17.3.0 keep the terms they shipped with.
+- **[Pro]** **React on Rails Pro adopts The ShakaStack License, version 1.0:** ShakaStack Pro covers React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache for the whole organization with no size limit. React on Rails Pro remains free in development, test, CI, and staging when preparing an application before production. Releases before 17.3.0 keep the terms they shipped with.
+  [PR 5346](https://github.com/shakacode/react_on_rails/pull/5346) by
+  [sashakhar1](https://github.com/sashakhar1).
 
 - **[Pro]** **`RSCRoute` takes `ref` as a regular prop instead of `forwardRef`**: The public
   `<RSCRoute ref={…}>` handle API and `onRefetchError` behavior are unchanged, and no minimum React

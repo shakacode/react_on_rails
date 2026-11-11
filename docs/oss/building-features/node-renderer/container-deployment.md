@@ -1,10 +1,7 @@
 # Node Renderer: Container Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free in development, test, CI, and staging, and in production for small
-> organizations, charities, schools, and hospitals; larger organizations
-> subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
-> No license key is needed to run Pro.
+> React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Production is free for organizations meeting all three license questions, charities, educational institutions, and hospitals. Other production use needs ShakaStack Pro for the whole organization at https://pro.reactonrails.com/ ($1,800 per year). No license key is needed to run Pro.
 
 This guide covers deploying the Node Renderer in containerized environments (Docker, Kubernetes, ControlPlane, etc.), including architecture options, performance tuning, memory management, error tracking, and troubleshooting.
 

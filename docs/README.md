@@ -52,8 +52,8 @@ Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro
 
 ## Friendly evaluation policy
 
-- You can try React on Rails Pro without a license key in development, test, CI, and staging, and in production for 45 days.
-- Small organizations, charities, schools, and hospitals run Pro in production for free; larger organizations subscribe at [pro.reactonrails.com](https://pro.reactonrails.com/).
+- React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production. A genuine production evaluation lasts up to 45 consecutive days.
+- Production is free for organizations that meet all three questions in [The ShakaStack License](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md), and for charities, educational institutions, and hospitals at any size. Other production use requires ShakaStack Pro for the whole organization at [pro.reactonrails.com](https://pro.reactonrails.com/).
 
 ## Need more help?
 

@@ -196,15 +196,12 @@ Now that you have React on Rails working, here's what to explore next:
 ### Pro Features
 
 :::tip Pro Features
-Free in development, test, CI, and staging, and in production for small
-organizations, charities, schools, and hospitals; larger organizations
-subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
-No license key is needed to run Pro.
+React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Production is free for organizations meeting all three license questions, charities, educational institutions, and hospitals. Other production use needs ShakaStack Pro for the whole organization at https://pro.reactonrails.com/ ($1,800 per year). No license key is needed to run Pro.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[React Server Components](../../pro/react-server-components/tutorial.md)** - Add the RSC path when you need it
-- **[Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)**: Subscription for organizations above the free line
+- **[Free & Pro](https://reactonrails.com/pricing/) and [subscribe](https://pro.reactonrails.com/)**: Review qualification and subscriptions
 
 ## 🆘 Need Help?
 

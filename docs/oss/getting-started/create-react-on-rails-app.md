@@ -25,10 +25,7 @@ want Pro with the generated React Server Components example. Pro modes require `
 to be installable in your environment ([Pro setup docs](../../pro/installation.md)). All mode flags
 support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
-Free in development, test, CI, and staging, and in production for small
-organizations, charities, schools, and hospitals; larger organizations
-subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
-No license key is needed to run Pro.
+React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Production is free for organizations meeting all three license questions, charities, educational institutions, and hospitals. Other production use needs ShakaStack Pro for the whole organization at https://pro.reactonrails.com/ ($1,800 per year). No license key is needed to run Pro.
 
 To try the latest release candidate instead of the latest stable release, use the npm `rc` tag:
 
