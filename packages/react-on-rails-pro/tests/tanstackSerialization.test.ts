@@ -24,6 +24,7 @@ import {
 } from '@tanstack/react-router';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
+import { act as reactDomAct } from 'react-dom/test-utils';
 import { clientHydrateTanStackApp } from '../src/tanstack-router/clientHydrate.ts';
 import { serverRenderTanStackAppAsync } from '../src/tanstack-router/serverRender.ts';
 import type { TanStackRouter } from '../src/tanstack-router/types.ts';
@@ -116,14 +117,15 @@ describe('TanStack SSR serialization', () => {
     document.body.appendChild(container);
     const errors: unknown[] = [];
     let root: ReturnType<typeof hydrateRoot> | undefined;
+    const act = typeof React.act === 'function' ? React.act : reactDomAct;
     try {
-      await React.act(async () => {
+      await act(async () => {
         root = hydrateRoot(container, client, { onRecoverableError: (error) => errors.push(error) });
       });
       expect(container.textContent).toBe('TypeError: boom');
       expect(errors).toEqual([]);
     } finally {
-      await React.act(async () => {
+      await act(async () => {
         root?.unmount();
       });
       container.remove();
