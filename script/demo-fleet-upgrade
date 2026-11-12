@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Upgrades the demo fleet to one React on Rails release candidate.
+# Dry run by default; see script/demo-fleet-upgrade --help.
+require_relative "demo_fleet_upgrade"
+
+begin
+  exit DemoFleetUpgrade::CLI.new(ARGV).run
+rescue DemoFleetUpgrade::Error, OptionParser::ParseError => e
+  warn e.message
+  exit 2
+end
