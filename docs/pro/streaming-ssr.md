@@ -958,7 +958,7 @@ React on Rails Pro hydrates components during the page loading state (before `DO
 - Optimal Time to Interactive (TTI) for both streaming and non-streaming pages
 - Works seamlessly with React's Selective Hydration
 
-**Note:** Early hydration requires a React on Rails Pro license. It is always enabled for Pro users and unavailable in OSS — no per-component toggle is exposed.
+**Note:** Early hydration requires React on Rails Pro under The ShakaStack License. It is enabled for Pro users and unavailable in OSS. There is no setting for individual components.
 
 **generated_component_packs_loading_strategy Option:**
 

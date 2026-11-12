@@ -4362,8 +4362,8 @@ describe InstallGenerator, type: :generator do
       expect(install_generator).to have_received(:say)
         .with(a_string_including(
                 "No license key is needed to run Pro",
-                "Production is free for small organizations, charities, schools, and hospitals",
-                "larger organizations subscribe: https://reactonrails.com/pricing/"
+                "Qualifying production use is free",
+                "other production use needs ShakaStack Pro for the whole organization"
               ))
       expect(install_generator).to have_received(:say)
         .with(a_string_including("https://reactonrails.com/docs/pro/upgrading-to-pro/"))

@@ -16,13 +16,13 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 
 ## Start Here
 
-- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/): Current Pro subscription
-- [Installation](./installation.md) - Fresh install or manual setup
-- [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
-- [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
-- [License CI Integration](./license-ci-integration.md) - Optionally monitor a subscription key
-- [Pro Review App Security](./deployment/review-app-security.md) - Safe review-app defaults for public repositories
-- [Troubleshooting](./troubleshooting.md) - Common setup and runtime issues
+1. [Free & Pro](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/): ShakaStack Pro subscription
+2. [Installation](./installation.md): Fresh install or manual setup
+3. [Upgrade from OSS to Pro](./upgrading-to-pro.md): Three step upgrade path
+4. [Configuration](../oss/configuration/configuration-pro.md): Pro runtime settings
+5. [License CI Integration](./license-ci-integration.md): Optional subscription key monitoring
+6. [Pro Review App Security](./deployment/review-app-security.md): Review app defaults for public repositories
+7. [Troubleshooting](./troubleshooting.md): Setup and runtime issues
 
 ## Route Map
 
@@ -42,32 +42,38 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Node renderer](./node-renderer.md)
 - [Code splitting and bundle caching](../oss/building-features/code-splitting.md)
 
-## ShakaCode Trust-Based Commercial Licensing
+## The ShakaStack License
 
 React on Rails (the `react_on_rails` gem and the `react-on-rails` package) is
 open source under the MIT License, the same license as Inertia Rails.
 
 React on Rails Pro adds React Server Components, streaming SSR, fragment
-caching, and the dedicated Node renderer, under The React on Rails Pro License,
-a trust-based commercial license:
+caching, and the dedicated Node renderer under The ShakaStack License,
+version 1.0, applied to React on Rails Pro.
 
-- **Free for everyone, at any organization size:** development, test, CI,
-  staging, preview and review apps (no license key needed), education, personal
-  projects, open-source projects, and a 45-day production evaluation.
-- **Free in production for small organizations:** under 10 people, under US $1M
-  revenue in the last twelve months, and under US $1M raised, counted with
-  affiliates. Charities, educational institutions, and hospitals are free at
-  any size.
-- **Everyone else subscribes for production use:** $1,800 per year per
-  organization, covering every application, environment, and developer, with
-  updates and maintainer support. Subscribe at
-  [pro.reactonrails.com](https://pro.reactonrails.com/).
-- **No license key is required to run anything,** nothing phones home, and
-  nothing breaks: a missing key only changes one HTML comment from `Licensed`
-  to `UNLICENSED`. If a subscription lapses, production stays licensed for 30
-  days.
-- **Terms are per version:** once a release ships under these terms, they never
-  tighten on that release.
+Development, test, CI, staging, preview, and review environments used solely
+to prepare an application before production are free for everyone. Production
+means serving real users or doing background work that supports a live
+application, whatever the environment is called. A genuine evaluation of
+covered use lasts up to 45 consecutive days. These environment rules apply
+to React on Rails Pro. ShakaPerf has its own free use rules, including for CI.
+
+Production is also free when the whole organization, counting affiliates,
+meets all three limits: fewer than 10 people, under US $1M revenue in the last
+twelve months, and under US $1M in outside capital raised ever. Charities,
+educational institutions, and hospitals are free at any size.
+
+Other production use requires ShakaStack Pro at US $1,800 per year per
+organization from [pro.reactonrails.com](https://pro.reactonrails.com/).
+One subscription includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR
+Cache for every affiliate, application, environment, repository, and developer,
+with Slack support and no size limit. An active React on Rails Pro subscription
+already counts as ShakaStack Pro.
+
+No key is required to run React on Rails Pro. A key only changes its attribution
+status in HTML and logs. When a subscription ends, covered use under this license
+stays licensed for 30 days while you renew or wind down. Each released version
+keeps the terms it shipped with.
 
 Full text:
 [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
@@ -91,14 +97,14 @@ dashboard, Lighthouse artifacts, and source repository links in one place.
 
 ## References
 
-- [Installation](./installation.md)
-- [License CI Integration](./license-ci-integration.md)
-- [Pro Review App Security](./deployment/review-app-security.md)
-- [Upgrade from OSS to Pro](./upgrading-to-pro.md)
-- [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
-- [Node Renderer](./node-renderer.md)
-- [Streaming SSR](./streaming-ssr.md)
-- [Fragment Caching](./fragment-caching.md)
-- [React Server Components](./react-server-components/index.md)
-- [Pro configuration](../oss/configuration/configuration-pro.md)
-- [ShakaCode consulting](mailto:react_on_rails@shakacode.com)
+1. [Installation](./installation.md)
+2. [License CI Integration](./license-ci-integration.md)
+3. [Pro Review App Security](./deployment/review-app-security.md)
+4. [Upgrade from OSS to Pro](./upgrading-to-pro.md)
+5. [Free & Pro](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/)
+6. [Node Renderer](./node-renderer.md)
+7. [Streaming SSR](./streaming-ssr.md)
+8. [Fragment Caching](./fragment-caching.md)
+9. [React Server Components](./react-server-components/index.md)
+10. [Pro configuration](../oss/configuration/configuration-pro.md)
+11. [ShakaCode consulting](mailto:react_on_rails@shakacode.com)

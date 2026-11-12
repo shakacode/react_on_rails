@@ -244,9 +244,7 @@ This is a helper method that takes any JavaScript expression and returns the out
 ## Pro-Only View Helpers
 
 The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install
-the Pro gem to use them. Free in development, test, CI, and staging, and in production for small organizations,
-charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year
-per organization). No license key is needed to run Pro.
+the Pro gem to use them. React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Production is free for organizations meeting all three license questions, charities, educational institutions, and hospitals. Other production use needs ShakaStack Pro for the whole organization at https://pro.reactonrails.com/ ($1,800 per year). No license key is needed to run Pro.
 
 ### cached_react_component and cached_react_component_hash
 

@@ -2,8 +2,8 @@
 
 This repository contains code under two different licenses:
 
-- **Core**: MIT License (applies to most files)
-- **Pro**: React on Rails Pro License (applies to specific directories)
+1. **Core**: MIT License (applies to most files)
+2. **Pro**: The ShakaStack License, version 1.0, applied to React on Rails Pro (applies to specific directories)
 
 ## License Scope
 
@@ -17,7 +17,7 @@ The following directories and all their contents are licensed under the **MIT Li
 
 ### Pro Licensed Code
 
-The following directories and all their contents are licensed under the **React on Rails Pro License**:
+The following directories and all their contents are licensed under **The ShakaStack License, version 1.0, applied to React on Rails Pro**:
 
 - `packages/react-on-rails-pro/` (entire package)
 - `packages/react-on-rails-pro-node-renderer/` (entire package)
@@ -25,7 +25,7 @@ The following directories and all their contents are licensed under the **React 
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
-**Important:** Pro-licensed code is included in this repository and is governed by The React on Rails Pro License: free for development, test, CI, staging, education, personal projects, open-source projects, and for production use by small organizations, charities, educational institutions, and hospitals; other production use requires a subscription.
+**Important:** React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production. Production use that serves real users or supports a live application requires ShakaStack Pro unless a free use applies. An organization qualifies for free use when it meets all three limits across its affiliates: fewer than 10 people, under US $1M in revenue during the last twelve months, and under US $1M in outside capital raised ever. Charities, educational institutions, and hospitals are free at any size. ShakaStack Pro covers the whole organization with no size limit and includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache. Each product has its own free use rules.
 
 ---
 
@@ -60,16 +60,16 @@ SOFTWARE.
 
 ---
 
-## React on Rails Pro License
+## The ShakaStack License for React on Rails Pro
 
 For Pro-licensed code (as defined in the "License Scope" section above), see:
 [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md)
 
 **Key Points:**
 
-- Development, test, CI, staging, preview and review apps, education, personal projects, open-source projects, and a 45-day production evaluation are free for everyone.
-- Production use is free when all three answers are yes: fewer than 10 people work for the organization, revenue in the last twelve months is under US $1M, and lifetime outside capital raised is under US $1M, counted with affiliates. Charities, educational institutions, and hospitals are free at any size.
-- Other production use requires a subscription at $1,800 per year per organization.
-- The Generated Attribution HTML comment must remain in every rendered document.
-- A license key is optional and only sets the attribution status.
-- MIT-licensed files may be modified under the MIT License, while the Pro packages remain governed by The React on Rails Pro License.
+1. Development, test, CI, staging, preview, and review use of React on Rails Pro is free when used solely to prepare an application before production. A genuine evaluation of covered use lasts up to 45 consecutive days.
+2. Production use is free when all three answers are yes: fewer than 10 people work for the organization, revenue in the last twelve months is under US $1M, and outside capital raised ever is under US $1M, counted with affiliates. Charities, educational institutions, and hospitals are free at any size.
+3. Other production use requires ShakaStack Pro at $1,800 per year per organization. The subscription covers every affiliate, application, environment, repository, and developer with no size limit. Active React on Rails Pro subscriptions count as ShakaStack Pro.
+4. The Generated Attribution HTML comment must remain in every rendered document.
+5. A license key is optional and only sets the attribution status.
+6. Files under the MIT License may be modified under its terms. The Pro packages remain governed by The ShakaStack License, version 1.0, applied to React on Rails Pro.

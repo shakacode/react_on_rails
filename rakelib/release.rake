@@ -10199,6 +10199,27 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
   end
 end
 
+def validate_pro_license_release!(monorepo_root:, target_gem_version:)
+  if Gem::Version.new(release_base_version(target_gem_version)) < Gem::Version.new("17.3.0")
+    abort "The ShakaStack License requires a target release of 17.3.0 or later."
+  end
+
+  license_paths = %w[
+    REACT-ON-RAILS-PRO-LICENSE.md
+    react_on_rails_pro/LICENSE
+    packages/react-on-rails-pro/LICENSE.md
+    packages/react-on-rails-pro-node-renderer/LICENSE.md
+  ]
+  license_paths.each do |relative_path|
+    path = File.join(monorepo_root, relative_path)
+    abort "Missing Pro license file: #{relative_path}" unless File.file?(path)
+
+    license_text = File.read(path)
+    abort "Pro license has a counsel marker: #{relative_path}" if license_text.match?(/\[COUNSEL-\d+\]/)
+    abort "Pro license has a status notice: #{relative_path}" if license_text.match?(/^\*{0,2}Status:/i)
+  end
+end
+
 # rubocop:disable Metrics/BlockLength
 
 desc("Unified release script for all React on Rails packages and gems.
@@ -10393,6 +10414,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_gem_version: current_checkout_version,
       version_input:
     )
+    validate_pro_license_release!(monorepo_root: release_root, target_gem_version: resolved_target_gem_version)
     version_converter = ReactOnRails::VersionSyntaxConverter.new
     resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)

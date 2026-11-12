@@ -1,7 +1,7 @@
 # Node Renderer: Heroku Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
+> React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Production is free for organizations meeting all three license questions, charities, educational institutions, and hospitals. Other production use needs ShakaStack Pro for the whole organization at https://pro.reactonrails.com/ ($1,800 per year). No license key is needed to run Pro.
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
 instances on the same server. This technique results in better performance since it avoids network

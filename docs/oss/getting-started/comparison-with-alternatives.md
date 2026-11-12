@@ -193,11 +193,8 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Free in development, test, CI, and staging, and in production for small
-organizations, charities, schools, and hospitals; larger organizations
-subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
-No license key is needed to run Pro. See
-[Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/), the
+React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Production is free for organizations meeting all three license questions, charities, educational institutions, and hospitals. Other production use needs ShakaStack Pro for the whole organization at https://pro.reactonrails.com/ ($1,800 per year). No license key is needed to run Pro. See
+[Free & Pro](https://reactonrails.com/pricing/) and [subscribe](https://pro.reactonrails.com/), the
 [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the
 [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 

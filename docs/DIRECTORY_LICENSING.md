@@ -28,10 +28,10 @@ react_on_rails/ (monorepo root)
 
 **Important Distinction:**
 
-- **MIT-licensed interface files** (outside the Pro-licensed directories) can be freely modified under MIT terms
-- **Pro-licensed files** remain governed by The React on Rails Pro License
-- **Free Pro uses** include development, test, CI, staging, education, personal and open-source projects, and production use by small organizations, charities, educational institutions, and hospitals
-- **Other production use** requires a subscription
+1. Interface files outside the Pro directories remain under the MIT License.
+2. Pro files remain governed by The ShakaStack License, version 1.0, applied to React on Rails Pro.
+3. Development, test, CI, and staging use of React on Rails Pro is free for everyone when the environment prepares an application before production.
+4. Production use that serves real users or supports a live application requires ShakaStack Pro unless the organization qualifies for a free use. The subscription covers the whole organization with no size limit and includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR Cache. Each product has its own free use rules.
 
 ## License Compliance Rules
 
@@ -44,8 +44,8 @@ react_on_rails/ (monorepo root)
 ### Package-Level Compliance
 
 1. **Gemspec Files**:
-   - `react_on_rails/react_on_rails.gemspec`: `s.license = "MIT"`
-   - `react_on_rails_pro/react_on_rails_pro.gemspec`: `s.license = "LicenseRef-ReactOnRailsPro"`
+   1. `react_on_rails/react_on_rails.gemspec`: `s.license = "MIT"`
+   2. `react_on_rails_pro/react_on_rails_pro.gemspec`: `s.license = "LicenseRef-ShakaStack-1.0-ReactOnRailsPro"`
 
 2. **Package.json Files**:
    - `packages/react-on-rails/package.json`: `"license": "MIT"` with a package-local `LICENSE.md`
@@ -64,7 +64,7 @@ react_on_rails/ (monorepo root)
 
 ### When Adding New Files
 
-1. Determine if the functionality is Core (MIT) or Pro (The React on Rails Pro License)
+1. Determine if the functionality is Core (MIT) or Pro (The ShakaStack License, version 1.0, applied to React on Rails Pro)
 2. Place the file in the appropriate licensed directory
 3. Ensure the package.json or gemspec correctly reflects the license
 4. Update LICENSE.md if creating new directories

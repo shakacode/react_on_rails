@@ -1,4 +1,6 @@
-# React on Rails Pro License — CI Integration
+# The ShakaStack License for React on Rails Pro: CI Integration
+
+React on Rails Pro is free in CI when used solely to prepare an application before production. ShakaPerf follows its own free use rules, including for CI. The key described here is optional and only changes React on Rails Pro attribution status. The complete terms are in [The ShakaStack License, version 1.0, applied to React on Rails Pro](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 Detailed examples for organizations that choose to monitor an optional subscription key in CI/CD, track expirations,
 and send renewal notifications. For basic key configuration, see

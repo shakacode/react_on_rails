@@ -2,6 +2,7 @@
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
+require "fileutils"
 require "stringio"
 require "tmpdir"
 
@@ -311,9 +312,68 @@ RSpec.describe "release.rake helper methods" do
       load File.expand_path("../../../rakelib/release.rake", __dir__)
       Object.instance_variable_set(:@release_rake_helpers_loaded, true)
     end
+    # Older release flow examples use historical targets; the guard has focused examples below.
+    release_receiver = Rake::Task["release"].actions.first.binding.receiver
+    allow(release_receiver).to receive(:validate_pro_license_release!)
     allow(self).to receive(:release_write_fence!) if respond_to?(:release_write_fence!, true)
     allow(self).to receive(:activate_release_lease_guard!) if respond_to?(:activate_release_lease_guard!, true)
     allow(ReleaseLeaseGuard).to receive(:activate!) if defined?(ReleaseLeaseGuard)
+  end
+
+  describe "#validate_pro_license_release!" do
+    let(:license_paths) do
+      %w[
+        REACT-ON-RAILS-PRO-LICENSE.md
+        react_on_rails_pro/LICENSE
+        packages/react-on-rails-pro/LICENSE.md
+        packages/react-on-rails-pro-node-renderer/LICENSE.md
+      ]
+    end
+
+    def with_license_files
+      Dir.mktmpdir do |root|
+        license_paths.each do |path|
+          destination = File.join(root, path)
+          FileUtils.mkdir_p(File.dirname(destination))
+          File.write(destination, "The ShakaStack License, version 1.0, applied to React on Rails Pro.\n")
+        end
+        yield root
+      end
+    end
+
+    it "rejects a release below the first ShakaStack version line" do
+      with_license_files do |root|
+        expect do
+          validate_pro_license_release!(monorepo_root: root, target_gem_version: "17.2.9")
+        end.to raise_error(SystemExit, /17\.3\.0/)
+      end
+    end
+
+    it "allows the first version line including release candidates" do
+      with_license_files do |root|
+        expect do
+          validate_pro_license_release!(monorepo_root: root, target_gem_version: "17.3.0.rc.1")
+        end.not_to raise_error
+      end
+    end
+
+    it "rejects a counsel marker in any shipped license file" do
+      with_license_files do |root|
+        File.write(File.join(root, license_paths.last), "Open wording [COUNSEL-4]\n")
+        expect do
+          validate_pro_license_release!(monorepo_root: root, target_gem_version: "17.3.0")
+        end.to raise_error(SystemExit, /counsel marker/)
+      end
+    end
+
+    it "rejects a proposed status notice" do
+      with_license_files do |root|
+        File.write(File.join(root, license_paths.first), "**Status: proposed text, pending counsel review.**\n")
+        expect do
+          validate_pro_license_release!(monorepo_root: root, target_gem_version: "17.3.0")
+        end.to raise_error(SystemExit, /status notice/)
+      end
+    end
   end
 
   describe "#parse_release_tag_to_gem_version" do

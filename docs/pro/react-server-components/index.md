@@ -7,7 +7,7 @@ description: >-
 # React Server Components in React on Rails Pro
 
 > **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
-> Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization). No license key is needed to run Pro.
+> React on Rails Pro is free in development, test, CI, and staging when preparing an application before production. Covered production use requires ShakaStack Pro unless a free use applies. No key is needed to run Pro. See [The ShakaStack License](../react-on-rails-pro.md#the-shakastack-license).
 
 > **Stable GA:** React Server Components are supported in React on Rails Pro 17. The stable RSC stack uses React and React DOM 19.2.7 or newer on a supported line (19.2.x or 19.3.x) with the matching stable `react-on-rails-rsc` release.
 

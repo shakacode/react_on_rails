@@ -59,8 +59,8 @@ describe ProGenerator, type: :generator do
       expect(error_text).not_to include("You specified")
       expect(error_text).to include("react_on_rails_pro")
       expect(error_text).to include("No license key is needed to run Pro")
-      expect(error_text).to include("Production is free for small organizations, charities, schools, and hospitals")
-      expect(error_text).to include("larger organizations subscribe: https://reactonrails.com/pricing/")
+      expect(error_text).to include("Qualifying production use is free")
+      expect(error_text).to include("needs ShakaStack Pro for the whole organization")
     end
   end
 

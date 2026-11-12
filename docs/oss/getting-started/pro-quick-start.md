@@ -6,19 +6,21 @@ paths land on the right Pro docs instead of a second, competing setup guide.
 
 ## Choose the Right Pro Path
 
-- **Need a production subscription?** Visit [Pricing](https://reactonrails.com/pricing/) and [sign up](https://pro.reactonrails.com/).
+- **Need a production subscription?** Review [Free & Pro](https://reactonrails.com/pricing/) and [subscribe](https://pro.reactonrails.com/).
 - **Starting a new Pro app from scratch?** Use [Pro Installation](../../pro/installation.md#fresh-installation).
 - **Upgrading an existing React on Rails app?** Use [Upgrading from React on Rails to React on Rails Pro](../../pro/upgrading-to-pro.md).
 - **Still deciding between OSS and Pro?** Review [React on Rails: OSS vs Pro Feature Comparison](./oss-vs-pro.md).
 
-React on Rails Pro is free in development, test, CI, and staging for everyone,
-and free in production for small organizations (under 10 people, under $1M
-revenue, under $1M raised) and for charities, schools, and hospitals at any
-size. Larger organizations subscribe for production use at
+React on Rails Pro is free in development, test, CI, and staging when used solely
+to prepare an application before production. Production is free when fewer than
+10 people perform paid work for the organization, its revenue in the last twelve
+months is under $1M, and it has raised under $1M in outside capital ever,
+counting affiliates. Charities, educational institutions, and hospitals are
+free at any size. Other production use requires ShakaStack Pro at
 [pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
-the whole organization. No license key is needed to run it; a key from your
-subscription only marks your pages `Licensed`. See
-[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+the whole organization. No license key is needed to run Pro; a subscription key
+only marks your pages `Licensed`. See
+[The ShakaStack License](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 
 ## After Setup
 

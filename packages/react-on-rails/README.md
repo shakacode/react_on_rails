@@ -16,7 +16,7 @@ pnpm add react-on-rails
 
 ## Need More Than OSS?
 
-If you want React Server Components, streaming SSR, fragment caching, or faster SSR with Node, try [`react-on-rails-pro`](https://www.npmjs.com/package/react-on-rails-pro). It is free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe ($1,800 per year per organization). No license key is needed to run it. See [pricing](https://reactonrails.com/pricing/).
+If you want React Server Components, streaming SSR, fragment caching, or faster SSR with Node, try [`react-on-rails-pro`](https://www.npmjs.com/package/react-on-rails-pro). React on Rails Pro is free in development, test, CI, and staging solely to prepare an application before production. Qualifying organizations and genuine evaluations can use Pro in production for free. Other production use requires ShakaStack Pro for the whole organization ($1,800 per year). No license key is needed to run Pro. See [Free & Pro](https://reactonrails.com/pricing/).
 
 - [Compare OSS vs Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
 - [Pro quick start](https://reactonrails.com/docs/getting-started/pro-quick-start/)

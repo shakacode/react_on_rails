@@ -31,10 +31,10 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 **Key Points:**
 
-- **Requires**: [React on Rails](https://github.com/shakacode/react_on_rails) (open-source) as a foundation
-- **Location**: Part of the React on Rails monorepo at `react_on_rails_pro/`
-- **License terms**: Free in development, test, CI, and staging, and in production for small organizations, charities, schools, and hospitals; larger organizations subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization)
-- **License key**: No license key is needed to run Pro
+1. **Requires**: [React on Rails](https://github.com/shakacode/react_on_rails) as a foundation
+2. **Location**: Part of the React on Rails monorepo at `react_on_rails_pro/`
+3. **License terms**: The ShakaStack License, version 1.0, applied to React on Rails Pro. Development, test, CI, and staging are free when preparing an application before production. Covered production use requires ShakaStack Pro unless a free use applies.
+4. **License key**: No license key is needed to run Pro
 
 ### How It Relates to React on Rails
 
@@ -59,16 +59,25 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 ## 📜 License
 
-### ShakaCode Trust-Based Commercial Licensing
+### The ShakaStack License
 
-React on Rails Pro is free in development, test, CI, and staging for everyone,
-and free in production for small organizations (under 10 people, under $1M
-revenue, under $1M raised) and for charities, schools, and hospitals at any
-size. Larger organizations subscribe for production use at
-[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
-the whole organization. No license key is needed to run it; a key from your
-subscription only marks your pages `Licensed`. See
-[the license](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
+React on Rails Pro is free in development, test, CI, and staging when used solely to prepare an application before production.
+Production use that serves real users or supports a live application requires
+ShakaStack Pro unless a free use applies. To qualify for free production use,
+your whole organization, including affiliates, must meet all three limits:
+fewer than 10 people, under US $1M revenue in the last twelve months, and under
+US $1M in outside capital raised ever. Charities, educational institutions,
+and hospitals are free at any size.
+
+ShakaStack Pro includes React on Rails Pro, ShakaPerf, and Inertia Rails SSR
+Cache for every affiliate, application, environment, repository, and developer.
+There is no limit on headcount or revenue. It costs US $1,800 per year per
+organization at [pro.reactonrails.com](https://pro.reactonrails.com/) with Slack
+support. An active React on Rails Pro subscription already counts as ShakaStack
+Pro. ShakaPerf has its own free use rules, including for CI. No key is needed
+to run React on Rails Pro; a key only marks pages `Licensed`. See
+[The ShakaStack License, version 1.0, applied to React on Rails Pro](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md)
+and the [ShakaStack Pro coverage notice](https://github.com/shakacode/commercial-licensing/blob/main/license/notices/2026-11-shakastack-pro-coverage.md).
 
 ### License Setup
 
@@ -285,10 +294,10 @@ end
 
 ### Quick Start
 
-Free in development, test, CI, and staging, and in production for small
-organizations, charities, schools, and hospitals; larger organizations
-subscribe at https://pro.reactonrails.com/ ($1,800 per year per organization).
-No license key is needed to run Pro.
+React on Rails Pro is free in development, test, CI, and staging when used solely
+to prepare an application before production. Covered production use
+requires ShakaStack Pro unless a free use applies. No key is needed to run Pro.
+See [the license](./LICENSE) for the complete terms.
 
 **1. Install the Gem**
 
@@ -444,15 +453,16 @@ React on Rails Pro is developed and maintained by [ShakaCode](https://www.shakac
 
 **Q: Do I need a license to try React on Rails Pro?**
 
-A: No. React on Rails Pro is free in development, test, CI, and staging, and in
-production for small organizations, charities, schools, and hospitals. Larger
-organizations subscribe for production use. No license key is needed to run
-Pro.
+A: No key is needed to run Pro. Development, test, CI, and staging are free for
+everyone when used solely to prepare an application before production. Covered
+production use requires ShakaStack Pro unless a free use applies.
 
 **Q: How much does a production subscription cost?**
 
-A: A subscription costs $1,800 per year per organization and covers every
-application, environment, and developer. Subscribe at
+A: ShakaStack Pro costs $1,800 per year per organization and includes React on
+Rails Pro, ShakaPerf, and Inertia Rails SSR Cache for every affiliate,
+application, environment, repository, and developer with no size limit.
+Subscribe at
 [pro.reactonrails.com](https://pro.reactonrails.com/).
 
 ### Technical Questions
@@ -514,13 +524,9 @@ A: Yes! The [spec/dummy](./spec/dummy) app demonstrates all Pro features. [See e
 
 ## 📄 License
 
-React on Rails Pro is free in development, test, CI, and staging for everyone,
-and free in production for small organizations (under 10 people, under $1M
-revenue, under $1M raised) and for charities, schools, and hospitals at any
-size. Larger organizations subscribe for production use at
-[pro.reactonrails.com](https://pro.reactonrails.com/): $1,800 per year covers
-the whole organization. No license key is needed to run it; a key from your
-subscription only marks your pages `Licensed`. See [the license](./LICENSE).
+The complete terms are in [The ShakaStack License, version 1.0, applied to
+React on Rails Pro](./LICENSE). Earlier releases keep the terms they shipped
+with.
 
 Questions: [contact@shakacode.com](mailto:contact@shakacode.com).
 
