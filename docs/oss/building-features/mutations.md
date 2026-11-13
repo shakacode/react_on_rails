@@ -432,6 +432,8 @@ function SaveButton({ onSave }) {
 ## Related docs
 
 - [Forms and Mutations with `useRailsForm`](./forms.md)
+- [Forms and Form Libraries on RSC Pages](../../pro/react-server-components/form-libraries.md) —
+  complete React 19, Conform, React Hook Form, and TanStack Form examples with Rails validation and RSC refresh
 - [Using TanStack Query](./tanstack-query.md)
 - [Generated Rails response types](./generated-rails-response-types.md)
 - [RSC data fetching and mutation guidance](../migrating/rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)

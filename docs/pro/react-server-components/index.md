@@ -133,6 +133,8 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 
 ## Deep Dives
 
+- [Forms and Form Libraries](./form-libraries.md) — submit to Rails, display validation errors, and
+  refresh RSC content with React 19, Conform, React Hook Form, or TanStack Form
 - [How RSC Works](./how-react-server-components-work.md) — bundling process, RSC payload format, and client references
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
 - [Critical Resource Hints](./critical-resource-hints.md) — emit measured preload, preconnect, DNS,
