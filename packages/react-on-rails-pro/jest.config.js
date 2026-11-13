@@ -28,8 +28,14 @@ const isReactServerEnv = (process.env.NODE_CONDITIONS ?? '')
 // Resolve React package roots through Node's module resolution so the aliases
 // follow workspace structure changes (renames, hoisting strategies, package
 // manager swaps) instead of hardcoding `../../node_modules/react`.
-const reactPackageRoot = path.dirname(require.resolve('react/package.json'));
-const reactDomPackageRoot = path.dirname(require.resolve('react-dom/package.json'));
+// JEST_REACT_PACKAGE_ROOT / JEST_REACT_DOM_PACKAGE_ROOT let a guard lane pin a
+// different React runtime without touching the workspace install — used by
+// scripts/run-react-floor-guard.mjs to re-run the imperativeRefetch suite on
+// the RSC client path's React floor (19.0.x) and oldest supported line (19.2.x).
+const reactPackageRoot =
+  process.env.JEST_REACT_PACKAGE_ROOT ?? path.dirname(require.resolve('react/package.json'));
+const reactDomPackageRoot =
+  process.env.JEST_REACT_DOM_PACKAGE_ROOT ?? path.dirname(require.resolve('react-dom/package.json'));
 const reactServerDependencies =
   isReactServerEnv && nodeVersion >= 18 ? resolveReactServerDependencies(import.meta.url) : undefined;
 
@@ -38,6 +44,9 @@ const reactServerDependencies =
 export default {
   // Inherit all settings from root
   ...rootConfig,
+
+  // Bound concurrent webpack/React tests on high-core developer machines.
+  maxWorkers: 2,
 
   // Override: Package-specific test directory
   testMatch: ['<rootDir>/tests/**/?(*.)+(spec|test).[jt]s?(x)'],

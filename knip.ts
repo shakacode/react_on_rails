@@ -118,6 +118,9 @@ const config: KnipConfig = {
         'src/worker.ts!',
         // License validator: reset() is used in tests, getLicenseStatus/LicenseStatus imported by master.ts
         'src/shared/licenseValidator.ts!',
+        // esbuild loads this regression fixture by path rather than a TypeScript import.
+        'tests/fixtures/concurrentStoreApp.ts',
+        'tests/fixtures/concurrentStoreRSCApp.ts',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -275,6 +278,7 @@ const config: KnipConfig = {
   // These test-only reset helpers are used across files (imported by test setup), but
   // `knip --production` strips test files and would report them as unused exports.
   ignoreIssues: {
+    'packages/react-on-rails-pro/src/cache/cacheHandlerRegistry.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/worker/shutdownHooks.ts': ['exports'],

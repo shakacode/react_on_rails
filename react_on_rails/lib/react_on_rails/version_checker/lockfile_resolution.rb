@@ -35,6 +35,20 @@ module ReactOnRails
         nil
       end
 
+      # Every version of +package_name+ that the lockfiles in +dir+ resolve, transitive copies
+      # included. .version answers "what did package.json's direct dependency resolve to"; this
+      # answers "which copies get installed", so a security check sees a vulnerable nested copy
+      # (react-server-dom-webpack arrives through react-on-rails-rsc, not package.json).
+      # Unreadable lockfiles contribute nothing. Returns a unique Array of version Strings.
+      def self.all_versions(dir, package_name)
+        ALL_VERSION_READERS.flat_map do |filename, reader|
+          path = File.join(dir, filename)
+          next [] unless File.exist?(path)
+
+          guard { reader.call(path, package_name) } || []
+        end.uniq
+      end
+
       # Yarn Berry (yarn 2+) yarn.lock content, dispatched from version_from_yarn_lock when the
       # __metadata marker is present. Returns a version String or nil.
       def self.berry_yarn_version(content, package_name)
@@ -74,6 +88,22 @@ module ReactOnRails
           case entry
           when Hash then strip_peer_suffix(entry["version"])
           when String then strip_peer_suffix(entry)
+          end
+        end
+
+        # Keys under packages/snapshots name every installed copy:
+        #   9.0: "name@1.2.3" or "name@1.2.3(peer@4.5.6)"; 6.0: "/name@1.2.3(...)"; 5.x: "/name/1.2.3_peer@4.5.6"
+        def self.all_versions(path, package_name)
+          doc = project_document(path)
+          return [] unless doc
+
+          keys = %w[packages snapshots].flat_map { |section| doc[section].is_a?(Hash) ? doc[section].keys : [] }
+          keys.filter_map do |key|
+            key = key.to_s.delete_prefix("/")
+            rest = [key.delete_prefix("#{package_name}@"), key.delete_prefix("#{package_name}/")].find do |candidate|
+              candidate != key
+            end
+            strip_peer_suffix(rest) if rest&.match?(/\A\d/)
           end
         end
 
@@ -119,6 +149,19 @@ module ReactOnRails
           resolution.rpartition("@").last
         end
 
+        # packages is keyed by install path ("name", "parent/name"); entry[0] is "name@version".
+        def self.all_versions(path, package_name)
+          packages = JSON.parse(jsonc_to_json(File.read(path)))["packages"]
+          return [] unless packages.is_a?(Hash)
+
+          packages.values.filter_map do |entry|
+            resolution = entry.is_a?(Array) ? entry[0] : nil
+            next unless resolution.is_a?(String) && resolution.start_with?("#{package_name}@")
+
+            resolution.delete_prefix("#{package_name}@")
+          end
+        end
+
         # One complete JSON string literal (escape-aware), a // line comment, a /* */ block
         # comment, and a trailing comma directly before } or ].
         STRING_LITERAL = /"(?:[^"\\]|\\.)*"/
@@ -157,14 +200,99 @@ module ReactOnRails
           # can merge several selectors into one key. Matching "#{name}@" cannot collide with
           # longer names ("react-on-rails-pro@..." does not start with "react-on-rails@").
           doc.each do |key, entry|
-            next if key == "__metadata"
-            next unless key.to_s.split(",").any? { |selector| selector.strip.start_with?("#{package_name}@") }
+            next unless entry_for?(key, package_name)
 
             return entry["version"]&.to_s if entry.is_a?(Hash)
           end
           nil
         end
+
+        def self.all_versions(content, package_name)
+          doc = YAML.safe_load(content, permitted_classes: [Date, Time])
+          return [] unless doc.is_a?(Hash)
+
+          # An alias ("flight@npm:react-server-dom-webpack@19.3.0") is keyed by the alias name, but
+          # its resolution still names the real package.
+          doc.filter_map do |key, entry|
+            next unless entry.is_a?(Hash)
+            next unless entry_for?(key, package_name) || entry["resolution"].to_s.start_with?("#{package_name}@")
+
+            entry["version"]&.to_s
+          end
+        end
+
+        def self.entry_for?(key, package_name)
+          return false if key == "__metadata"
+
+          key.to_s.split(",").any? { |selector| selector.strip.start_with?("#{package_name}@") }
+        end
       end
+
+      # Yarn classic yarn.lock: one block per resolved copy, keyed by its selectors
+      # ("name@^1.0.0", "name@~1.0.2":) with an indented version "1.0.3" line. An npm alias
+      # selector ("flight@npm:name@19.3.0") names the real package after "npm:".
+      module ClassicYarnLockfile
+        def self.all_versions(path, package_name)
+          content = File.read(path)
+          return BerryYarnLockfile.all_versions(content, package_name) if content[0, 1024].include?("__metadata:")
+
+          selector = /\A"?(?:[^\s"]+@npm:)?#{Regexp.escape(package_name)}@/
+          versions = []
+          in_block = false
+          content.each_line do |line|
+            if line.match?(/\A\S/)
+              in_block = line.match?(selector)
+            elsif in_block && (match = line.match(/\A\s+version\s+"?([^"\s]+)"?/))
+              versions << match[1]
+              in_block = false
+            end
+          end
+          versions
+        end
+      end
+
+      # package-lock.json v2/v3 keys every copy by install path ("node_modules/name",
+      # "node_modules/parent/node_modules/name"); an npm alias installs under the alias path and
+      # records the real package in "name". v1 nests copies under dependencies, and records an
+      # alias's real package in its version ("flight": { "version": "npm:name@1.2.3" }).
+      module NpmLockfile
+        def self.all_versions(path, package_name)
+          doc = JSON.parse(File.read(path))
+          return [] unless doc.is_a?(Hash)
+
+          install_path = %r{(?:\A|/)node_modules/#{Regexp.escape(package_name)}\z}
+          from_packages = (doc["packages"].is_a?(Hash) ? doc["packages"] : {}).filter_map do |key, entry|
+            next unless entry.is_a?(Hash)
+
+            entry["version"] if key.match?(install_path) || (key != "" && entry["name"] == package_name)
+          end
+          from_packages + v1_versions(doc["dependencies"], package_name)
+        end
+
+        def self.v1_versions(dependencies, package_name)
+          return [] unless dependencies.is_a?(Hash)
+
+          alias_prefix = "npm:#{package_name}@"
+          dependencies.flat_map do |name, entry|
+            next [] unless entry.is_a?(Hash)
+
+            version = entry["version"].to_s
+            own = if version.start_with?(alias_prefix) then [version.delete_prefix(alias_prefix)]
+                  elsif name == package_name && !version.empty? then [version]
+                  else
+                    []
+                  end
+            own + v1_versions(entry["dependencies"], package_name)
+          end
+        end
+      end
+
+      ALL_VERSION_READERS = {
+        "yarn.lock" => ClassicYarnLockfile.method(:all_versions),
+        "package-lock.json" => NpmLockfile.method(:all_versions),
+        "pnpm-lock.yaml" => PnpmLockfile.method(:all_versions),
+        "bun.lock" => BunLockfile.method(:all_versions)
+      }.freeze
     end
   end
 end

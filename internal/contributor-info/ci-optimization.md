@@ -249,9 +249,8 @@ dispatcher, and docs in sync:
    `ready-for-hosted-ci` as a request to bypass optimized selection.
 8. If `+ci-run-hosted` or `+ci-force-full` should dispatch the workflow for the
    exact current head SHA, add it to `.github/workflows/ci-commands.yml`.
-9. Update `.github/read-me.md`, `CONTRIBUTING.md`, `AGENTS.md`, and
-   `.agents/workflows/pr-processing.md` when the request or readiness process
-   changes.
+9. Update `.github/read-me.md`, `CONTRIBUTING.md`, and `AGENTS.md` when the
+   request or readiness process changes.
 
 ## Rollout For Existing Open PRs
 

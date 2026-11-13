@@ -50,7 +50,8 @@ module ReactOnRailsPro
     STATIC_SHELL_NOTIFICATION = "ppr.static_shell.react_on_rails_pro"
 
     # Cache-effectiveness instrumentation (issue #5102). Exactly ONE ppr.cache.lookup event
-    # fires per ppr_react_component invocation, at the validated read branch point, with
+    # fires per ppr_react_component invocation that reaches the validated read branch point
+    # (an invocation that raises earlier emits ppr.render.abort instead, never a lookup), with
     # outcome :hit (a validated cached envelope was found — the cached shell serves with no
     # prerender request) or outcome :miss (no usable entry — first visit, expired, evicted
     # invalid, or read error — so the full prerender runs). One event with the outcome in the

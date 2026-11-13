@@ -1,0 +1,509 @@
+{
+  "description": "Shared inline/fetched RSC redaction contract. Original diagnostics contain only the original hasErrors/renderingError keys; original metadata preserves every input field. Missing railsEnv fails closed.",
+  "baseMetadata": {
+    "consoleReplayScript": "console.error(\"synthetic-contract-replay\")",
+    "diagnosticContext": {
+      "sourcePath": "/synthetic/private/component.ts"
+    }
+  },
+  "environments": [
+    {
+      "name": "development",
+      "railsEnv": "development",
+      "outcome": "full"
+    },
+    {
+      "name": "test",
+      "railsEnv": "test",
+      "outcome": "full"
+    },
+    {
+      "name": "production",
+      "railsEnv": "production",
+      "outcome": "redacted"
+    },
+    {
+      "name": "staging",
+      "railsEnv": "staging",
+      "outcome": "redacted"
+    },
+    {
+      "name": "unknown",
+      "railsEnv": "qa-sandbox",
+      "outcome": "redacted"
+    },
+    {
+      "name": "absent",
+      "outcome": "redacted"
+    }
+  ],
+  "outcomes": {
+    "clean": {
+      "diagnostic": null,
+      "metadata": "original",
+      "consoleReplay": true
+    },
+    "suppressed": {
+      "diagnostic": null,
+      "metadata": {
+        "hasErrors": false
+      },
+      "consoleReplay": false
+    },
+    "full-error": {
+      "diagnostic": "original",
+      "metadata": "original",
+      "consoleReplay": true
+    },
+    "redacted-error": {
+      "diagnostic": {
+        "hasErrors": true
+      },
+      "metadata": {
+        "hasErrors": true
+      },
+      "consoleReplay": false
+    }
+  },
+  "cases": [
+    {
+      "name": "absent flags and error",
+      "metadata": {},
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "false flag without error",
+      "metadata": {
+        "hasErrors": false
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "true flag without error",
+      "metadata": {
+        "hasErrors": true
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "string flag without error",
+      "metadata": {
+        "hasErrors": "true"
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "numeric flag without error",
+      "metadata": {
+        "hasErrors": 1
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "null flag without error",
+      "metadata": {
+        "hasErrors": null
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "object flag without error",
+      "metadata": {
+        "hasErrors": {}
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "array flag without error",
+      "metadata": {
+        "hasErrors": []
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "clean"
+      }
+    },
+    {
+      "name": "null error with false flag",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": null
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "null error with true flag",
+      "metadata": {
+        "hasErrors": true,
+        "renderingError": null
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "null error without flag",
+      "metadata": {
+        "renderingError": null
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "null error with string flag",
+      "metadata": {
+        "hasErrors": "true",
+        "renderingError": null
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "numeric error",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": 42
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "string error",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": "synthetic error"
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "boolean error",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": false
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "array error",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": []
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "empty error",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {}
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "empty error with true flag",
+      "metadata": {
+        "hasErrors": true,
+        "renderingError": {}
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "blank message and stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": " \t\n",
+          "stack": ""
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "null message and stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": null,
+          "stack": null
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "numeric message",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": 42
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "boolean stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "stack": true
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "object message and array stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": {},
+          "stack": []
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "unknown error field",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "detail": "synthetic secret"
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "message without flag",
+      "metadata": {
+        "renderingError": {
+          "message": "synthetic error"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "stack with false flag",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "stack": "/synthetic/private/component.ts:1:1"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "valid message and stack",
+      "metadata": {
+        "hasErrors": true,
+        "renderingError": {
+          "message": "synthetic error",
+          "stack": "/synthetic/private/component.ts:1:1"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "message with nonboolean flag",
+      "metadata": {
+        "hasErrors": "false",
+        "renderingError": {
+          "message": "synthetic error"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "valid message and malformed stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": "synthetic error",
+          "stack": 42
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "malformed message and valid stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": false,
+          "stack": "/synthetic/private/component.ts:1:1"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "NUL-only message",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": "\u0000"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "NUL-only stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "stack": "\u0000"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "BOM-only message",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": "\ufeff"
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "BOM-only stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "stack": "\ufeff"
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    },
+    {
+      "name": "NEL-only message",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": "\u0085"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "NEL-only stack",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "stack": "\u0085"
+        }
+      },
+      "expected": {
+        "full": "full-error",
+        "redacted": "redacted-error"
+      }
+    },
+    {
+      "name": "ECMAScript trim whitespace only",
+      "metadata": {
+        "hasErrors": false,
+        "renderingError": {
+          "message": "\t\n\u000b\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+        }
+      },
+      "expected": {
+        "full": "clean",
+        "redacted": "suppressed"
+      }
+    }
+  ]
+}

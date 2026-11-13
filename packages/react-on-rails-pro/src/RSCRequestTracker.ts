@@ -20,7 +20,7 @@ import {
   RailsContextWithServerComponentMetadata,
   GenerateRSCPayloadFunction,
 } from 'react-on-rails/types';
-import { extractErrorMessage } from './utils.ts';
+import { extractErrorMessage, createEmbeddedPayloadKey } from './utils.ts';
 
 const expectedRSCStreamCleanup = Symbol('expectedRSCStreamCleanup');
 const rscStreamTruncationWarningState = Symbol('rscStreamTruncationWarningState');
@@ -188,7 +188,7 @@ class RSCRequestTracker {
    * diagnostics, and does NOT prevent future `getRSCPayloadStream` calls. It only stops the
    * upstream work and ends the tee output for the subset of streams still in-flight.
    */
-  cancelInFlightStreams(): void {
+  cancelInFlightStreams(committedKeys?: Set<string>): void {
     // Mark the tracker as settled so that any generateRSCPayload promise that resolves
     // AFTER this point (slow Rails endpoint whose HTTP response hasn't arrived yet) does
     // not wire up a new stream or fire onRSCPayloadGenerated callbacks. Without this flag,
@@ -202,16 +202,50 @@ class RSCRequestTracker {
 
     this.sourceStreams.forEach((source, index) => {
       try {
-        if (!source.destroyed && !source.readableEnded) {
-          markExpectedRSCStreamCleanup(source);
-          source.destroy();
+        // Determine whether this stream's content was committed to the prelude (shell).
+        //
+        // When committedKeys is provided (from scanning PPR prelude for data-rsc-committed
+        // markers), a stream is committed only if its embedded payload key (componentName +
+        // props hash) appears in the set. This correctly handles both:
+        //   - The edge case where an RSC stream completes (readableEnded=true) but the
+        //     owning Suspense boundary was postponed for another reason (e.g., a sibling
+        //     lazy import) — the marker is absent from the prelude.
+        //   - Two RSCRoute instances with the same componentName but different props — only
+        //     the instance whose marker is in the committed set is kept (#5019-A).
+        //
+        // When committedKeys is not provided, fall back to the readableEnded heuristic
+        // for backward compatibility.
+        const streamInfo = this.streams[index];
+        const isCommittedToShell = committedKeys
+          ? committedKeys.has(createEmbeddedPayloadKey(streamInfo?.componentName ?? '', streamInfo?.props))
+          : source.readableEnded;
 
+        if (!isCommittedToShell) {
+          // Destroy the source if it hasn't been already. Node's Readable has
+          // autoDestroy: true by default, so a source that completed naturally
+          // (readableEnded → 'end' → internal destroy()) already has source.destroyed
+          // set. We still need to drain and end its tee below — the auto-destroy path
+          // does NOT drain the tee's buffered chunks (#5019-A).
+          if (!source.destroyed) {
+            markExpectedRSCStreamCleanup(source);
+            source.destroy();
+          }
+
+          // Drain and end the tee output regardless of source.destroyed state.
+          // When the source auto-destroyed after natural EOF, its tee may still hold
+          // buffered Flight payload chunks that must not leak into the cached shell.
+          // Two cases:
+          //   - Tee still open (!writableEnded): drain buffered chunks and end gracefully.
+          //   - Tee already ended by the source's 'close' handler after auto-destroy:
+          //     drain the readable buffer to discard data before any consumer reads it.
           const teeStream = this.streams[index]?.stream as PassThrough | undefined;
-          if (teeStream && !teeStream.writableEnded && !teeStream.destroyed) {
+          if (teeStream && !teeStream.destroyed) {
             markExpectedRSCStreamCleanup(teeStream);
-            // Drain buffered chunks so end() doesn't flush them into the shell (#5019-A).
+            // Drain buffered chunks so they don't leak into the shell (#5019-A).
             while (teeStream.read() !== null) {} // eslint-disable-line no-empty
-            teeStream.end();
+            if (!teeStream.writableEnded) {
+              teeStream.end();
+            }
           }
         }
       } catch (error) {

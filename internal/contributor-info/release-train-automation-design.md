@@ -166,7 +166,7 @@ rc stabilization, a fix's changelog entry must land on `release/X.Y.Z`, not `mai
 - `main` (default, today's behavior) — entries to `[Unreleased]`, branch off
   `main`, PR targets `main`.
 - `release` — resolve the active `release/X.Y.Z` (explicit arg, or detect the lone
-  `release/*` / the `agent-coord` phase), branch off it, PR targets it, entries go
+  `release/*`), branch off it, PR targets it, entries go
   under the in-progress rc section (the rc stamping moves `[Unreleased]` entries
   under the new header).
 

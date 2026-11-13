@@ -18,6 +18,23 @@ import CallbackRegistry from './CallbackRegistry.ts';
 
 const storeGeneratorRegistry = new CallbackRegistry<StoreGenerator>('store generator');
 const hydratedStoreRegistry = new CallbackRegistry<Store>('hydrated store');
+const scopeKey = {};
+
+function currentHydratedStoreRegistry(): CallbackRegistry<Store> {
+  const scopeStorage = (
+    globalThis as typeof globalThis & {
+      reactOnRailsHydratedStoreScope?: { getStore: () => Map<object, unknown> | undefined };
+    }
+  ).reactOnRailsHydratedStoreScope;
+  const scope = scopeStorage?.getStore();
+  if (!scope) return hydratedStoreRegistry;
+  let registry = scope.get(scopeKey) as CallbackRegistry<Store> | undefined;
+  if (!registry) {
+    registry = new CallbackRegistry<Store>('hydrated store', false);
+    scope.set(scopeKey, registry);
+  }
+  return registry;
+}
 
 /**
  * Register a store generator, a function that takes props and returns a store.
@@ -57,14 +74,15 @@ export function register(storeGenerators: Record<string, StoreGenerator>): void 
  * @public
  */
 export function getStore(name: string, throwIfMissing = true): Store | undefined {
+  const registry = currentHydratedStoreRegistry();
   try {
-    return hydratedStoreRegistry.get(name);
+    return registry.get(name);
   } catch (error) {
     if (!throwIfMissing) {
       return undefined;
     }
 
-    if (hydratedStoreRegistry.getAll().size === 0) {
+    if (registry.getAll().size === 0) {
       const msg = `There are no stores hydrated and you are requesting the store ${name}.
 This can happen if you are server rendering and either:
 1. You do not call redux_store near the top of your controller action's view (not the layout)
@@ -91,7 +109,7 @@ export const getStoreGenerator = (name: string): StoreGenerator => storeGenerato
  * @param store (not the storeGenerator, but the hydrated store)
  */
 export function setStore(name: string, store: Store): void {
-  hydratedStoreRegistry.set(name, store);
+  currentHydratedStoreRegistry().set(name, store);
 }
 
 /**
@@ -99,7 +117,7 @@ export function setStore(name: string, store: Store): void {
  * @public
  */
 export function clearHydratedStores(): void {
-  hydratedStoreRegistry.clearWithReject(
+  currentHydratedStoreRegistry().clearWithReject(
     new Error('Cleared hydrated store registry before pending waiters resolved.'),
   );
 }
@@ -121,7 +139,7 @@ export function clearHydratedStores(): void {
  * navigations.
  */
 export function clearHydratedStoresKeepingWaiters(): void {
-  hydratedStoreRegistry.clear();
+  currentHydratedStoreRegistry().clear();
 }
 
 /**
@@ -146,7 +164,7 @@ export const storeGenerators = (): Map<string, StoreGenerator> => storeGenerator
  * @returns Map where key is the component name and values are the hydrated stores.
  * @public
  */
-export const stores = (): Map<string, Store> => hydratedStoreRegistry.getAll();
+export const stores = (): Map<string, Store> => currentHydratedStoreRegistry().getAll();
 
 /**
  * Used by components to get the hydrated store, waiting for it to be hydrated if necessary.
@@ -154,7 +172,7 @@ export const stores = (): Map<string, Store> => hydratedStoreRegistry.getAll();
  * @returns Promise that resolves with the Store once hydrated
  */
 export const getOrWaitForStore = (name: string): Promise<Store> =>
-  hydratedStoreRegistry.getOrWaitForItem(name);
+  currentHydratedStoreRegistry().getOrWaitForItem(name);
 
 /**
  * Used by components to get the store generator, waiting for it to be registered if necessary.

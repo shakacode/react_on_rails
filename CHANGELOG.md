@@ -24,6 +24,64 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Improved
+
+- **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
+  request digest over `js_code` and its serialized props only when prerender caching needs it as a
+  cache key. Uncached renders send the Node Renderer a cheap `Component-pid-counter` id in the same
+  URL segment, which the renderer does not use. The route shape is unchanged.
+  `NodeRenderingPool.prepare_render_path` and `.prepare_incremental_render_path` now take only
+  `render_options`; drop the `js_code` argument if you call or override them.
+  [PR 5223](https://github.com/shakacode/react_on_rails/pull/5223) by
+  [justin808](https://github.com/justin808). Fixes
+  [Issue 4880](https://github.com/shakacode/react_on_rails/issues/4880).
+
+- **[Pro]** **Tag-based invalidation groundwork for the RSC cache**: `unstable_cache` accepts a
+  `tags` option (a static array, or a function of the call's arguments), the `CacheHandler` interface
+  gains an optional `revalidateTag(tag, invalidatedAt?)` method, the in-memory handler implements it
+  with mark-stale semantics, and `unstable_revalidateTag` is exported from `react-on-rails-pro/cache`.
+  Invalidation is per-process at this stage; the Node Renderer endpoint and Rails bridge land
+  separately. Part of [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **Redis and tiered tag invalidation for the RSC cache**: `RedisCacheHandler` implements
+  `revalidateTag` with monotonic per-tag stamps (written atomically via Lua), persists entry tags in a
+  versioned binary format, and refuses and cleans up invalidated entries on read — one
+  `unstable_revalidateTag` call is now visible to every worker and machine sharing the Redis.
+  `TieredCacheHandler` forwards `revalidateTag` to both layers (tagged entries are not promoted from
+  L2 into L1; see the docs). Entries written by pre-tags package versions live under a different key
+  namespace and are never read after the upgrade; they expire via their own TTLs.
+  **Action required for upgraders:** on a shared Redis, (1) set a `volatile-*` eviction policy —
+  under `allkeys-*`, eviction can drop invalidation stamps while cached entries survive,
+  resurrecting stale data (the handler warns on connect when it detects one); (2) if you used
+  `revalidate: 0` with tags' predecessor entries, delete the orphaned old-namespace blobs manually —
+  see the migration note in the
+  [unstable_cache docs](https://reactonrails.com/docs/pro/react-server-components/unstable-cache). Part of
+  [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+- **[Pro]** **`ReactOnRailsPro.revalidate_tag` now invalidates the RSC `unstable_cache` too**: with
+  `config.server_renderer = "NodeRenderer"`, every `revalidate_tag`/`revalidate_tags` call — including
+  the `Cache::Revalidates` `after_commit` concern, with zero app changes — fans out to the Node
+  Renderer's `/revalidate-tags` endpoint after clearing the Rails fragment-cache entries, so one
+  committed write busts both caches under the same normalized tag vocabulary (a model becomes its
+  version-less `cache_key`, e.g. `posts/42`). The fanout is best-effort and time-bounded: a single
+  attempt on a dedicated connection with a 1-second connect/read timeout, no transport retries, never raising
+  into the write path, and it runs even when the Rails cache store itself raised during revalidation
+  (the two backends are independent); failures are logged and covered entries fall back to their
+  `revalidate` TTL. Tag lengths are measured in UTF-16 code units to match the renderer's cap, so one
+  astral-plane tag can never 400 a whole batch. Closes the read-your-writes gap of
+  [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+- **[Pro]** **Node Renderer `POST /revalidate-tags` endpoint with cluster-wide fanout**: one
+  authenticated POST invalidates `unstable_cache` tags in **every** renderer worker — the receiving
+  worker stamps the invalidation at arrival, the master rebroadcasts it over IPC, and each worker
+  applies it inside every loaded bundle sandbox (all generations, so rolling-deploy bundles are
+  covered; pre-tags bundles are skipped with a one-time warning). In-memory caches gain their first
+  cross-worker invalidation path; standalone (`workersCount: 0`) renderers apply locally. Delivery is
+  best-effort with the entry TTL as the correctness floor. Caps: 64 distinct tags per request, 256
+  chars per tag. Part of
+  [Issue 5077](https://github.com/shakacode/react_on_rails/issues/5077).
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Added
 
 - **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
@@ -60,7 +118,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   pre-flush stays a hit, identified by pairing with `ppr.resume.degraded_pre_flush`; invalid
   entries and cache read errors count as misses alongside their diagnostic events.
   `ppr.static_shell` no longer carries `cache_hit:` — the cache axis lives exclusively in the
-  lookup event. A `ppr_react_component` invocation that raises past the helper now emits
+  lookup event — and the private helper `ReactOnRailsProHelper#ppr_serve_shell` loses its
+  required `cache_hit:` keyword, so an application override that prepends or redefines that
+  method must drop the keyword or it will raise `ArgumentError`. A `ppr_react_component` invocation that raises past the helper now emits
   `ppr.render.abort.react_on_rails_pro` (redacted error class name, error re-raised unchanged),
   so an app-level `rescue_from` can no longer make a failed PPR page look like an all-hits or
   no-PPR page; and a persisted write whose cache-tag registration fails reports
@@ -85,6 +145,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   warmed / already-warm / no-ppr / failed summary. Resolves
   [Issue 4965](https://github.com/shakacode/react_on_rails/issues/4965).
   [PR 4967](https://github.com/shakacode/react_on_rails/pull/4967) by
+
+#### Changed
+
+- **[Pro]** **`RSCRoute` takes `ref` as a regular prop instead of `forwardRef`**: The public
+  `<RSCRoute ref={…}>` handle API and `onRefetchError` behavior are unchanged, and no minimum React
+  version changes — the core package still supports React >= 16, and the RSC client path keeps its
+  existing React 19 floor (now enforced: rendering `<RSCRoute>` on older React fails fast with a
+  branded error naming the React >= 19 requirement and the version it found, instead of a cryptic
+  `use is not a function`, and CI re-runs the RSC client suite against real pinned React installs —
+  18.3.1 below the floor plus 19.0.x/19.1.x/19.2.x — with no mocks). `useEffectEvent` was deliberately not adopted to keep that floor. Calling
+  `useEffectEvent`, `useFormStatus`, or `useFormState` in a server component without `'use client'`
+  now gets the branded missing-directive diagnostic. Implements
+  [Issue 5030](https://github.com/shakacode/react_on_rails/issues/5030).
+  [PR 5031](https://github.com/shakacode/react_on_rails/pull/5031) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **PPR CSS/asset coordination between cached shell and resume stream**: The PPR resume
@@ -99,19 +173,175 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4907](https://github.com/shakacode/react_on_rails/pull/4907) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **[Pro]** **TanStack Router SSR HTTP status propagation**: `redirect()`, `notFound()`, and loader errors
+  now produce real HTTP status codes and `Location` headers instead of always returning 200.
+  New `ReactOnRails::SsrStatusHandler` controller concern reads `httpResponse` metadata from the
+  render result and sets `response.status` and `response.headers["Location"]` in an `after_action`.
+  The prerender cache preserves status metadata via a cache envelope and skips writes for 5xx
+  responses so the next request retries. The `globalNotFound` state is preserved during hydration
+  so not-found pages hydrate without errors. Validated header values reject control characters and
+  literal backslashes. Both the legacy `router.state.statusCode` API (<=1.170.18) and
+  the newer `router._serverResult` API (>=1.170.19) are supported.
+  Fixes [#5125](https://github.com/shakacode/react_on_rails/issues/5125).
+  [PR 5224](https://github.com/shakacode/react_on_rails/pull/5224).
+
+- **[Pro]** **RSC cache entries are now timestamped at render start** (was: at store time), so a tag
+  invalidation during an in-flight render correctly refuses the entry that render stores. For handlers
+  that enforce expiry from the entry timestamp (the in-memory handler), effective TTL shrinks by the
+  render duration; `RedisCacheHandler`'s Redis-side `EX` TTL is unchanged.
+  [PR 5122](https://github.com/shakacode/react_on_rails/pull/5122) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Fixed
 
+- **Components inside a Turbo Frame now mount after a frame navigation**: With `turbo: true`, the `react-on-rails`
+  package now handles `turbo:frame-render`. It unmounts the components the frame render removed and mounts the ones
+  in the new frame content. Components outside the frame stay mounted.
+  Previously the open-source package never mounted frame content loaded by navigation and leaked the
+  replaced frame's React roots. Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
+  [PR 5220](https://github.com/shakacode/react_on_rails/pull/5220) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **Turbo Frame navigation releases the replaced frame's React roots**: With `turbo: true`, the
+  `react-on-rails-pro` package now handles `turbo:frame-render` and unmounts the components the frame render removed.
+  Components outside the frame stay mounted, and the new frame content still mounts through each component's inline
+  script. Previously the replaced roots stayed mounted until the next full Turbo page visit.
+  Fixes [Issue 5128](https://github.com/shakacode/react_on_rails/issues/5128).
+  [PR 5227](https://github.com/shakacode/react_on_rails/pull/5227) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **Concurrent SSR keeps hydrated Redux stores separate**: Async rendering, streaming,
+  and RSC Client Component providers now read only their request's stores in a shared Node Renderer
+  worker. **Action required for upgraders:** Upgrade the Node Renderer and React on Rails JavaScript packages together. Move module-scope `setStore` calls into per-render hydration. Browser store
+  APIs and page lifecycle behavior are unchanged. Set `isolateHydratedStores: false` or
+  `RENDERER_ISOLATE_HYDRATED_STORES=false` to restore the shared registry temporarily. Fixes [Issue 5124](https://github.com/shakacode/react_on_rails/issues/5124).
+  [PR 5133](https://github.com/shakacode/react_on_rails/pull/5133) by [justin808](https://github.com/justin808).
+
+- **A failed load of `react-dom/client` is reported instead of swallowed**: With React 18 or later, when
+  `react-dom/client` exists but one of its own dependencies fails to load, React on Rails now rethrows that
+  error when the bundle loads. Previously it was discarded and surfaced later as
+  `reactDomClient.hydrateRoot is not a function`, or not at all in a server bundle. React 16 and 17 apps are
+  unaffected: a missing `react-dom/client` still falls back to `react-dom`. The optional-module behavior
+  is preserved with webpack and Rspack.
+  RSC bundles avoid the client-only import. **Action required for upgraders:** if a server bundle now
+  fails to load, restore or bundle the missing dependency named in the original error.
+  Fixes [Issue 5180](https://github.com/shakacode/react_on_rails/issues/5180).
+  [PR 5181](https://github.com/shakacode/react_on_rails/pull/5181) by [justin808](https://github.com/justin808).
+
+- **Rspack server bundles no longer write a stray `ssr-generated/manifest.json`**: The generated
+  `serverWebpackConfig.js` removed client-only plugins by webpack class names only, so Rspack apps kept
+  `rspack-manifest-plugin` and `CssExtractRspackPlugin` in the server compilation and in the RSC compilations
+  derived from it. Each of those builds wrote its own `ssr-generated/manifest.json`, which ended up listing only
+  the bundle that finished last. The generated config now removes both Rspack plugins. Existing Rspack apps can
+  apply the same change to the plugin filter in `config/rspack/serverWebpackConfig.js`. Fixes
+  [Issue 5184](https://github.com/shakacode/react_on_rails/issues/5184).
+  [PR 5185](https://github.com/shakacode/react_on_rails/pull/5185) by [justin808](https://github.com/justin808).
+
+- **[Pro]** Inline RSC payloads now suppress console replay outside development and test whenever
+  `renderingError` is present, including null, empty, and malformed values. This matches fetched RSC payloads
+  and prevents console replay from exposing server diagnostics that error metadata omits. Ruby diagnostics now use JavaScript trim whitespace rules:
+  NUL/NEL-only errors count as nonblank, while BOM-only errors do not. Clean-chunk replay is unchanged. See [Issue 4991](https://github.com/shakacode/react_on_rails/issues/4991).
+
+- **[Pro]** **Fix CSP nonce handling in fragment-cached components**: The `cached_*` helpers now refresh executable inline script nonces on cache hits, preventing CSP from blocking hydration, console replay, and streaming scripts.
+  Only nonces the framework emitted are refreshed. A cached render gives framework scripts a random placeholder nonce, and every response swaps it for its own nonce. App markup that carries the request's nonce, such as stored HTML injected while the nonce generator is session-derived, keeps its stale nonce for CSP to block on cache hits.
+  **Upgrade notes:** App code that needs a nonce inside a cached component should read `railsContext.cspNonce`; a nonce passed in through props or Rails helpers is not refreshed. Overrides of these private Pro helpers must accept and forward their new parameters: `normalize_cached_pro_attribution` and `normalize_cached_pro_attribution_html` (`cached_csp_nonce`), `append_cached_csp_nonce_marker` (`placeholder`), `consumer_stream_async` (`live_chunk_rewriter:` keyword), and `process_stream_chunks` (`live_chunk_rewriter`); `fetch_cache_entry` now returns a fourth value. Framework emitters read the nonce through `ReactOnRails::Helper#csp_nonce`, which returns the placeholder during cached renders; code that overrides or stubs it should use the new `request_csp_nonce` for the request's own nonce. Component cache keys use a new `csp-nonce-placeholder` partition segment, so nonce-rendered entries written before upgrading are not reused. See [CSP caching caveats](docs/pro/strict-csp.md#caching-caveats) for details.
+  Fixes [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021) and [Issue 5267](https://github.com/shakacode/react_on_rails/issues/5267). [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by [AbanoubGhadban](https://github.com/AbanoubGhadban) and [PR 5270](https://github.com/shakacode/react_on_rails/pull/5270) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **`unstable_cache` no longer crashes on RSC payload-endpoint requests**: `BUILD_ID` was initialized only
+  on page-render requests, so any `/rsc_payload/*` request (e.g. `RSCRoute.refetch()`) that landed on a renderer
+  worker which had not yet served a full page render threw `BUILD_ID not set`. The RSC bundle hash is now published
+  on both paths, and the renderer VM context carries the bundle identity as a structural fallback so future RSC
+  entrypoints are safe by default. Fixes [Issue 5076](https://github.com/shakacode/react_on_rails/issues/5076).
+  [PR 5141](https://github.com/shakacode/react_on_rails/pull/5141),
+  [PR 5142](https://github.com/shakacode/react_on_rails/pull/5142) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Security
+
+- **[Pro]** **Doctor warns when the lockfile resolves a vulnerable `react-server-dom-webpack`**: With RSC enabled,
+  `rake react_on_rails:doctor` now reads every `react-server-dom-webpack` copy in `yarn.lock`, `package-lock.json`,
+  `pnpm-lock.yaml`, or `bun.lock`, including copies installed through `react-on-rails-rsc` and npm aliases. It warns
+  when a copy is affected by React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)): any 19.0 through 19.3
+  version below its line's patched release (19.0.9, 19.1.10, 19.2.9, 19.3.1), prereleases included. The fix updates
+  `react`, `react-dom`, and `react-server-dom-webpack` together to 19.3.1 (19.2.9 on the 19.2 line) and commits the
+  refreshed lockfile. Doctor also warns when no lockfile in the package root lists the package, or when a copy, such
+  as an experimental build, falls outside the advisories' version rules.
+  [PR 5247](https://github.com/shakacode/react_on_rails/pull/5247) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **The RSC generator declares React 19.3.1 as the floor**: New RSC apps now install `react` and `react-dom`
+  from `~19.3.1` instead of `~19.3.0`, so they cannot resolve React 19.3.0. React's 2026-10-14 advisories (critical RCE
+  [GHSA-xqc2-xf4c-x3h3](https://github.com/react/react/security/advisories/GHSA-xqc2-xf4c-x3h3) and DoS
+  [GHSA-h3gv-c5rc-p453](https://github.com/react/react/security/advisories/GHSA-h3gv-c5rc-p453)) affect
+  `react-server-dom-webpack` 19.3.0, and the patched `react-server-dom-webpack` 19.3.1 peers on React 19.3.1.
+  `react-on-rails-rsc` 19.3.1 still accepts React 19.3.0, so this floor is stricter than the package requires. When an
+  existing app has React 19.3.0, the generator now warns and gives one command that upgrades `react`, `react-dom`, and
+  `react-server-dom-webpack` together, so a retained lockfile cannot keep the vulnerable copy.
+  [PR 5252](https://github.com/shakacode/react_on_rails/pull/5252) by [justin808](https://github.com/justin808).
+
+### [17.2.0] - 2026-10-13
+
+#### Changed
+
+- **[Pro]** **React 19.3 support now requires stable `react-on-rails-rsc` 19.3.1**: The Pro packages build and
+  test against stable `react-on-rails-rsc` 19.3.1 (npm `latest`) with React/React DOM 19.3.0, replacing the
+  19.3.1-rc.0 release candidate that 17.2.0.rc.0 and 17.2.0.rc.1 used. The `react-on-rails-pro` optional peer
+  range is `>=19.2.1 <20.0.0` again; the temporary `~19.3.1-rc.0` alternative is removed. The node renderer
+  startup check and `react_on_rails:doctor` accept only stable `react-on-rails-rsc` releases: 19.2.x with
+  React 19.2.7+, 19.3.0 with React 19.2.8+, and 19.3.x from 19.3.1 with React 19.3.x. **Action required for upgraders:**
+  apps that installed `react-on-rails-rsc` 19.3.1-rc.0 or 19.3.1-rc.1 while testing a 17.2.0 release candidate
+  must install stable 19.3.1 (React/React DOM stay on 19.3.0). The node renderer refuses those prereleases at
+  startup, and both its error and Doctor's Fix name 19.3.1. Apps on stable 19.2.x or 19.3.0 need no change.
+  [PR 5162](https://github.com/shakacode/react_on_rails/pull/5162) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **New RSC apps install the React 19.3 line**: `rails g react_on_rails:install --rsc`,
+  `rails g react_on_rails:rsc`, and `create-react-on-rails-app --rsc` now install `react-on-rails-rsc` 19.3.1 with
+  `react@~19.3.0` and `react-dom@~19.3.0`. The 17.0 generator installed `react-on-rails-rsc` 19.2.1 with
+  React 19.2.7, and apps on that set keep working unchanged. Apps generated by 17.1.0 pin the superseded
+  19.3.0-rc.4, which the node renderer refuses at startup: install `react-on-rails-rsc` 19.3.0 with React/React DOM
+  19.2.8+, or 19.3.1 with React/React DOM 19.3.0. Running
+  `rails g react_on_rails:rsc` on an existing Pro app that is still on React 19.2.x now warns that the installed
+  `react-on-rails-rsc` 19.3.1 needs React 19.3.x; upgrade React and React DOM to `~19.3.0`, or keep React 19.2.x
+  and pin `react-on-rails-rsc@19.2.1` yourself. When Doctor has no closer match, its Fix now recommends the same
+  19.3.1 / React 19.3.0 set the generator installs.
+  [PR 5164](https://github.com/shakacode/react_on_rails/pull/5164) by
+  [justin808](https://github.com/justin808).
+- **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
+  Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
+  educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
+  the license key stays optional and only sets the attribution status.
+  Published gem metadata now uses `LicenseRef-ReactOnRailsPro`, and generator messages reflect these terms.
+  [PR 5104](https://github.com/shakacode/react_on_rails/pull/5104) by
+  [sashakhar1](https://github.com/sashakhar1).
+
+#### Fixed
+
+- **[Pro]** **Doctor no longer reports a superseded prerelease as newer**: `react_on_rails:doctor` warned that
+  an installed stable `react-on-rails-rsc` was behind the npm `next` dist-tag even when `next` pointed at a
+  release candidate that stable `latest` had already replaced (for example `next` 19.3.1-rc.1 with `latest`
+  19.3.1), a prerelease this version rejects. Doctor now skips a `next` or `rc` tag that is not newer than
+  `latest`.
+  [PR 5164](https://github.com/shakacode/react_on_rails/pull/5164) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Rejected `react-on-rails-rsc` prereleases now say why**: When the node renderer startup check or
+  `react_on_rails:doctor` rejects a prerelease such as 19.3.2-rc.0, the message now reads
+  `>= 19.2.1 (stable releases only)`. The previous `>= 19.2.1` label was satisfied by the prerelease it rejected.
+  [PR 5168](https://github.com/shakacode/react_on_rails/pull/5168) by
+  [justin808](https://github.com/justin808).
 - **[Pro]** **Streamed `useId` hydration**: Client components now hydrate with the server's `useId` prefix even when
   they are not wrapped by the default RSC provider. This prevents hydration mismatches and keeps
   generated IDs consistent with accessible references. Fixes [Issue 5146](https://github.com/shakacode/react_on_rails/issues/5146).
   [PR 5148](https://github.com/shakacode/react_on_rails/pull/5148) by [justin808](https://github.com/justin808).
 
-- **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
-  Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
-  Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use
-  Node's native console while chunks reach the consumer. Production builds and HTML streams keep the
-  caller's console unchanged. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
-  [justin808](https://github.com/justin808).
+- **[Pro]** **Node Renderer no longer drops multipart files that follow a large file over HTTP/1.1**: With
+  `fastifyServerOptions: { http2: false }`, file parts uploaded after a large file part were silently discarded
+  while the request still returned `200`. With RSC enabled, a large `assets_to_copy` file such as
+  `loadable-stats.json` caused the RSC manifests behind it to go missing, so the first RSC render failed with
+  `ENOENT ... react-client-manifest.json`. The renderer now keeps every file part, and requests over the
+  aggregate upload limit still return `413`. HTTP/2 (the default transport) was not affected. Fixes
+  [Issue 5144](https://github.com/shakacode/react_on_rails/issues/5144).
+  [PR 5147](https://github.com/shakacode/react_on_rails/pull/5147) by [justin808](https://github.com/justin808).
 
 - **Published JavaScript no longer ships dangling `sourceMappingURL` pointers**: Every published `lib/**/*.js` file
   in `react-on-rails` and `react-on-rails-pro` ended with a `//# sourceMappingURL=<name>.js.map` comment, but the
@@ -141,6 +371,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 5079](https://github.com/shakacode/react_on_rails/issues/5079).
   [PR 5100](https://github.com/shakacode/react_on_rails/pull/5100) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **RSC streams no longer encode consumer logs into the Flight payload**: React 19.3 development
+  Flight keeps a console hook active while it flushes chunks, so logs from code consuming the returned RSC
+  Readable were serialized as `:W["log"...]` rows. In non-production builds, RSC payload streams now use
+  Node's native console while chunks reach the consumer. Production builds and HTML streams keep the
+  caller's console unchanged. [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
+  [justin808](https://github.com/justin808).
 
 - **`authenticityHeaders()` no longer mutates its input object**: The helper now returns a new merged object instead of writing CSRF headers into the caller's `otherHeaders` argument. Previously, passing a shared or module-level headers object would bake a stale CSRF token into it, causing intermittent `422 InvalidAuthenticityToken` errors after Turbo navigations. Fixes [Issue 5028](https://github.com/shakacode/react_on_rails/issues/5028).
 
@@ -191,40 +427,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   promoted entries now always encode exactly the remaining lifetime. Fixes
   [Issue 5027](https://github.com/shakacode/react_on_rails/issues/5027).
   [PR 5029](https://github.com/shakacode/react_on_rails/pull/5029) by
-  [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **[Pro]** **Fragment-cached components no longer serve stale CSP nonces**: The `cached_*` helpers
-  (`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`,
-  `cached_buffered_stream_react_component`, `cached_static_rsc_component`, `cached_async_react_component`) cached
-  the rendered HTML with the originating request's CSP nonce baked into every executable inline script — immediate
-  hydration, console replay, and React's streaming runtime scripts — so under a nonce-enforcing `script-src` every
-  cache hit served scripts the browser refused to run. The cache write now records the originating request's nonce
-  in a trailing framework marker, and cache hits re-stamp exactly the attributes carrying that originating value
-  with the serving request's nonce (streamed replays are rewritten across chunk boundaries, so an attribute that
-  straddles two cached chunks is still re-stamped) — matching the exact per-request secret means
-  markup that arrived with any other nonce value is never promoted to the live nonce. Every component cache key also
-  gains a CSP-nonce partition segment (`csp-nonce` or `csp-nonce-free`), placed at a fixed position preceded only
-  by framework-controlled segments — before the caller's component name and `cache_key` value — so neither can
-  spell one partition into the other; entries rendered with a nonce are never
-  shared with nonce-free requests (and vice versa) when an app toggles its nonce generator. (Component cache keys
-  already embed the gem version, so the new segment costs no extra cache fault beyond the upgrade's own.) For the executable double-quoted
-  `nonce="…"` attributes it covers, the re-stamp also stops serving one request's nonce value to other users from
-  shared cache entries, which mattered for session-derived nonce generators — but only there: a nonce rendered into
-  visible text, a data attribute, differently-quoted app markup, or JSON props inside a cached fragment still replays
-  verbatim, so apps must not render the nonce (e.g. `railsContext.cspNonce`) into cached content outside those
-  attributes. Requests whose nonce is present but falls outside
-  the base64/base64url shape bypass the component cache entirely (they render fresh), so a malformed nonce can
-  neither create entries that no later request could re-stamp nor leak a sanitized derivative of its value into entries
-  served to nonce-free requests. The whole mechanism fails open: an error inside nonce detection or validation (e.g. a
-  raising custom `content_security_policy_nonce_generator` consulted on a cache hit, or one returning a value whose
-  encoding makes the presence/shape checks raise), the write-time marker, hit-time marker extraction, or the re-stamp
-  itself never fails the request — the step is skipped with one warning per failed step per request (error class only,
-  never nonce values), and the affected cached markup is served as-is, at worst with its stale originating nonce for
-  CSP to block. Note for apps overriding private normalization hooks: `normalize_cached_pro_attribution`
-  and `normalize_cached_pro_attribution_html` now take a `cached_csp_nonce` parameter and are invoked with it on cache
-  hits, so an override or prepended module written for the old one-argument form raises ArgumentError after upgrading —
-  accept (and forward) the new parameter. Fixes
-  [Issue 5021](https://github.com/shakacode/react_on_rails/issues/5021).
-  [PR 5025](https://github.com/shakacode/react_on_rails/pull/5025) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Console replay can no longer swallow the rest of the page, and replayed messages are no longer altered**:
@@ -319,15 +521,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4864](https://github.com/shakacode/react_on_rails/pull/4864) by
   [justin808](https://github.com/justin808).
 
-#### Changed
+#### Added
 
-- **[Pro]** **License**: React on Rails Pro moves to The React on Rails Pro License 3.0, an application of ShakaCode
-  Trust-Based Commercial Licensing that matches ShakaPerf: free in production for small organizations, charities,
-  educational institutions, and hospitals; 45-day production evaluation; 30-day grace after a subscription lapses;
-  the license key stays optional and only sets the attribution status.
-  Published gem metadata now uses `LicenseRef-ReactOnRailsPro`, and generator messages reflect these terms.
-  [PR 5104](https://github.com/shakacode/react_on_rails/pull/5104) by
-  [sashakhar1](https://github.com/sashakhar1).
+- **[Pro]** **React 19.3 support with `react-on-rails-rsc@19.3.1-rc.0`**: The node renderer startup
+  check and `react_on_rails:doctor` now accept `react-on-rails-rsc` 19.3.1-rc.0 (npm `next`) and later
+  19.3.1+ releases with React/React DOM 19.3.x. The `react-on-rails-pro` optional peer range admits
+  `~19.3.1-rc.0`. Published `react-on-rails-rsc` 19.3.0 (npm `latest`, which bundles React 19.2.8 Flight)
+  stays supported with React 19.2.8+ only, and 19.2.x stays on React 19.2.7+. Each check rejects mixed pairs
+  such as 19.3.0 with React 19.3 or 19.2.x with React 19.3, and it rejects prerelease React builds. Doctor's
+  Fix command names the React version that matches the installed RSC package. The generator still installs
+  stable `react-on-rails-rsc` 19.2.1. **Action required for upgraders:** apps generated by 17.1.0 pin the
+  superseded `react-on-rails-rsc` 19.3.0-rc.4, which the node renderer now refuses at startup. Install 19.3.0
+  with React/React DOM 19.2.8+, or 19.3.1-rc.0 with React/React DOM 19.3.0. The node renderer error and Doctor's Fix name the stable
+  release to install for the known 19.3.0 transition; other rejected prereleases no longer imply that
+  a compatible stable version is published. Doctor falls back to the published generator pin for those versions.
+  [PR 5094](https://github.com/shakacode/react_on_rails/pull/5094) by
+  [justin808](https://github.com/justin808).
 
 ### [17.1.0] - 2026-09-16
 
@@ -3535,7 +3744,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.2.0...main
+[17.2.0]: https://github.com/shakacode/react_on_rails/compare/v17.1.0...v17.2.0
 [17.1.0]: https://github.com/shakacode/react_on_rails/compare/v17.0.1...v17.1.0
 [17.0.1]: https://github.com/shakacode/react_on_rails/compare/v17.0.0...v17.0.1
 [17.0.0]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v17.0.0

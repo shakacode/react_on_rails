@@ -1,0 +1,27 @@
+<h1>Turbo Frame navigation</h1>
+
+<%# client-bundle registers HydrationSchedulingProbe, so skip the auto-loaded generated pack. %>
+
+<%# Lives outside the frame, so a frame navigation must leave it mounted. %>
+<%= react_component("HydrationSchedulingProbe",
+                    props: { label: "Outside frame island", mode: "immediate", testId: "outside-frame" },
+                    prerender: false,
+                    auto_load_bundle: false,
+                    id: "outside-frame") %>
+
+<%= turbo_frame_tag "react-frame" do %>
+  <% if params[:step] == "2" %>
+    <%= react_component("HydrationSchedulingProbe",
+                        props: { label: "Second frame island", mode: "immediate", testId: "frame-second" },
+                        prerender: false,
+                        auto_load_bundle: false,
+                        id: "frame-second") %>
+  <% else %>
+    <%= react_component("HydrationSchedulingProbe",
+                        props: { label: "First frame island", mode: "immediate", testId: "frame-first" },
+                        prerender: false,
+                        auto_load_bundle: false,
+                        id: "frame-first") %>
+    <%= link_to "Load next frame", turbo_frame_navigation_path(step: 2) %>
+  <% end %>
+<% end %>

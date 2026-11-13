@@ -31,12 +31,8 @@ module ReactOnRailsPro
 
         def exec_server_render_js(js_code, render_options)
           ::ReactOnRailsPro::Utils.with_trace(render_options.react_component_name) do
-            # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-            # the digest is on the render options.
-            # TODO: the request digest should be removed unless prerender caching is used
-            set_request_digest_on_render_options(js_code, render_options)
-
             # Cache non-streaming immediately. For streaming, optionally cache via write-through.
+            # Only the cached path hashes js_code: cache_key sets request_digest before rendering.
             if cache_enabled_for?(render_options)
               render_with_cache(js_code, render_options)
             else
@@ -45,8 +41,8 @@ module ReactOnRailsPro
           end
         end
 
-        # See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
-        # the digest is on the render options.
+        # The digest is the prerender cache key, so it is computed only when caching needs it.
+        # It must never hold a placeholder value: the blank? guard would treat it as the key.
         def set_request_digest_on_render_options(js_code, render_options)
           return unless render_options.request_digest.blank?
 
@@ -78,9 +74,8 @@ module ReactOnRailsPro
           result = if render_options.streaming?
                      render_streaming_with_cache(prerender_cache_key, js_code, render_options)
                    else
-                     Rails.cache.fetch(prerender_cache_key) do
+                     fetch_prerender_cache_entry(prerender_cache_key, js_code, render_options) do
                        prerender_cache_hit = false
-                       render_on_pool(js_code, render_options)
                      end
                    end
 
@@ -92,6 +87,31 @@ module ReactOnRailsPro
           end
 
           result
+        end
+
+        # Fetches from the prerender cache, skipping the write when the render
+        # result carries a 5xx httpResponse status. Server errors should not be
+        # cached — the next request should retry and may succeed. See issue #5125.
+        def fetch_prerender_cache_entry(prerender_cache_key, js_code, render_options)
+          skip_write = Object.new
+          catch(skip_write) do
+            Rails.cache.fetch(prerender_cache_key) do
+              yield if block_given? # signal cache miss to caller
+              rendered = render_on_pool(js_code, render_options)
+
+              throw(skip_write, rendered) if server_error_render_result?(rendered)
+
+              rendered
+            end
+          end
+        end
+
+        # Returns true when a render result Hash carries a 5xx httpResponse status.
+        def server_error_render_result?(rendered)
+          return false unless rendered.is_a?(Hash)
+
+          hr = rendered["httpResponse"]
+          hr.is_a?(Hash) && hr["status"].is_a?(Integer) && hr["status"] >= 500
         end
 
         def render_streaming_with_cache(prerender_cache_key, js_code, render_options)

@@ -1399,6 +1399,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       true
     rescue Errno::ESRCH
       false
+    rescue Errno::EPERM
+      true
     end
 
     def write_session(root, overrides = {})

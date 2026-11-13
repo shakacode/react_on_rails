@@ -97,6 +97,55 @@ test('rejects another CI run or attempt even when head and timestamp match', () 
   );
 });
 
+const withRunLine = (runLine) => ({
+  ...report,
+  body: `No findings.\n\nREVIEWED ${headSha} BY anthropic/claude\n${runLine}`,
+});
+
+for (const runLine of [
+  // Observed on PRs #5194 and #5202.
+  'CI run: 36966141444/2 · [Branch](https://github.com/shakacode/react_on_rails/tree/feature)',
+  // Observed on PR #5160.
+  'CI run: 36966141444/2 · branch [`ppr-event-logger`](https://github.com/shakacode/react_on_rails/tree/ppr-event-logger)',
+]) {
+  test(`accepts a run marker followed by decoration: ${runLine.slice(0, 40)}`, () => {
+    assert.equal(assertReviewCompleted(result, [withRunLine(runLine)], context).commentId, 123);
+  });
+}
+
+test('rejects a linked run ID that drops the attempt', () => {
+  // Observed on PR #5225; the prompt, not the verifier, prevents this form.
+  const runLine =
+    'CI run: [36966141444](https://github.com/shakacode/react_on_rails/actions/runs/36966141444) · Branch: [`feature`](https://github.com/shakacode/react_on_rails/tree/feature)';
+  assert.throws(
+    () => assertReviewCompleted(result, [withRunLine(runLine)], context),
+    /No completed Claude review report/,
+  );
+});
+
+test('rejects a run marker that only shares a prefix with this run', () => {
+  const prefixContext = { ...context, runId: '123', runAttempt: '1' };
+  for (const runLine of [
+    'CI run: 123/12',
+    'CI run: 123/12 · [Branch](https://example.com)',
+    'CI run: 123/1x',
+  ]) {
+    assert.throws(
+      () => assertReviewCompleted(result, [withRunLine(runLine)], prefixContext),
+      /No completed Claude review report/,
+    );
+  }
+  assert.equal(assertReviewCompleted(result, [withRunLine('CI run: 123/1')], prefixContext).commentId, 123);
+});
+
+test('rejects a decorated REVIEWED line', () => {
+  const body = `No findings.\n\nREVIEWED ${headSha} BY anthropic/claude · [Branch](https://example.com)\nCI run: 36966141444/2`;
+  assert.throws(
+    () => assertReviewCompleted(result, [{ ...report, body }], context),
+    /No completed Claude review report/,
+  );
+});
+
 test('rejects a matching marker from another actor', () => {
   assert.throws(
     () => assertReviewCompleted(result, [{ ...report, user: { login: 'contributor' } }], context),

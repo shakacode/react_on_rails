@@ -93,7 +93,9 @@ function shouldEmitConsoleReplay(metadata: Record<string, unknown>, railsEnv?: s
   // diagnostic metadata redacts, so unknown and production-like environments fail closed.
   if (railsEnv === 'development' || railsEnv === 'test') return true;
 
-  return metadata.hasErrors !== true && !hasRenderingErrorSignal(metadata.renderingError);
+  // Match the fetched Ruby payload's allowlist: even empty or malformed renderingError
+  // metadata removes replay, which may contain details absent from the error signal.
+  return metadata.hasErrors !== true && !Object.prototype.hasOwnProperty.call(metadata, 'renderingError');
 }
 
 function createRSCDiagnosticScript(

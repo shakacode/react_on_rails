@@ -16,6 +16,7 @@
 import { Readable, PassThrough } from 'stream';
 import { readFileSync } from 'fs';
 import { resolve as resolvePath } from 'path';
+import { runInNewContext } from 'vm';
 import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
@@ -60,6 +61,25 @@ type ShakapackerAssetShapes = {
 const shakapackerAssetShapes = JSON.parse(
   readFileSync(resolvePath(__dirname, 'fixtures/rsc-css-gating/shakapacker-asset-shapes.json'), 'utf8'),
 ) as ShakapackerAssetShapes;
+
+type RedactionOutcome = {
+  diagnostic: Record<string, unknown> | 'original' | null;
+  metadata: Record<string, unknown> | 'original';
+  consoleReplay: boolean;
+};
+
+const redactionContract = JSON.parse(
+  readFileSync(resolvePath(__dirname, 'fixtures/rsc-error-metadata-contract.json'), 'utf8'),
+) as {
+  baseMetadata: Record<string, unknown>;
+  environments: Array<{ name: string; railsEnv?: string; outcome: 'full' | 'redacted' }>;
+  outcomes: Record<string, RedactionOutcome>;
+  cases: Array<{
+    name: string;
+    metadata: Record<string, unknown>;
+    expected: Record<'full' | 'redacted', string>;
+  }>;
+};
 
 // Shared utilities — createMockRSCStream wraps content in length-prefixed format,
 // createMockHTMLStream passes HTML through as-is.
@@ -483,6 +503,42 @@ describe('injectRSCPayload', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  describe.each(redactionContract.environments)('shared redaction contract: $name', (environment) => {
+    it.each(redactionContract.cases)('$name', async (testCase) => {
+      const metadata = { ...redactionContract.baseMetadata, ...testCase.metadata };
+      const expected = redactionContract.outcomes[testCase.expected[environment.outcome]];
+      const diagnosticMetadata = Object.fromEntries(
+        Object.entries(metadata).filter(([key]) => key === 'hasErrors' || key === 'renderingError'),
+      );
+      const expectedDiagnostic =
+        expected.diagnostic === 'original' ? diagnosticMetadata : expected.diagnostic;
+      const content = '0:"synthetic-contract-flight"';
+      const mockRSC = createMockRSCStreamWithMetadata(content, metadata);
+      const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+      const result = injectRSCPayload(
+        createMockHTMLStream(['<div>contract</div>']),
+        rscRequestTracker,
+        domNodeId,
+        undefined,
+        { railsEnv: environment.railsEnv },
+      );
+      const output = await collectStreamData(result);
+      const browser = {
+        REACT_ON_RAILS_RSC_ERRORS: {} as Record<string, unknown>,
+        REACT_ON_RAILS_RSC_PAYLOADS: {} as Record<string, string[]>,
+      };
+      const replay = jest.fn();
+      const context = { self: browser, console: { error: replay } };
+      for (const match of output.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)) {
+        runInNewContext(match[1], context);
+      }
+
+      expect(browser.REACT_ON_RAILS_RSC_ERRORS[rscPayloadKey] ?? null).toEqual(expectedDiagnostic);
+      expect(replay.mock.calls).toEqual(expected.consoleReplay ? [['synthetic-contract-replay']] : []);
+      expect(browser.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual([content]);
+    });
   });
 
   it('injects RSC diagnostic metadata without exposing unrelated stream metadata', async () => {
@@ -1176,17 +1232,14 @@ describe('injectRSCPayload', () => {
 
   it('keeps opt-in observability scripts out of raw-text split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([
       Buffer.from('before<script>window.msg = "caf'),
       eAcuteBytes.subarray(0, 1),
     ]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1195,11 +1248,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('window.msg');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const appScriptIndex = resultStr.indexOf('<script>window.msg = "café";</script>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
@@ -1212,17 +1270,14 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of raw-text split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([
       Buffer.from('before<script>window.msg = "caf'),
       eAcuteBytes.subarray(0, 1),
     ]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1230,11 +1285,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('window.msg');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const appScriptIndex = resultStr.indexOf('<script>window.msg = "café";</script>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
@@ -1247,17 +1307,14 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of script double-escaped split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([
       Buffer.from('before<script><!--<script>const marker = "</script>"; caf'),
       eAcuteBytes.subarray(0, 1),
     ]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1265,11 +1322,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<script><!--<script>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const appScriptIndex = resultStr.indexOf(
       '<script><!--<script>const marker = "</script>"; café";</script>after',
@@ -1358,14 +1420,11 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of iframe split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([Buffer.from('before<iframe>caf'), eAcuteBytes.subarray(0, 1)]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</iframe>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1373,11 +1432,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<iframe>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const iframeIndex = resultStr.indexOf('<iframe>café</iframe>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
@@ -1390,14 +1454,11 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of noscript split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([Buffer.from('before<noscript>caf'), eAcuteBytes.subarray(0, 1)]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</noscript>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1405,11 +1466,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<noscript>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const noscriptIndex = resultStr.indexOf('<noscript>café</noscript>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
@@ -1422,14 +1488,11 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of template split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([Buffer.from('before<template>caf'), eAcuteBytes.subarray(0, 1)]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</template>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1437,11 +1500,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<template>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const templateIndex = resultStr.indexOf('<template>café</template>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
@@ -1454,17 +1522,14 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of template quoted-attribute split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([
       Buffer.from('before<template><span title="</template>">caf'),
       eAcuteBytes.subarray(0, 1),
     ]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</span></template>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1472,11 +1537,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<template>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const templateIndex = resultStr.indexOf(
       '<template><span title="</template>">café</span></template>after',
@@ -1491,17 +1561,14 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of nested template split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([
       Buffer.from('before<template><template></template>caf'),
       eAcuteBytes.subarray(0, 1),
     ]);
     const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</template>after')]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1509,11 +1576,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<template>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const templateIndex = resultStr.indexOf('<template><template></template>café</template>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
@@ -1526,7 +1598,7 @@ describe('injectRSCPayload', () => {
 
   it('keeps default RSC scripts out of template raw-text split UTF-8 tails', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockRSC = new PassThrough();
     const eAcuteBytes = Buffer.from('é');
     const firstHtmlChunk = Buffer.concat([
       Buffer.from('before<template><script>const marker = "</template>"; caf'),
@@ -1536,10 +1608,7 @@ describe('injectRSCPayload', () => {
       eAcuteBytes.subarray(1),
       Buffer.from('";</script></template>after'),
     ]);
-    const mockHTML = createMockHTMLByteStream({
-      5: firstHtmlChunk,
-      25: secondHtmlChunk,
-    });
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1547,11 +1616,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write(firstHtmlChunk);
+
+    // Keep the split UTF-8 tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('<template>');
 
+    mockHTML.end(secondHtmlChunk);
     const resultStr = await allData;
     const templateIndex = resultStr.indexOf(
       '<template><script>const marker = "</template>"; café";</script></template>after',
@@ -1602,11 +1676,8 @@ describe('injectRSCPayload', () => {
 
   it('keeps opt-in observability scripts out of ambiguous raw-text closing tag prefixes', async () => {
     const flightData = '{"test": "data"}';
-    const mockRSC = createMockRSCStream({ 0: flightData });
-    const mockHTML = createMockHTMLStream({
-      5: 'before<style>body{color:red}</s',
-      25: 'tyle>after',
-    });
+    const mockRSC = new PassThrough();
+    const mockHTML = new PassThrough();
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
@@ -1615,11 +1686,16 @@ describe('injectRSCPayload', () => {
     });
     const { allData, firstChunk } = collectStreamDataByChunk(result);
 
+    mockRSC.end(toLengthPrefixed(flightData));
+    mockHTML.write('before<style>body{color:red}</s');
+
+    // Keep the raw-text tail incomplete until its first flush is observed.
     await expect(firstChunk).resolves.toContain(expectedInitializationScript);
     await expect(firstChunk).resolves.toContain('before');
     await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
     await expect(firstChunk).resolves.not.toContain('body{color:red}');
 
+    mockHTML.end('tyle>after');
     const resultStr = await allData;
     const styleIndex = resultStr.indexOf('<style>body{color:red}</style>after');
     const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));

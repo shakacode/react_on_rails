@@ -23,6 +23,7 @@ import path from 'path';
 import vm from 'vm';
 import m from 'module';
 import cluster from 'cluster';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Readable } from 'stream';
 import { ReadableStream } from 'stream/web';
 import { performance as monotonicPerformance } from 'node:perf_hooks';
@@ -66,6 +67,36 @@ const readFileAsync = promisify(fs.readFile);
 // MIRROR VALUES OF: packages/react-on-rails-pro/src/injectRSCPayload.ts
 const LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY = '__reactOnRailsProReportMissingLoadableStats';
 // MIRROR VALUES END
+const HYDRATED_STORE_SCOPE_CONTEXT_KEY = 'reactOnRailsHydratedStoreScope';
+// Host-required packages execute outside the VM realm. Share one storage even
+// when the renderer module is loaded more than once in this process.
+const hostScopeKey = Symbol.for('reactOnRailsHydratedStoreScope.host');
+type HostStoreScope = {
+  storage: AsyncLocalStorage<Map<object, unknown>>;
+  bridge: { getStore: () => Map<object, unknown> | undefined };
+};
+const hostStoreScope =
+  (globalThis as typeof globalThis & Partial<Record<symbol, HostStoreScope>>)[hostScopeKey] ??
+  (() => {
+    const storage = new AsyncLocalStorage<Map<object, unknown>>();
+    return Object.freeze({ storage, bridge: Object.freeze({ getStore: () => storage.getStore() }) });
+  })();
+Object.defineProperty(globalThis, hostScopeKey, { value: hostStoreScope });
+Object.defineProperty(globalThis, HYDRATED_STORE_SCOPE_CONTEXT_KEY, {
+  configurable: false,
+  enumerable: false,
+  value: hostStoreScope.bridge,
+  writable: false,
+});
+const hydratedStoreScope = hostStoreScope.storage;
+// Injected into each VM context so the RSC runtime can derive BUILD_ID from the
+// executing bundle's own identity, without waiting for a Rails-supplied parameter.
+// See: packages/react-on-rails-pro/src/cache/buildIdProvider.ts (issue #5076).
+// MIRROR VALUE OF: packages/react-on-rails-pro/src/cache/buildIdProvider.ts
+const BUNDLE_ID_CONTEXT_KEY = '__reactOnRailsProBundleId';
+// MIRROR VALUE OF: packages/react-on-rails-pro/src/cache/buildIdProvider.ts
+const BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY = '__reactOnRailsProReportBuildIdMismatch';
+// MIRROR VALUES END
 // This is process-scoped diagnostic state, not request data: every VM context
 // shares the same host callback and only the first missing-stats event logs.
 let hasReportedMissingLoadableStats = false;
@@ -76,6 +107,20 @@ function reportMissingLoadableStats(loadableStatsPath: unknown) {
   hasReportedMissingLoadableStats = true;
   log.info(
     `React on Rails Pro could not find ${loadableStatsPath}; RSC stylesheet inference is falling back to streamed preload tags and will retry. Verify that loadable-stats.json is emitted to the server bundle directory.`,
+  );
+}
+
+// Per-VM mismatch reporting. Each VM's bundled buildIdProvider calls this host
+// callback when setBuildId receives a value that disagrees with the VM-injected
+// bundle identity. The warning reaches the host logger (pino) at warn level,
+// bypassing the VM's console-replay mechanism so it is not sent to the browser.
+function reportBuildIdMismatch(explicitId: unknown, vmBundleId: unknown) {
+  if (typeof explicitId !== 'string' || typeof vmBundleId !== 'string') return;
+
+  log.warn(
+    `BUILD_ID mismatch: setBuildId received "${explicitId}" but the VM-injected bundle identity ` +
+      `is "${vmBundleId}". Cache keys may diverge across workers. This usually means the Rails ` +
+      `rscBundleHash and the renderer bundle file path encode different identities.`,
   );
 }
 
@@ -444,6 +489,73 @@ export function isDeclaredCurrentGenerationReady() {
   return declaredCurrentGenerationIsReady();
 }
 
+// Bundles already warned about for lacking the revalidation hook, so a pre-tags
+// bundle logs once per worker instead of once per invalidation. Never cleaned
+// on eviction: a Set of bundle paths is tiny, and re-warning after a pool
+// eviction/reload of the same stale bundle would add noise, not signal.
+const revalidateHookMissingWarnedBundles = new Set<string>();
+
+/**
+ * Delivers a tag invalidation into every loaded bundle sandbox — every
+ * generation, not just the current one: during rolling deploys old-generation
+ * bundles still serve requests from their own caches.
+ *
+ * The hook is installed on the sandbox's global object by the
+ * `react-on-rails-pro` package's cache module when the bundle loads
+ * (`__REACT_ON_RAILS_REVALIDATE_TAGS__`). The sandbox global IS the context
+ * object the worker holds, so the function reference is read directly off it —
+ * no code-string evaluation. A bundle built with a pre-tags package version has
+ * no hook: warn once per bundle (silence would be indistinguishable from a
+ * broken broadcast) and skip it.
+ *
+ * Best-effort by contract: one bundle's failure never stops delivery to the
+ * others, and callers only need to know (via logs) that something failed.
+ */
+export async function revalidateTagsInAllVMContexts(tags: string[], invalidatedAt: number): Promise<void> {
+  const deliveries: Promise<void>[] = [];
+  for (const [bundlePath, vmContext] of vmContexts.entries()) {
+    // eslint-disable-next-line no-underscore-dangle -- dunder name matches the sandbox-global convention
+    const hook = (vmContext.context as Record<string, unknown>).__REACT_ON_RAILS_REVALIDATE_TAGS__;
+    // An explicit null is the cache stub's marker: this bundle (the SSR server
+    // bundle in every normal deployment) can never hold unstable_cache
+    // entries, so it is skipped silently. Only `undefined` — a bundle built
+    // before tag support — earns the once-per-bundle warning below.
+    if (hook === null) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+    if (typeof hook !== 'function') {
+      if (!revalidateHookMissingWarnedBundles.has(bundlePath)) {
+        revalidateHookMissingWarnedBundles.add(bundlePath);
+        log.warn(
+          {
+            bundlePath,
+          },
+          'Tag revalidation skipped for a bundle with no __REACT_ON_RAILS_REVALIDATE_TAGS__ hook. ' +
+            "Either the bundle never imports 'react-on-rails-pro/cache' (it then holds no " +
+            'unstable_cache entries and this warning is harmless), or it was built with a ' +
+            'react-on-rails-pro version without cache tag support, in which case its ' +
+            'unstable_cache entries expire by TTL only.',
+        );
+      }
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    deliveries.push(
+      // Promise.resolve().then(...) converts a synchronous throw inside the
+      // sandbox into a rejection handled below, so one bundle cannot abort
+      // delivery to the rest.
+      Promise.resolve()
+        .then(() => (hook as (tags: string[], invalidatedAt: number) => Promise<void>)(tags, invalidatedAt))
+        .catch((err: unknown) => {
+          log.warn({ msg: 'Tag revalidation failed inside bundle sandbox', bundlePath, err });
+        }),
+    );
+  }
+  await Promise.all(deliveries);
+}
+
 /**
  * The type of the result returned by executing the code payload sent in the rendering request.
  */
@@ -683,12 +795,36 @@ async function buildVM(filePath: string): Promise<VMContext> {
       if (additionalContextIsObject) {
         extendContext(contextObject, additionalContext);
       }
+      Object.defineProperty(contextObject, HYDRATED_STORE_SCOPE_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: hostStoreScope.bridge,
+        writable: false,
+      });
       // Install this after every context extension so application configuration
       // and bundle code cannot redirect the server path into replayed VM console history.
       Object.defineProperty(contextObject, LOADABLE_STATS_MISSING_DIAGNOSTIC_CONTEXT_KEY, {
         configurable: false,
         enumerable: false,
         value: reportMissingLoadableStats,
+        writable: false,
+      });
+      // Expose the bundle's identity hash so the RSC runtime can derive BUILD_ID
+      // from the executing bundle itself, independent of any Rails-supplied parameter.
+      // This is a per-bundle constant (same value for all requests using this VM),
+      // so it satisfies the rsc-guardrails invariant 2 carve-out for build-config
+      // caches keyed by a build artifact. Uses bundleIdentityPath (not the raw
+      // request path) for stability across trusted aliases. (issue #5076)
+      Object.defineProperty(contextObject, BUNDLE_ID_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: path.basename(filePath, '.js'),
+        writable: false,
+      });
+      Object.defineProperty(contextObject, BUNDLE_ID_MISMATCH_REPORTER_CONTEXT_KEY, {
+        configurable: false,
+        enumerable: false,
+        value: reportBuildIdMismatch,
         writable: false,
       });
       const context = vm.createContext(contextObject);
@@ -964,6 +1100,12 @@ export async function buildExecutionContext(
   // It allows data to be shared between the initial render and subsequent update chunks.
   // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
+  const requestHydratedStores = new Map<object, unknown>();
+  // Without this scope the store registries fall back to their shared map. buildConfig
+  // normalizes the option so only an explicit `false` turns it off.
+  const inStoreScope: <T>(fn: () => T) => T = getConfig().isolateHydratedStores
+    ? (fn) => hydratedStoreScope.run(requestHydratedStores, fn)
+    : (fn) => fn();
   let released = false;
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
@@ -998,28 +1140,36 @@ export async function buildExecutionContext(
       // so that code can store/retrieve data (e.g., asyncPropsManager).
       // IMPORTANT: We clean up immediately after execution to prevent the VM context
       // (which may be reused by other requests) from retaining references to this request's data.
-      let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
-        context.renderingRequest = renderingRequest;
-        context.sharedExecutionContext = sharedExecutionContext;
-        context.runOnOtherBundle = (bundleTimestamp: string | number, newRenderingRequest: string) => {
-          const otherBundleFilePath = getRequestBundleFilePath(bundleTimestamp);
-          return runInVM(newRenderingRequest, otherBundleFilePath, vmCluster);
-        };
+      let result = inStoreScope(() =>
+        sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
+          context.renderingRequest = renderingRequest;
+          context.sharedExecutionContext = sharedExecutionContext;
+          context.runOnOtherBundle = (bundleTimestamp: string | number, newRenderingRequest: string) => {
+            const otherBundleFilePath = getRequestBundleFilePath(bundleTimestamp);
+            return runInVM(newRenderingRequest, otherBundleFilePath, vmCluster);
+          };
 
-        try {
-          return vm.runInContext(renderingRequest, context) as RenderCodeResult;
-        } finally {
-          // Clean up references immediately after execution.
-          // Note: sharedExecutionContext itself is NOT cleared here - it persists
-          // for the lifetime of this ExecutionContext so that update chunks can access it.
-          // We only remove the VM context's reference to prevent cross-request data access.
-          context.renderingRequest = undefined;
-          context.sharedExecutionContext = undefined;
-          context.runOnOtherBundle = undefined;
-        }
-      });
+          try {
+            return vm.runInContext(renderingRequest, context) as RenderCodeResult;
+          } finally {
+            // Clean up references immediately after execution.
+            // Note: sharedExecutionContext itself is NOT cleared here - it persists
+            // for the lifetime of this ExecutionContext so that update chunks can access it.
+            // We only remove the VM context's reference to prevent cross-request data access.
+            context.renderingRequest = undefined;
+            context.sharedExecutionContext = undefined;
+            context.runOnOtherBundle = undefined;
+          }
+        }),
+      );
 
       if (isReadableStream(result)) {
+        // Consumer-driven reads and teardown can begin outside the render's async context.
+        const stream = result;
+        const read = stream.read.bind(stream);
+        const destroy = stream.destroy.bind(stream);
+        stream.read = (size?: number) => inStoreScope(() => read(size));
+        stream.destroy = (error?: Error) => inStoreScope(() => destroy(error));
         const reportedErrors = new WeakSet<object>();
         // A stream error thrown inside the sandboxed VM realm is a genuine Error, but it
         // fails the worker-realm `instanceof Error` check because it comes from a different

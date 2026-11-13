@@ -57,6 +57,7 @@ Rails.application.routes.draw do
   get "cached_stream_async_components_for_testing" => "pages#cached_stream_async_components_for_testing",
       as: :cached_stream_async_components_for_testing
   get "ppr_page_for_testing" => "pages#ppr_page_for_testing", as: :ppr_page_for_testing
+  get "shakaperf_ppr_lookups" => "pages#shakaperf_ppr_lookups", as: :shakaperf_ppr_lookups
   get "test_incremental_rendering" => "pages#test_incremental_rendering", as: :test_incremental_rendering
   get "lazy_props_for_testing" => "pages#lazy_props_for_testing", as: :lazy_props_for_testing
   get "lazy_props_redis_for_testing" => "pages#lazy_props_redis_for_testing",
@@ -131,6 +132,7 @@ Rails.application.routes.draw do
   get "css_modules_images_fonts_example" => "pages#css_modules_images_fonts_example"
   get "turbolinks_cache_disabled" => "pages#turbolinks_cache_disabled"
   get "stale_store_probe" => "pages#stale_store_probe"
+  get "turbo_frame_navigation" => "pages#turbo_frame_navigation"
   get "rendered_html" => "pages#rendered_html"
   get "xhr_refresh" => "pages#xhr_refresh"
   get "react_helmet" => "pages#react_helmet"

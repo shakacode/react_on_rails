@@ -21,6 +21,19 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       ReactOnRailsPro.instance_variable_set(:@configuration, nil)
     end
 
+    describe ".ppr_event_logging" do
+      it "defaults to disabled" do
+        expect(ReactOnRailsPro.configuration.ppr_event_logging).to be(false)
+        expect(described_class.new.ppr_event_logging).to be(false)
+      end
+
+      it "can be enabled through application configuration" do
+        ReactOnRailsPro.configure { |config| config.ppr_event_logging = true }
+
+        expect(ReactOnRailsPro.configuration.ppr_event_logging).to be(true)
+      end
+    end
+
     describe ".license_token" do
       it "defaults to nil" do
         expect(ReactOnRailsPro.configuration.license_token).to be_nil

@@ -38,11 +38,13 @@ RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
 RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS = 10
 RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
 GITHUB_RELEASE_BODY_MAX_LENGTH = 125_000
-# npm can take longer than the former 25-second window to serve a just-published
-# exact version, even when cache reads are bypassed. Keep the recovery bounded
-# while allowing the registry's eventual-consistency window to settle.
-NPM_PUBLISH_VERIFY_ATTEMPTS = 24
-NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
+# npm can take minutes to serve a just-published exact version, even when cache
+# reads are bypassed: the 17.2.0.rc.2 release saw react-on-rails-pro stay
+# invisible past the former two-minute window and appear within six minutes.
+# Keep the recovery bounded while allowing that eventual-consistency window to settle.
+# The first lookup is immediate, so 61 attempts leave 60 ten-second waits.
+NPM_PUBLISH_VERIFY_ATTEMPTS = 61
+NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 10
 NPM_PUBLISH_MAX_BACKOFF_SECONDS = 30
 NPM_PUBLISH_HARD_FAILURE_CATEGORIES = %i[
   authentication_failure
@@ -8944,6 +8946,88 @@ def report_release_dry_run_follow_up(version:)
   GUIDANCE
 end
 
+# Prints what the maintainer must do after a live publish. A stable release cut from
+# release/X.Y.Z leaves main without its changelog stamp until a dedicated PR records it,
+# so name that PR's exact title and provenance line, which the close-out checks match.
+def report_post_release_next_steps(version:, branch:, changelog_source_sha:, changelog_section: true)
+  runbook = "internal/contributor-info/release-train-runbook.md"
+  puts "\n#{'=' * 80}"
+  puts "POST-RELEASE NEXT STEPS"
+  puts "=" * 80
+
+  unless branch.start_with?("release/")
+    return report_non_release_branch_next_steps(version:, branch:, changelog_section:)
+  end
+
+  source = "origin/#{branch}"
+  forward_port_check = "script/release-forward-port --source #{source} --target main"
+
+  if release_prerelease_version?(version)
+    puts <<~STEPS
+      1. Forward-port every fix merged into #{branch} to main, one PR each. This must pass:
+           #{forward_port_check} --check
+      2. The #{version} changelog stays on #{branch} until the final release.
+         Do not copy RC sections to main.
+
+      See #{runbook} (step 3).
+    STEPS
+    return
+  end
+
+  # Never print a shell substitution here: the checker matches this sentence with the resolved SHA.
+  provenance_sha = changelog_source_sha || "<SHA>"
+  sha_note = changelog_source_sha ? "" : post_release_sha_lookup_note(source)
+  puts <<~STEPS
+    main does not have the #{version} changelog yet. The release is not closed out until it does.
+
+    1. Forward-port any release-only fixes to main, one PR each. This must pass:
+         #{forward_port_check} --check
+    2. Open a CHANGELOG.md-only PR against main titled exactly:
+         Record the final React on Rails #{version} changelog
+       - Copy the [#{version}] section from #{branch} unchanged.
+       - Remove the entries that shipped in #{version} from [Unreleased]; keep main-only entries.
+       - Point the [unreleased] compare link at v#{version} and add the [#{version}] link.
+       - Put this line in the PR body and keep it in the squash commit:
+           The final changelog records source CHANGELOG.md commit `#{provenance_sha}`.#{sha_note}
+    3. After that PR merges, confirm both checks pass from an up-to-date main:
+         #{forward_port_check} --check
+         #{forward_port_check} --changelog --check
+    4. Preview closing the release line (deletes #{branch} only in normal mode):
+         script/release-finish close-out #{version} --dry-run
+
+    See #{runbook} (step 5).
+  STEPS
+end
+
+def report_non_release_branch_next_steps(version:, branch:, changelog_section:)
+  github_release_step =
+    if changelog_section
+      "Confirm the GitHub release for v#{version} looks right."
+    else
+      "No GitHub release was created: CHANGELOG.md has no #{version} section. Add it as described above."
+    end
+
+  if branch == "main"
+    puts "Published from main, so nothing needs forward-porting.\n#{github_release_step}"
+  else
+    puts <<~STEPS
+      Published from #{branch}, which is neither main nor a release branch.
+      Any fix this release carries that main lacks must reach main through its own PR.
+      #{github_release_step}
+    STEPS
+  end
+end
+
+def post_release_sha_lookup_note(source)
+  "\n       Replace <SHA> with the output of: git log -1 --format=%H #{source} -- CHANGELOG.md"
+end
+
+def latest_changelog_commit_sha(monorepo_root)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "log", "-1", "--format=%H", "--", "CHANGELOG.md")
+  sha = output.strip
+  status.success? && sha.match?(/\A\h{40}\z/) ? sha : nil
+end
+
 def report_github_release_notes_preflight!(version:, changelog_notes:)
   return unless changelog_notes
 
@@ -10002,20 +10086,24 @@ def retry_npm_publish_after_error(error:, package_name:, attempt:, max_retries:,
   current_otp
 end
 
-def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempotent_retry: false, max_retries: 3)
+def skip_existing_npm_publish?(package_name, idempotent_retry:)
+  return false unless npm_package_already_published?(*parse_npm_package_ref(package_name))
+
+  unless idempotent_retry
+    abort_existing_registry_artifact_without_retry!(artifact_ref: "npm package #{package_name}", registry_name: "npm")
+  end
+
+  puts "ℹ️ npm package #{package_name} is already visible on npm; skipping publish."
+  true
+end
+
+def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempotent_retry: false, max_retries: 3,
+                           verify: true)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
   publish_args = Array(base_args)
   npm_package_name, npm_package_version = parse_npm_package_ref(package_name)
-
-  if npm_package_already_published?(npm_package_name, npm_package_version)
-    unless idempotent_retry
-      abort_existing_registry_artifact_without_retry!(artifact_ref: "npm package #{package_name}", registry_name: "npm")
-    end
-
-    puts "ℹ️ npm package #{package_name} is already visible on npm; skipping publish."
-    return current_otp
-  end
+  return current_otp if skip_existing_npm_publish?(package_name, idempotent_retry:)
 
   attempt = 0
   uncertain_publish_attempt = false
@@ -10025,7 +10113,7 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, idempoten
       with_publishable_package_json(dir, npm_package_version) do
         run_npm_publish_attempt!(dir:, package_name:, attempt:, publish_args:, otp: current_otp)
       end
-      verify_npm_package_published!(npm_package_name, npm_package_version)
+      verify_npm_package_published!(npm_package_name, npm_package_version) if verify
       return current_otp
     rescue NpmPublishAttemptError => e
       uncertain_publish_attempt ||= e.category == :transient
@@ -10634,7 +10722,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         "react-on-rails@#{actual_npm_version}",
         base_args: npm_base_args,
         otp: current_npm_otp,
-        idempotent_retry: idempotent_publish_retry
+        idempotent_retry: idempotent_publish_retry,
+        verify: false
       )
 
       current_npm_otp = publish_npm_with_retry(
@@ -10642,7 +10731,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         "react-on-rails-pro@#{actual_npm_version}",
         base_args: npm_base_args,
         otp: current_npm_otp,
-        idempotent_retry: idempotent_publish_retry
+        idempotent_retry: idempotent_publish_retry,
+        verify: false
       )
 
       puts "\n#{'=' * 80}"
@@ -10654,7 +10744,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         "react-on-rails-pro-node-renderer@#{actual_npm_version}",
         base_args: npm_base_args,
         otp: current_npm_otp,
-        idempotent_retry: idempotent_publish_retry
+        idempotent_retry: idempotent_publish_retry,
+        verify: false
       )
 
       publish_npm_with_retry(
@@ -10662,8 +10753,15 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         "create-react-on-rails-app@#{actual_npm_version}",
         base_args: npm_base_args,
         otp: current_npm_otp,
-        idempotent_retry: idempotent_publish_retry
+        idempotent_retry: idempotent_publish_retry,
+        verify: false
       )
+
+      # Verify after every npm publish so the registry's propagation delays overlap
+      # instead of stacking, and still before any RubyGem is published.
+      NPM_RELEASE_PACKAGE_NAMES.each do |package_name|
+        verify_npm_package_published!(package_name, actual_npm_version)
+      end
 
       puts "\n#{'=' * 80}"
       puts "Publishing PUBLIC Ruby gems..."
@@ -10753,6 +10851,13 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       puts "    1. Ensure CHANGELOG.md entries are complete"
       puts "    2. Push any follow-up changelog fixes if needed"
     end
+
+    report_post_release_next_steps(
+      version: released_gem_version,
+      branch: current_branch,
+      changelog_source_sha: latest_changelog_commit_sha(monorepo_root),
+      changelog_section: !has_changelog_section.nil?
+    )
     puts ""
   end
 end

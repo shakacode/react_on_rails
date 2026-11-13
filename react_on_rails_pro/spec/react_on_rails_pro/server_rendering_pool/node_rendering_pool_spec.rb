@@ -179,7 +179,6 @@ module ReactOnRailsPro
       end
 
       describe ".prepare_incremental_render_path" do
-        let(:js_code) { "console.log('test');" }
         let(:render_options) do
           instance_double(
             ReactOnRails::ReactComponent::RenderOptions,
@@ -189,14 +188,12 @@ module ReactOnRailsPro
         end
 
         before do
-          allow(ReactOnRailsPro::ServerRenderingPool::ProRendering)
-            .to receive(:set_request_digest_on_render_options)
           allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
           allow(described_class).to receive_messages(server_bundle_hash: "server123", rsc_bundle_hash: "rsc456")
         end
 
         it "returns path with incremental-render endpoint" do
-          path = described_class.prepare_incremental_render_path(js_code, render_options)
+          path = described_class.prepare_incremental_render_path(render_options)
 
           expect(path).to eq("/bundles/server123/incremental-render/abc123")
         end
@@ -211,7 +208,7 @@ module ReactOnRailsPro
           end
 
           it "uses RSC bundle hash instead of server bundle hash" do
-            path = described_class.prepare_incremental_render_path(js_code, render_options)
+            path = described_class.prepare_incremental_render_path(render_options)
 
             expect(path).to eq("/bundles/rsc456/incremental-render/abc123")
           end
@@ -222,10 +219,68 @@ module ReactOnRailsPro
               .with(:renderer_artifact_snapshot)
               .and_return([rsc_artifact])
 
-            path = described_class.prepare_incremental_render_path(js_code, render_options)
+            path = described_class.prepare_incremental_render_path(render_options)
 
             expect(path).to eq("/bundles/rsc-snapshot/incremental-render/abc123")
           end
+        end
+      end
+
+      describe ".prepare_render_path" do
+        let(:render_options) do
+          instance_double(
+            ReactOnRails::ReactComponent::RenderOptions,
+            request_digest: nil,
+            react_component_name: "App/Header Bar",
+            rsc_payload_streaming?: false
+          )
+        end
+
+        before do
+          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+          allow(described_class).to receive(:server_bundle_hash).and_return("server123")
+        end
+
+        it "uses a cheap per-request id instead of hashing js_code when no cache digest exists" do
+          allow(Digest::MD5).to receive(:hexdigest)
+
+          first_path = described_class.prepare_render_path(render_options)
+          second_path = described_class.prepare_render_path(render_options)
+
+          id_pattern = %r{\A/bundles/server123/render/App_Header_Bar-#{Process.pid}-(\d+)\z}
+          expect(first_path).to match(id_pattern)
+          expect(second_path).to match(id_pattern)
+          expect(second_path[id_pattern, 1].to_i).to be > first_path[id_pattern, 1].to_i
+          expect(Digest::MD5).not_to have_received(:hexdigest)
+        end
+
+        it "keeps generated ids within Fastify's default 100-character route param limit" do
+          allow(render_options).to receive(:react_component_name).and_return("A" * 300)
+
+          segment = described_class.prepare_render_path(render_options).split("/").last
+
+          expect(segment).to start_with("#{'A' * 48}-#{Process.pid}-")
+          expect(segment.length).to be <= 100
+        end
+
+        it "keeps generated ids unique across threads" do
+          paths = Array.new(8) do
+            Thread.new { Array.new(50) { described_class.prepare_render_path(render_options) } }
+          end.flat_map(&:value)
+
+          expect(paths.uniq.size).to eq(400)
+        end
+
+        it "uses the cheap id for the incremental-render endpoint too" do
+          path = described_class.prepare_incremental_render_path(render_options)
+
+          expect(path).to match(%r{\A/bundles/server123/incremental-render/App_Header_Bar-#{Process.pid}-\d+\z})
+        end
+
+        it "keeps the prerender cache digest in the path when caching already computed it" do
+          allow(render_options).to receive(:request_digest).and_return("cache-digest")
+
+          expect(described_class.prepare_render_path(render_options)).to eq("/bundles/server123/render/cache-digest")
         end
       end
 
@@ -233,8 +288,6 @@ module ReactOnRailsPro
         let(:js_code) { "console.log('test');" }
 
         before do
-          allow(ReactOnRailsPro::ServerRenderingPool::ProRendering)
-            .to receive(:set_request_digest_on_render_options)
           allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
           allow(described_class).to receive_messages(server_bundle_hash: "server123", rsc_bundle_hash: "rsc456")
         end
@@ -255,14 +308,14 @@ module ReactOnRailsPro
           it "calls prepare_incremental_render_path and render_code_with_incremental_updates" do
             expected_path = "/bundles/server123/incremental-render/abc123"
             allow(described_class).to receive(:prepare_incremental_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
               .and_return(expected_path)
             allow(ReactOnRailsPro::Request).to receive(:render_code_with_incremental_updates)
 
             described_class.eval_streaming_js(js_code, render_options)
 
             expect(described_class).to have_received(:prepare_incremental_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
               .with(
                 expected_path,
@@ -279,7 +332,7 @@ module ReactOnRailsPro
             expected_path = "/bundles/server123/incremental-render/abc123"
             allow(render_options).to receive(:internal_option).with(:push_props).and_return([])
             allow(described_class).to receive(:prepare_incremental_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
               .and_return(expected_path)
             allow(ReactOnRailsPro::Request).to receive(:render_code_with_incremental_updates)
 
@@ -309,14 +362,14 @@ module ReactOnRailsPro
           it "calls prepare_render_path and render_code_as_stream" do
             expected_path = "/bundles/server123/render/abc123"
             allow(described_class).to receive(:prepare_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
               .and_return(expected_path)
             allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream)
 
             described_class.eval_streaming_js(js_code, render_options)
 
             expect(described_class).to have_received(:prepare_render_path)
-              .with(js_code, render_options)
+              .with(render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_as_stream)
               .with(expected_path, js_code, is_rsc_payload: false, rsc_stream_observability: false)
           end

@@ -85,12 +85,8 @@ RSpec.describe "script/release-forward-port" do
     documented_bash_snippet('CLOSEOUT_PR="${CLOSEOUT_PR:?set the closeout PR number or URL}"')
   end
 
-  def documented_release_line_lease_snippet
-    marker = [
-      'if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_LINE_TARGET+x}" = x ] || ',
-      '[ "${RELEASE_BRANCH+x}" = x ]; then'
-    ].join
-    documented_bash_snippet(marker)
+  def documented_release_line_variables_snippet
+    documented_bash_snippet('if [ "${RELEASE_VERSION+x}" = x ] || [ "${RELEASE_BRANCH+x}" = x ]; then')
   end
 
   def documented_backport_merge_snippet
@@ -118,31 +114,6 @@ RSpec.describe "script/release-forward-port" do
   end
 
   def write_release_lifecycle_stubs(tmpdir)
-    helper_dir = File.join(tmpdir, "bin")
-    FileUtils.mkdir_p(helper_dir)
-    helper_path = File.join(helper_dir, "agent-coord-bounded")
-    File.write(
-      helper_path,
-      <<~BASH
-        #!/bin/bash
-        target=""
-        command=""
-        while [ "$#" -gt 0 ]; do
-          case "$1" in
-            status|claim) command="$1" ;;
-            --target) shift; target="$1" ;;
-          esac
-          shift
-        done
-        if [ "${command}" = "status" ]; then
-          printf '{"claims":[{"status":"active","agent_id":"%s","instance_id":"%s","branch":"%s","expires_at":"2099-01-01T00:00:00Z"}],"heartbeats":[{"agent_id":"%s","instance_id":"%s","branch":"%s","target":"shakacode/react_on_rails#%s","liveness":"live"}]}\\n' \
-            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${RELEASE_BRANCH}" \
-            "${RELEASE_COORDINATOR_ID}" "${RELEASE_COORDINATOR_INSTANCE_ID}" "${RELEASE_BRANCH}" "${target}"
-        fi
-      BASH
-    )
-    FileUtils.chmod(0o755, helper_path)
-
     script_dir = File.join(tmpdir, "script")
     FileUtils.mkdir_p(script_dir)
     forward_port_path = File.join(script_dir, "release-forward-port")
@@ -180,8 +151,6 @@ RSpec.describe "script/release-forward-port" do
         shift
         printf '%s\\0' "$@" >>"${LIFECYCLE_TEST_CALLS}"
       }
-
-      agent-coord() { return 0; }
 
       bundle() {
         record_call bundle "$@"
@@ -224,8 +193,8 @@ RSpec.describe "script/release-forward-port" do
     BASH
   end
 
-  def release_lifecycle_harness(operation_snippet, bootstrap_calls: 1)
-    indented_bootstrap = documented_release_line_lease_snippet.lines.map { |line| "  #{line}" }.join
+  def release_lifecycle_harness(operation_snippet)
+    indented_bootstrap = documented_release_line_variables_snippet.lines.map { |line| "  #{line}" }.join
     indented_operation = operation_snippet.lines.map { |line| "  #{line}" }.join
     <<~BASH
       set -u
@@ -244,22 +213,19 @@ RSpec.describe "script/release-forward-port" do
       bootstrap_release_line
       bootstrap_status=$?
       test "${bootstrap_status}" -eq 0 || exit "${bootstrap_status}"
-      #{bootstrap_calls == 2 ? 'bootstrap_release_line || exit $?' : ':'}
       run_operation
     BASH
   end
 
-  def run_documented_release_lifecycle(operation_snippet, environment = {}, bootstrap_calls: 1)
+  def run_documented_release_lifecycle(operation_snippet, environment = {})
     Dir.mktmpdir("release-lifecycle-runbook") do |tmpdir|
       write_release_lifecycle_stubs(tmpdir)
       calls_path = File.join(tmpdir, "calls")
       mutation_arguments_path = File.join(tmpdir, "mutation-arguments")
       defaults = {
         "BUNDLE_GEMFILE" => nil,
-        "PR_BATCH_SKILL_DIR" => tmpdir,
         "RELEASE_BRANCH" => nil,
         "RELEASE_BRANCH_INPUT" => nil,
-        "RELEASE_LINE_TARGET" => nil,
         "RELEASE_VERSION" => nil,
         "RELEASE_VERSION_INPUT" => "17.0.0",
         "RUBYLIB" => nil,
@@ -279,7 +245,7 @@ RSpec.describe "script/release-forward-port" do
       stdout, stderr, status = Open3.capture3(
         defaults.merge(environment),
         "/bin/bash",
-        stdin_data: release_lifecycle_harness(operation_snippet, bootstrap_calls:),
+        stdin_data: release_lifecycle_harness(operation_snippet),
         chdir: tmpdir
       )
       mutation_arguments =
@@ -290,11 +256,10 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
-  def run_documented_release_line_lease(extra_script, release_version: "17.0.0", environment: {}, bootstrap_calls: 1)
+  def run_documented_release_line_variables(extra_script, release_version: "17.0.0", environment: {})
     run_documented_release_lifecycle(
       extra_script,
-      { "RELEASE_VERSION_INPUT" => release_version }.merge(environment),
-      bootstrap_calls:
+      { "RELEASE_VERSION_INPUT" => release_version }.merge(environment)
     ).first(3)
   end
 
@@ -512,6 +477,38 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  # Adds a release-first commit (no -x footer) as a final-plan PICK and its omitted-pick manifest row.
+  def add_release_first_omission(repo, fixture, subject, replacement_sha: "NONE", omission_class: nil,
+                                 tracking_issue: nil)
+    git(repo, "checkout", "release/1.0.0")
+    write_file(repo, "#{subject.downcase.gsub(/[^a-z0-9]+/, '-')}.txt", "#{subject}\n")
+    release_sha = commit_all(repo, subject)
+    fixture[:release_tip] = release_sha
+    fixture[:plan] += "PICK #{release_sha[0, 12]} #{subject}\n"
+    row = {
+      "release_sha" => release_sha,
+      "origin_sha" => "NONE",
+      "replacement_sha" => replacement_sha,
+      "replacement_disposition" => "NONE",
+      "proof" => "main already carries an equivalent change",
+      "approval" => "maintainer approved the exact omission"
+    }
+    if replacement_sha == "NONE"
+      row["omission_class"] = omission_class
+      row["tracking_issue"] = tracking_issue if tracking_issue
+    else
+      row["replacement_disposition"] = {
+        "replacement_sha" => replacement_sha,
+        "audited_main_sha" => fixture.fetch(:main_tip),
+        "approved_by" => "maintainer",
+        "approval_record" => "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-789"
+      }
+    end
+    fixture.fetch(:manifest).fetch("omitted_picks") << row
+    write_selective_closeout_inputs(repo, fixture)
+    row
+  end
+
   def version_file(version)
     <<~RUBY
       # frozen_string_literal: true
@@ -577,36 +574,32 @@ RSpec.describe "script/release-forward-port" do
     git(repo, "config", "diff.external", external_diff_path)
   end
 
-  describe "documented release-line lease bootstrap" do
-    it "rejects a non-stable canonical version before acquiring the lease" do
-      _stdout, stderr, status = run_documented_release_line_lease("exit 72", release_version: "17.0.0.rc.1")
+  describe "documented release-line variables" do
+    it "rejects a non-stable canonical version before any release command" do
+      _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
+        "git fetch --prune origin main",
+        { "RELEASE_VERSION_INPUT" => "17.0.0.rc.1" }
+      )
 
       expect(status).not_to be_success
-      expect(stderr).to include("release version must be a stable X.Y.Z version; stop")
+      expect(stderr).to include("release version must be X.Y.Z; stop")
+      expect(calls).to be_empty
     end
 
-    it "keeps the canonical release version, target, and branch immutable for the shell lifecycle" do
-      stdout, stderr, status = run_documented_release_line_lease(<<~BASH)
+    it "keeps the canonical release version and branch immutable for the shell lifecycle" do
+      stdout, stderr, status = run_documented_release_line_variables(<<~BASH)
         ( RELEASE_VERSION=17.0.1 ) >/dev/null 2>&1 && exit 70
-        ( RELEASE_LINE_TARGET=release-line:17.0.1 ) >/dev/null 2>&1 && exit 71
         ( RELEASE_BRANCH=release/17.0.1 ) >/dev/null 2>&1 && exit 72
-        printf '%s %s %s\n' "${RELEASE_VERSION}" "${RELEASE_LINE_TARGET}" "${RELEASE_BRANCH}"
+        printf '%s %s\n' "${RELEASE_VERSION}" "${RELEASE_BRANCH}"
       BASH
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("17.0.0 release-line:17.0.0 release/17.0.0")
+      expect(stdout).to include("17.0.0 release/17.0.0")
     end
 
-    it "refuses either pre-existing canonical variable before assignment or coordination" do
-      [
-        { "RELEASE_VERSION" => "17.0.0" },
-        { "RELEASE_LINE_TARGET" => "release-line:17.0.0" },
-        { "RELEASE_BRANCH" => "release/17.0.0" }
-      ].each do |preexisting|
-        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
-          "exit 72",
-          preexisting
-        )
+    it "refuses either pre-existing canonical variable before any release command" do
+      [{ "RELEASE_VERSION" => "17.0.0" }, { "RELEASE_BRANCH" => "release/17.0.0" }].each do |preexisting|
+        _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle("exit 72", preexisting)
 
         expect(status).not_to be_success
         expect(stderr).to include("canonical release variables are already set; start a fresh shell")
@@ -614,11 +607,9 @@ RSpec.describe "script/release-forward-port" do
       end
     end
 
-    it "refuses re-pasting the exact bootstrap in the same interactive shell" do
+    it "refuses re-pasting the release variables in the same shell" do
       _stdout, stderr, status, _mutations, calls = run_documented_release_lifecycle(
-        "exit 72",
-        {},
-        bootstrap_calls: 2
+        documented_release_line_variables_snippet
       )
 
       expect(status).not_to be_success
@@ -626,36 +617,16 @@ RSpec.describe "script/release-forward-port" do
       expect(calls).to be_empty
     end
 
-    it "documents the active coordinator variables alongside the retired lease bootstrap" do
+    it "documents one canonical release version and branch assignment" do
       runbook = File.read(File.join(repo_root, "internal/contributor-info/release-train-runbook.md"))
       snippets = runbook.to_enum(:scan, /```bash\n(.*?)\n[ \t]*```/m).map { Regexp.last_match(1) }
       executable_lines = snippets.flat_map(&:lines).map(&:strip)
 
       expect(executable_lines.grep(/\ARELEASE_VERSION=/)).to eq(
-        [
-          'RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"',
-          'RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact stable X.Y.Z release version}"'
-        ]
+        ['RELEASE_VERSION="${RELEASE_VERSION_INPUT:?set the exact X.Y.Z release version}"']
       )
-      expect(executable_lines.grep(/\ARELEASE_LINE_TARGET=/)).to eq(
-        ['RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"']
-      )
-      expect(executable_lines.grep(/\ARELEASE_BRANCH=/)).to eq(
-        [
-          'RELEASE_BRANCH="release/${RELEASE_VERSION}"',
-          'RELEASE_BRANCH="${RELEASE_BRANCH_INPUT:-release/${RELEASE_VERSION}}"'
-        ]
-      )
-    end
-
-    it "allows an ordinary stable release to select main explicitly" do
-      stdout, stderr, status = run_documented_release_line_lease(
-        'printf \'%s\n\' "${RELEASE_BRANCH}"',
-        environment: { "RELEASE_BRANCH_INPUT" => "main" }
-      )
-
-      expect(status).to be_success, stderr
-      expect(stdout).to include("main")
+      expect(executable_lines.grep(/\ARELEASE_LINE_TARGET=/)).to be_empty
+      expect(executable_lines.grep(/\ARELEASE_BRANCH=/)).to eq(['RELEASE_BRANCH="release/${RELEASE_VERSION}"'])
     end
 
     it "uses the canonical version in every executable release-ref command" do
@@ -687,7 +658,7 @@ RSpec.describe "script/release-forward-port" do
       end
     end
 
-    it "runs exact branch creation and manual closeout snippets through the acquired canonical lifecycle" do
+    it "runs exact branch creation and manual closeout snippets through the canonical lifecycle" do
       [documented_release_branch_creation_snippet, documented_manual_closeout_snippet].each do |snippet|
         environment = { "RELEASE_VERSION_INPUT" => "17.0.1" }
         if snippet == documented_manual_closeout_snippet
@@ -925,7 +896,7 @@ RSpec.describe "script/release-forward-port" do
       expect(arguments).to include("commitHeadline=Backport release fix (#999)")
     end
 
-    it "accepts a matching backport input without retargeting the canonical lease variables" do
+    it "accepts a matching backport input without retargeting the canonical release variables" do
       _stdout, stderr, status, arguments = run_documented_backport_merge(
         lease_version: "17.0.0",
         release_version: "17.0.0",
@@ -966,13 +937,13 @@ RSpec.describe "script/release-forward-port" do
       )
 
       expect(status).not_to be_success
-      expect(stderr).to include("release version must be a stable X.Y.Z version; stop")
+      expect(stderr).to include("release version must be X.Y.Z; stop")
       expect(arguments).to be_empty
     end
   end
 
   describe "documented selective manual closeout validator" do
-    it "accepts a selective-closeout version that matches the held lease" do
+    it "accepts a selective-closeout version that matches the canonical release version" do
       stdout, stderr, status, arguments = run_documented_selective_closeout_setup(
         lease_version: "17.0.0",
         closeout_version: "17.0.0"
@@ -1038,6 +1009,110 @@ RSpec.describe "script/release-forward-port" do
 
         expect(status).not_to be_success
         expect(stderr).to include("replacement disposition is stale or main-tip-mismatched")
+      end
+    end
+
+    it "accepts release-first omissions that have a main replacement or an explicit omission class" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        add_release_first_omission(repo, fixture, "Fix renderer timeout (#4845)",
+                                   replacement_sha: fixture.fetch(:replacement_sha))
+        add_release_first_omission(repo, fixture, "Fix test-only flake (#5087)",
+                                   replacement_sha: fixture.fetch(:replacement_sha))
+        add_release_first_omission(repo, fixture, "Release: set package versions for 1.0.0.rc.2 (#4997)",
+                                   omission_class: "version-only")
+        add_release_first_omission(repo, fixture, "Revert live main patch (#5070)", omission_class: "revert-of-live")
+        add_release_first_omission(repo, fixture, "Qualify Rspack support (#5026)",
+                                   omission_class: "deferred",
+                                   tracking_issue: "https://github.com/shakacode/react_on_rails/issues/5120")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).to be_success, stderr
+      end
+    end
+
+    it "rejects a release-first omission without a replacement unless it names a known omission class" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Qualify Rspack support (#5066)", omission_class: "later")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("release-first omission without a replacement needs omission_class")
+
+        row.delete("omission_class")
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+      end
+    end
+
+    it "rejects a deferred release-first omission without its own bare tracking issue" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Qualify Rspack support (#5066)", omission_class: "deferred")
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+
+        row["tracking_issue"] = "https://github.com/shakacode/react_on_rails/issues/123#issuecomment-789"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 tracking_issue must be a bare issue URL")
+
+        row["tracking_issue"] = "https://github.com/shakacode/react_on_rails/issues/5066"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 tracking_issue names the omitted change itself")
+      end
+    end
+
+    it "rejects an omission class on rows that are not unreplaced release-first omissions" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        row = add_release_first_omission(repo, fixture, "Fix renderer timeout (#4845)",
+                                         replacement_sha: fixture.fetch(:replacement_sha))
+        row["omission_class"] = "deferred"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 shape is invalid")
+
+        row.delete("omission_class")
+        main_origin_row = fixture.fetch(:manifest).fetch("omitted_picks").fetch(0)
+        main_origin_row["omission_class"] = "deferred"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 0 shape is invalid")
+      end
+    end
+
+    it "rejects a release-first row whose release commit has a -x footer" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        main_origin_row = fixture.fetch(:manifest).fetch("omitted_picks").fetch(0)
+        main_origin_row["origin_sha"] = "NONE"
+        write_selective_closeout_inputs(repo, fixture)
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 0 release-first commit has a -x footer")
+      end
+    end
+
+    it "rejects a release-first replacement that is not on audited main" do
+      with_selective_closeout_validator_fixture do |repo, fixture|
+        add_release_first_omission(repo, fixture, "Fix renderer timeout (#4928)",
+                                   replacement_sha: fixture.fetch(:manual_sha))
+        _stdout, stderr, status = run_documented_selective_closeout_validator(repo, fixture)
+
+        expect(status).not_to be_success
+        expect(stderr).to include("row 1 replacement is not an ancestor of audited main")
       end
     end
 
@@ -1270,6 +1345,84 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status.exitstatus).to eq(1)
       expect(stderr).to include("CHECK FAILED")
+    end
+  end
+
+  it "binds a final changelog whose provenance sentence the merge queue wrapped" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Final release fix. (PR #101)\n"
+      )
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Final release fix. (PR #101)\n"
+      )
+      git(repo, "add", "CHANGELOG.md")
+      record_final = lambda do |provenance, *amend|
+        git(repo, "commit", "--no-gpg-sign", *amend, "-m",
+            "Record the final React on Rails 1.0.1 changelog (#999)", "-m", provenance)
+      end
+
+      record_final.call("Not yet: The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`.")
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      expect(status.exitstatus).to eq(1), stderr
+
+      record_final.call("The final changelog records source CHANGELOG.md commit\n`#{source_changelog_sha}`.", "--amend")
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+
+      own_line = "Fixes #123.\nThe final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+      record_final.call(own_line, "--amend")
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      expect(status).to be_success, stderr
+    end
+  end
+
+  it "binds a final changelog whose provenance sentence was folded at 72 columns into a paragraph" do
+    with_release_repo do |repo|
+      changelog = "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n" \
+                  "- Final release fix. (PR #101)\n"
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "CHANGELOG.md", changelog)
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+      write_file(repo, "CHANGELOG.md", changelog)
+      git(repo, "add", "CHANGELOG.md")
+
+      fold = lambda do |paragraph|
+        paragraph.split.each_with_object([+""]) do |word, lines|
+          lines << +"" if !lines.last.empty? && lines.last.length + word.length + 1 > 72
+          lines.last << (lines.last.empty? ? word : " #{word}")
+        end.join("\n")
+      end
+      record_final = lambda do |paragraph|
+        body = fold.call(paragraph)
+        expect(body.lines).to all(satisfy { |line| line.chomp.length <= 72 })
+        git(repo, "commit", "--no-gpg-sign", "--allow-empty", "--amend", "-m",
+            "Record the final React on Rails 1.0.1 changelog (#999)", "-m", body)
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      end
+      git(repo, "commit", "--no-gpg-sign", "-m", "Record the final React on Rails 1.0.1 changelog (#999)")
+      sentence = "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+
+      stdout, stderr, status = record_final.call("Records the final 1.0.1 changelog on main. #{sentence} Thanks.")
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+
+      _stdout, stderr, status = record_final.call("Records the final 1.0.1 changelog on main, not yet: #{sentence}")
+      expect(status.exitstatus).to eq(1), stderr
     end
   end
 
@@ -3731,6 +3884,29 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).not_to include("PICK #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
       expect(git(repo, "rev-list", "--count", "main").strip).to eq(restored_count)
       expect(File.read(File.join(repo, "react_on_rails/lib/react_on_rails/version.rb"))).to include("1.0.0")
+    end
+  end
+
+  it "classifies the `Release: bump versions to` subject form like `Bump version to`" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.2"))
+      rc_bump_sha = commit_all(repo, "Release: bump versions to 1.0.1.rc.2")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1.rc.3"))
+      bare_plural_rc_bump_sha = commit_all(repo, "Bump versions to 1.0.1.rc.3")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      stable_bump_sha = commit_all(repo, "Release: bump version to 1.0.1")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Release: bump versions to 1.0.1.rc.2")
+      expect(stdout).to include("rc version bump commit")
+      expect(stdout).to include("SKIP #{bare_plural_rc_bump_sha[0, 12]} Bump versions to 1.0.1.rc.3")
+      expect(stdout).to include("MANUAL #{stable_bump_sha[0, 12]} Release: bump version to 1.0.1")
+      expect(stdout).to include("stable release version bump commit")
+      expect(stdout).not_to include("PICK ")
     end
   end
 

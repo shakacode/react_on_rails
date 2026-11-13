@@ -37,8 +37,30 @@ Rails.application.configure do
   config.consider_all_requests_local       = true
   config.action_controller.perform_caching = false
 
-  # disable caching for tests
-  config.cache_store = :null_store
+  # Disable caching for tests. Browser (:js) specs are the exception: Capybara
+  # drives an external `rails server` process (Capybara.run_server = false), so
+  # an in-process cache swap can never reach the server answering the browser.
+  # When E2E_SHARED_CACHE_DIR is set, that server uses a file store instead:
+  # files are visible across processes, so the RSpec process can assert real
+  # cache-write and cache-hit evidence, and PPR's cold->warm flow genuinely
+  # runs (see spec/system/ppr_system_spec.rb). A relative path resolves against
+  # the server's working directory (spec/dummy in CI and in local runs).
+  config.cache_store = if ENV["E2E_SHARED_CACHE_DIR"]
+                         [:file_store, File.expand_path(ENV["E2E_SHARED_CACHE_DIR"])]
+                       else
+                         :null_store
+                       end
+
+  # ShakaPerf PPR benchmark gate (issue #5103): the gate boots this app with
+  # RAILS_ENV=test (mirroring the rsc-fouc gate) but measures *warm-hit* PPR
+  # requests, which require a real cache store — with :null_store every
+  # ppr_react_component lookup is a miss and the gate would silently measure
+  # cold prerenders. Opt-in via env so normal test runs keep the
+  # deterministic :null_store.
+  if ENV["SHAKAPERF_PPR_CACHE"] == "true"
+    config.action_controller.perform_caching = true
+    config.cache_store = :memory_store, { size: 64.megabytes }
+  end
 
   # Raise exceptions instead of rendering exception templates.
   config.action_dispatch.show_exceptions = :none

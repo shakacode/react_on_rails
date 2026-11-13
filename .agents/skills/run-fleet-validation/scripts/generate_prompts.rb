@@ -356,22 +356,16 @@ module FleetValidation
 
         Subagent plan (required):
         1. Spawn one read-only evidence subagent covering all assigned targets. It must inspect the
-           tracker, targeted coordination state, existing bump PRs, required checks, and repo-local
+           tracker, Shaka `claim` results, existing bump PRs, required checks, and repo-local
            instructions, then return a passed/blocked/pending/unknown matrix with links. It must not edit
            or post.
-        2. Before starting a mutable app worker, acquire or resume its authoritative `agent-coord` claim
-           under the candidate-specific batch/target recorded in live coordination. If no lane exists for
-           a fresh target, use its generated fallback claim target shown below. Never use the fallback to
-           bypass an active/refused existing claim or completed handoff. Follow
-           `.agents/workflows/pr-processing.md`: targeted status is preflight only; the claim is the
-           compare-and-swap gate. Hard-stop that target on CLAIM_REFUSED. On claim timeout or unknown
-           outcome, report UNKNOWN and do not create a branch/worktree. Resume another owner's work only
-           through an explicit fenced handoff. Replace `RESOLVED_TAG` in a fallback template with the exact
-           tag before status/claim and use the displayed fallback claim repository; never submit the
-           template literally. Heartbeat successful claims at phase transitions.
+        2. Before starting a mutable app worker, run Shaka `claim` for that target and check its open
+           PRs and remote branches. If another owner already holds the target, skip it and report the
+           owner; resume another owner's work only through an explicit handoff. If the check cannot
+           complete, report UNKNOWN and do not create a branch/worktree.
         3. Concurrently spawn one execution subagent for the assigned monorepo generator/install gate,
-           if present, plus one per successfully claimed app target (maximum #{targets.length} here). The
-           monorepo worker needs no app claim and runs the local checkout commands plus the published
+           if present, plus one per app target with no other owner (maximum #{targets.length} here). The
+           monorepo worker needs no app claim check and runs the local checkout commands plus the published
            three-mode matrix in an isolated scratch directory. Every app worker uses its own scratch
            clone/worktree, validates or updates the existing release bump, runs the effective
            install/build/test/smoke ladder, and prepares exact public-safe evidence.
@@ -454,8 +448,6 @@ module FleetValidation
         - #{target.fetch('name')} — #{target.fetch('headline')}
           packages: #{packages}
           needs_pro: #{target.fetch('needs_pro')}; package_manager: #{target.fetch('package_manager')}
-          fallback_claim_repo: shakacode/react_on_rails
-          fallback_claim_target_template: adhoc:fleet-RESOLVED_TAG-#{stable_target_id(target)}
           install: #{install_command(target.fetch('package_manager'))}
           ruby_test: #{target.fetch('ruby_test')}; js_test: #{target['js_test'] || 'none'}
           build: #{target.fetch('build')}; smoke: #{target.fetch('smoke', []).join(', ')}
@@ -491,9 +483,8 @@ module FleetValidation
           published `react_on_rails`, `react_on_rails_pro`, `react-on-rails`, `react-on-rails-pro`,
           `react-on-rails-pro-node-renderer`, and `create-react-on-rails-app` packages plus the matching git
           tag. Normalize RubyGems/npm RC or beta spelling before comparison and derive the release line from
-          that exact tag before selecting a tracker. Under `shakacode/react_on_rails`, acquire the
-          coordination snapshot claim `adhoc:fleet-snapshot-RESOLVED_TAG` after replacing `RESOLVED_TAG`
-          with the exact tag. Never submit the template literally; a refused claim is a hard stop.
+          that exact tag before selecting a tracker. If the tracker already has a snapshot comment for this
+          pack, use it instead of posting a second one.
       STEPS
     end
 
@@ -512,8 +503,6 @@ module FleetValidation
             `tracker_mode: INITIAL_TRACKER_MODE`. Replace both placeholders with the exact resolved
             values. The independent checker must
             copy both exact values from that unique snapshot comment rather than the ledger.
-            Heartbeat/close the snapshot claim only after the
-            public-safe comment is readable.
         STEPS
       else
         <<~STEPS.chomp
@@ -540,7 +529,7 @@ module FleetValidation
         <<~STEPS.chomp
           - Find the open `Release gate: react_on_rails X.Y.Z` tracking issue for that release line. Do not
             create a second tracker. A tracker spans multiple candidates: use its newest explicit RC section
-            or comment and targeted coordination status, not an older version still present in the issue body.
+            or comment, not an older version still present in the issue body.
             If the current candidate has no authoritative entry or live sources conflict, stop writes and
             report UNKNOWN with evidence.
         STEPS
@@ -548,7 +537,7 @@ module FleetValidation
         <<~STEPS.chomp
           - Find the open `Release gate: react_on_rails X.Y.Z` tracking issue for the release line containing
             the pinned #{@release_selector} candidate. Do not create a second tracker. Use only the exact
-            candidate's section/comments plus targeted coordination state for candidate evidence. Newer
+            candidate's section/comments for candidate evidence. Newer
             candidate entries are context and must not override the pinned selector. If authoritative
             artifacts or the matching tag conflict with the pinned selector, stop writes and report UNKNOWN.
         STEPS

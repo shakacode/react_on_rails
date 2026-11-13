@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "ripper"
+require "open3"
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
@@ -38,6 +39,69 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
   describe "rendered serverWebpackConfig.js.tt" do
     let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
 
+    # Shakapacker's Rspack config adds rspack-manifest-plugin and CssExtractRspackPlugin where its
+    # webpack config adds WebpackAssetsManifest and MiniCssExtractPlugin (issue #5184). The rendered
+    # config runs against stand-ins with the real class names and export shapes.
+    let(:server_bundle_build_script) do
+      <<~JS
+        const fs = require('fs');
+        const vm = require('vm');
+        const { source, bundler } = JSON.parse(fs.readFileSync(0, 'utf8'));
+        const rspack = bundler === 'rspack';
+        class LimitChunkCountPlugin {}
+        class EnvironmentPlugin {}
+        class WebpackAssetsManifest {}
+        class MiniCssExtractPlugin {}
+        class ForkTsCheckerWebpackPlugin {}
+        // rspack-manifest-plugin declares this class and exports it as both names.
+        class WebpackManifestPlugin {}
+        class CssExtractRspackPlugin {}
+        const extractLoader = rspack
+          ? '/app/node_modules/@rspack/core/dist/cssExtractLoader.js'
+          : '/app/node_modules/mini-css-extract-plugin/dist/loader.js';
+        const common = () => ({
+          entry: { 'server-bundle': './server-bundle.js' },
+          module: { rules: [{ use: [extractLoader, { loader: 'css-loader', options: {} }] }] },
+          plugins: rspack
+            ? [new EnvironmentPlugin(), new WebpackManifestPlugin(), new CssExtractRspackPlugin()]
+            : [
+                new EnvironmentPlugin(),
+                new WebpackAssetsManifest(),
+                new MiniCssExtractPlugin(),
+                new ForkTsCheckerWebpackPlugin(),
+              ],
+        });
+        const dependencies = {
+          shakapacker: { config: { assets_bundler: bundler, privateOutputPath: '/app/ssr-generated' } },
+          './commonWebpackConfig': common,
+          path: require('path'),
+          fs: { existsSync: () => true },
+          ...(rspack
+            ? {
+                '@rspack/core': { optimize: { LimitChunkCountPlugin }, CssExtractRspackPlugin },
+                'rspack-manifest-plugin': { RspackManifestPlugin: WebpackManifestPlugin, WebpackManifestPlugin },
+              }
+            : { webpack: { optimize: { LimitChunkCountPlugin } } }),
+        };
+        const context = {
+          module: { exports: {} },
+          process: { env: {} },
+          __dirname: '/app/config/webpack',
+          console: { log() {}, warn() {} },
+          require: (name) => {
+            if (!(name in dependencies)) throw new Error('Unexpected dependency: ' + name);
+            return dependencies[name];
+          },
+        };
+        vm.runInNewContext(source, context);
+        const config = context.module.exports();
+        process.stdout.write(JSON.stringify({
+          plugins: config.plugins.map((plugin) => plugin.constructor.name),
+          loaders: config.module.rules[0].use.map((item) => (typeof item === 'string' ? item : item.loader)),
+        }));
+      JS
+    end
+
     def render_server_webpack_config(options = {})
       described_class.new([], options, { destination_root: destination })
                      .send(:rendered_template_for_cleanup, "base/base/config/webpack/serverWebpackConfig.js.tt")
@@ -50,6 +114,29 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
 
       expect(content.scan("loaderPath.includes('cssExtractLoader')").size).to eq(2)
       expect(content.scan("loaderPath.includes('mini-css-extract-plugin')").size).to eq(2)
+    end
+
+    def build_server_bundle_config(bundler)
+      stdout, stderr, status = Open3.capture3(
+        "node", "-e", server_bundle_build_script,
+        stdin_data: JSON.generate(source: render_server_webpack_config, bundler:)
+      )
+      expect(status.success?).to be(true), stderr
+      JSON.parse(stdout)
+    end
+
+    it "drops Rspack's manifest and CSS extraction plugins from the server bundle" do
+      expect(build_server_bundle_config("rspack")).to eq(
+        "plugins" => %w[LimitChunkCountPlugin EnvironmentPlugin],
+        "loaders" => ["css-loader"]
+      )
+    end
+
+    it "drops webpack's client-only plugins without loading rspack-manifest-plugin" do
+      expect(build_server_bundle_config("webpack")).to eq(
+        "plugins" => %w[LimitChunkCountPlugin EnvironmentPlugin],
+        "loaders" => ["css-loader"]
+      )
     end
 
     it "merges exportOnlyLocals into existing CSS module options instead of replacing them" do

@@ -4,6 +4,7 @@ version: 1
 base_branch: main
 review:
   required: meaningful_changes
+  local_review_count: 2
   ci_review_jobs:
   - claude-review
   local_review_agents:

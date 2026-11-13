@@ -3,6 +3,15 @@ name: JS unit tests for Renderer package
 permissions:
   contents: read
 
+concurrency:
+  group: >-
+    ${{
+      github.event.pull_request.number &&
+      format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) ||
+      format('{0}-{1}', github.workflow, github.run_id)
+    }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
@@ -66,6 +75,8 @@ jobs:
           PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
           PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
           EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+          # Force-pushes run every test suite (#5119).
+          EVENT_FORCED: ${{ github.event.forced || false }}
         run: |
           # Force-full hosted CI is the explicit escape hatch that bypasses
           # optimized change selection. Hosted readiness alone stays path-based.
@@ -112,6 +123,22 @@ jobs:
           # main, merge queue, release target, or explicit force-full hosted CI.
           - node-version: ${{ needs.detect-changes.outputs.should_use_full_matrix != 'true' && '20' || '' }}
     runs-on: ubuntu-22.04
+    # Redis service for the env-gated RedisCacheHandler integration suite —
+    # mirrors pro-test-package-and-gem.yml's package-js-tests job so the suite
+    # runs (not describe.skip) everywhere `pnpm --filter react-on-rails-pro test`
+    # runs in CI. The suite's CI tripwire fails closed if this wiring is lost.
+    services:
+      redis:
+        image: public.ecr.aws/docker/library/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      REDIS_TEST_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
         with:

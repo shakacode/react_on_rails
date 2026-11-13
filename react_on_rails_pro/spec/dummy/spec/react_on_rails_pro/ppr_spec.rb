@@ -74,6 +74,55 @@ describe ReactOnRailsPro::Ppr do
           .to eq(ReactOnRailsPro::Ppr::UNKNOWN_REACT_VERSION_CACHE_KEY)
       end
     end
+
+    # Memoization behavior (#5002): the version participates in every PPR cache key,
+    # so detection must not re-read package.json per render outside development.
+    it "memoizes the detected version outside development (a later file change is not seen)" do
+      Dir.mktmpdir do |dir|
+        package_json = File.join(dir, "node_modules", "react-dom", "package.json")
+        FileUtils.mkdir_p(File.dirname(package_json))
+        File.write(package_json, { name: "react-dom", version: "19.2.7" }.to_json)
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        allow(ReactOnRails.configuration).to receive(:node_modules_location).and_return(nil)
+
+        expect(described_class.react_version_cache_key).to eq("react-19.2.7")
+        File.write(package_json, { name: "react-dom", version: "99.0.0" }.to_json)
+
+        expect(described_class.react_version_cache_key).to eq("react-19.2.7")
+      end
+    end
+
+    it "re-detects after reset_react_version_cache_key! (the test-only seam)" do
+      Dir.mktmpdir do |dir|
+        package_json = File.join(dir, "node_modules", "react-dom", "package.json")
+        FileUtils.mkdir_p(File.dirname(package_json))
+        File.write(package_json, { name: "react-dom", version: "19.2.7" }.to_json)
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        allow(ReactOnRails.configuration).to receive(:node_modules_location).and_return(nil)
+
+        expect(described_class.react_version_cache_key).to eq("react-19.2.7")
+        File.write(package_json, { name: "react-dom", version: "99.0.0" }.to_json)
+        described_class.reset_react_version_cache_key!
+
+        expect(described_class.react_version_cache_key).to eq("react-99.0.0")
+      end
+    end
+
+    it "does not memoize in development, where node_modules can change under a running server" do
+      Dir.mktmpdir do |dir|
+        package_json = File.join(dir, "node_modules", "react-dom", "package.json")
+        FileUtils.mkdir_p(File.dirname(package_json))
+        File.write(package_json, { name: "react-dom", version: "19.2.7" }.to_json)
+        allow(Rails).to receive_messages(root: Pathname.new(dir),
+                                         env: ActiveSupport::StringInquirer.new("development"))
+        allow(ReactOnRails.configuration).to receive(:node_modules_location).and_return(nil)
+
+        expect(described_class.react_version_cache_key).to eq("react-19.2.7")
+        File.write(package_json, { name: "react-dom", version: "99.0.0" }.to_json)
+
+        expect(described_class.react_version_cache_key).to eq("react-99.0.0")
+      end
+    end
   end
 
   describe ".compute_checksum" do

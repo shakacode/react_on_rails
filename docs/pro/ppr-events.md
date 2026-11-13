@@ -19,7 +19,7 @@ All constants live on `ReactOnRailsPro::Ppr` (e.g. `ReactOnRailsPro::Ppr::CACHE_
 
 | Event                            | Fires when                                                                                                                | Payload                                                                                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ppr.cache.lookup`               | Once per `ppr_react_component` invocation, at the validated cache read                                                    | `component_name`, `outcome` (`:hit` \| `:miss`)                                                                                                            |
+| `ppr.cache.lookup`               | Once per `ppr_react_component` invocation that reaches the validated cache read                                           | `component_name`, `outcome` (`:hit` \| `:miss`)                                                                                                            |
 | `ppr.static_shell`               | A render completed with no Suspense holes (blank `postponed_state`) and no render error                                   | `component_name`                                                                                                                                           |
 | `ppr.cache.write`                | A shell + PostponedState envelope was persisted                                                                           | `component_name`, `cache_key` (raw — see below), `tags_registered` (`false` when the persisted entry's cache-tag registration failed — see ordering below) |
 | `ppr.cache.write_refused`        | NO entry was persisted: the write was skipped (render error, expired cache options) or the store raised/returned falsy    | `component_name`, `reason` (`"render_error"` \| `"expired"` \| `"store_error"`)                                                                            |
@@ -33,7 +33,7 @@ Full event names carry the `.react_on_rails_pro` suffix, e.g. `ppr.cache.lookup.
 
 ## `ppr.cache.lookup` — cache effectiveness
 
-The hit/miss counter. Exactly **one** lookup event fires per `ppr_react_component` invocation, decided by the validated cache read before any render work:
+The hit/miss counter. Exactly **one** lookup event fires per `ppr_react_component` invocation that reaches the validated cache read, decided before any render work (an invocation that raises earlier emits `ppr.render.abort` instead, never a lookup):
 
 - `outcome: :hit` — a validated cached envelope was found; the cached shell serves with no prerender request.
 - `outcome: :miss` — no usable entry: first visit, expired, evicted as invalid, or a cache read error. The full prerender runs.

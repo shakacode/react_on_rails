@@ -10,7 +10,7 @@ React on Rails Pro supports streaming server rendering using React 18/19's `rend
 React 18 applications can progressively stream ordinary components with Suspense and synchronous props without
 installing or enabling React Server Components. React 16 and 17 remain compatible through synchronous SSR fallback,
 provided the rendered tree does not actually suspend; `renderToString` cannot complete SSR for a suspended child such
-as `React.lazy`. Async props and React Server Components require React/React DOM 19.2.x with patch 19.2.7 or newer. See
+as `React.lazy`. Async props and React Server Components require React/React DOM 19.2.7 or newer (19.2.x or 19.3.x). See
 [React 18 Streaming Without RSC](../../pro/streaming-ssr.md#react-18-streaming-without-rsc) for a complete example.
 :::
 

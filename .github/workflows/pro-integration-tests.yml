@@ -3,6 +3,15 @@ name: React on Rails Pro - Integration Tests
 permissions:
   contents: read
 
+concurrency:
+  group: >-
+    ${{
+      github.event.pull_request.number &&
+      format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) ||
+      format('{0}-{1}', github.workflow, github.run_id)
+    }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
@@ -71,6 +80,8 @@ jobs:
           PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
           PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
           EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+          # Force-pushes run every test suite (#5119).
+          EVENT_FORCED: ${{ github.event.forced || false }}
         working-directory: .
         run: |
           # Force-full hosted CI is the explicit escape hatch that bypasses
@@ -214,7 +225,11 @@ jobs:
     # Redis backs streamed RSC fixtures covered by the request specs.
     services:
       redis:
-        image: public.ecr.aws/docker/library/redis:6.2.6
+        # Docker Hub's official image, pinned by digest. GitHub-hosted runners
+        # are exempt from Docker Hub pull limits. ECR Public allows anonymous
+        # pulls only 500 GB/month per source IP, which shared runner IPs use up.
+        # yamllint disable-line rule:line-length
+        image: docker.io/library/redis:6.2.6@sha256:b7fd1a2c89d09a836f659d72c52d27b9f71202c97014a47639f87c992e8c0f1b
         ports:
           - 6379:6379
         options: >-
@@ -323,7 +338,12 @@ jobs:
       - name: Run Rails server in background
         run: |
           cd spec/dummy
-          RAILS_ENV="test" bundle exec rails server &
+          # E2E_SHARED_CACHE_DIR switches this server's Rails.cache from
+          # :null_store to a file store (config/environments/test.rb) so the
+          # PPR browser spec can observe cache writes and hits across
+          # processes (spec/system/ppr_system_spec.rb). Only the server gets
+          # the var: the rspec step below keeps :null_store.
+          RAILS_ENV="test" E2E_SHARED_CACHE_DIR="tmp/e2e_shared_cache" bundle exec rails server &
 
       - name: Wait for Rails server to start
         run: |
@@ -417,7 +437,11 @@ jobs:
     # Redis service container
     services:
       redis:
-        image: public.ecr.aws/docker/library/redis:6.2.6
+        # Docker Hub's official image, pinned by digest. GitHub-hosted runners
+        # are exempt from Docker Hub pull limits. ECR Public allows anonymous
+        # pulls only 500 GB/month per source IP, which shared runner IPs use up.
+        # yamllint disable-line rule:line-length
+        image: docker.io/library/redis:6.2.6@sha256:b7fd1a2c89d09a836f659d72c52d27b9f71202c97014a47639f87c992e8c0f1b
         ports:
           - 6379:6379
         options: >-
@@ -596,7 +620,11 @@ jobs:
       SHAKAPACKER_ASSETS_BUNDLER: rspack
     services:
       redis:
-        image: public.ecr.aws/docker/library/redis:6.2.6
+        # Docker Hub's official image, pinned by digest. GitHub-hosted runners
+        # are exempt from Docker Hub pull limits. ECR Public allows anonymous
+        # pulls only 500 GB/month per source IP, which shared runner IPs use up.
+        # yamllint disable-line rule:line-length
+        image: docker.io/library/redis:6.2.6@sha256:b7fd1a2c89d09a836f659d72c52d27b9f71202c97014a47639f87c992e8c0f1b
         ports:
           - 6379:6379
         options: >-

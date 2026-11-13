@@ -232,6 +232,7 @@ const sidebars: SidebarsConfig = {
         'pro/rolling-deploy-adapters',
         'pro/rolling-deploy-custom-adapters',
         'pro/fragment-caching',
+        'pro/ppr-runtime-requirements',
         'pro/ppr-cache-warm-up',
         'pro/ppr-events',
         'pro/js-memory-leaks',

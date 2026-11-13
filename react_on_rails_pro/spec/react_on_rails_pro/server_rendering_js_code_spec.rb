@@ -274,6 +274,65 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           .with(:renderer_artifact_snapshot, identities).twice
       end
 
+      context "when rendering on the RSC payload endpoint (rsc_payload_streaming)" do
+        let(:payload_render_options) do
+          instance_double(
+            ReactOnRails::ReactComponent::RenderOptions,
+            internal_option: nil,
+            streaming?: true,
+            rsc_payload_streaming?: true,
+            ppr_prerender?: false,
+            ppr_resume?: false,
+            dom_id: "TestComponent-0",
+            trace: false
+          )
+        end
+
+        before do
+          allow(payload_render_options).to receive(:set_option)
+        end
+
+        it "publishes rscBundleHash so the RSC runtime can initialize BUILD_ID (#5076)" do
+          result = described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            payload_render_options
+          )
+
+          expect(result).to include('rscBundleHash: "rsc-artifact-id-before-drift"')
+        end
+
+        it "still prevents nested RSC payload generation" do
+          result = described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            payload_render_options
+          )
+
+          expect(result).to include("throw new Error")
+          expect(result).to include("already running on the RSC bundle")
+        end
+
+        it "does not publish renderingRequest (only the page path needs it)" do
+          result = described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            payload_render_options
+          )
+
+          # The payload branch should not include renderingRequest in serverSideRSCPayloadParameters
+          expect(result).not_to include("renderingRequest,")
+          # But it should include rscBundleHash
+          expect(result).to include("rscBundleHash:")
+        end
+      end
+
       it "keeps the per-bundle dispatch for PPR prerender renders (#4659 defect 3)" do
         allow(render_options).to receive_messages(ppr_prerender?: true, streaming?: true)
         allow(ReactOnRailsPro.configuration).to receive(:ppr_settle_budget_ms).and_return(500)
@@ -398,6 +457,28 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
 
         expect(render_js).to include('railsContext.pprPostponedState = "{\"step\":1}";')
+      end
+
+      # Wire-key pin: `railsContext.pprShellAssets` carries the cached shell's asset
+      # manifest (stylesheet hrefs + init-script keys) to the resume render so it can
+      # suppress duplicates (#4897). Renaming either side silently disables the dedup
+      # (#5002 break-it M10: the suite stayed green with this emission removed).
+      it "injects the shell asset manifest under the pinned railsContext.pprShellAssets wire key" do
+        allow(render_options).to receive(:ppr_resume?).and_return(true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+        allow(render_options).to receive(:internal_option)
+          .with(:ppr_shell_assets).and_return('{"stylesheetHrefs":[],"initScriptKeys":["K1"]}')
+
+        expect(render_js)
+          .to include('railsContext.pprShellAssets = "{\"stylesheetHrefs\":[],\"initScriptKeys\":[\"K1\"]}";')
+      end
+
+      it "omits pprShellAssets from the resume context when the cached entry carried no manifest" do
+        allow(render_options).to receive(:ppr_resume?).and_return(true)
+        allow(render_options).to receive(:internal_option).with(:ppr_postponed_state).and_return('{"step":1}')
+        allow(render_options).to receive(:internal_option).with(:ppr_shell_assets).and_return(nil)
+
+        expect(render_js).not_to include("pprShellAssets")
       end
     end
   end

@@ -32,6 +32,7 @@ import {
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
+import { createEmbeddedPayloadKey } from '../src/utils.ts';
 // Registers the PPR APIs from react-dom, exactly like an app's server bundle entry does — the
 // registry is the only source the renderers load from.
 import '../src/pprSupport.ts';
@@ -103,6 +104,13 @@ const PprShellWithRSCHole = (props, railsContext) => {
     <div>
       <h1>{SHELL_HEADER_TEXT}</h1>
       <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        {/* Boundary-committed marker inside the Suspense — discarded when postponed (#5019-A) */}
+        <span
+          data-rsc-committed={createEmbeddedPayloadKey('PostponedRSCComponent', {
+            marker: RSC_PAYLOAD_MARKER,
+          })}
+          style={{ display: 'none' }}
+        />
         <DelayedHole {...props} />
       </React.Suspense>
     </div>
@@ -138,7 +146,17 @@ const PprShellWithMixedRSC = (props, railsContext) => {
   return (
     <div>
       <h1>{SHELL_HEADER_TEXT}</h1>
+      {/* FastRSCComponent marker OUTSIDE the Suspense — always committed to shell */}
+      <span
+        data-rsc-committed={createEmbeddedPayloadKey('FastRSCComponent', { type: 'fast' })}
+        style={{ display: 'none' }}
+      />
       <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        {/* SlowRSCComponent marker INSIDE the Suspense — discarded when postponed */}
+        <span
+          data-rsc-committed={createEmbeddedPayloadKey('SlowRSCComponent', { type: 'slow' })}
+          style={{ display: 'none' }}
+        />
         <DelayedHole {...props} />
       </React.Suspense>
     </div>
@@ -270,6 +288,8 @@ describe('pprServerRenderedReactComponent', () => {
     props = {},
     postponedStateJson,
     throwJsErrors = false,
+    generateRSCPayload,
+    pprShellAssets,
   }) => {
     ReactOnRails.register({ [componentName]: component });
     return pprResumeServerRenderedReactComponent({
@@ -278,9 +298,11 @@ describe('pprServerRenderedReactComponent', () => {
       trace: false,
       props,
       throwJsErrors,
+      ...(generateRSCPayload ? { generateRSCPayload } : {}),
       railsContext: {
         ...testingRailsContext,
         ...(postponedStateJson != null ? { pprPostponedState: postponedStateJson } : {}),
+        ...(pprShellAssets != null ? { pprShellAssets } : {}),
       },
     });
   };
@@ -544,6 +566,8 @@ describe('pprServerRenderedReactComponent', () => {
   });
 
   it('captures the asset manifest in the prerender trailing protocol chunk', async () => {
+    // The test components are plain React (no RSC), so the manifest arrays are empty —
+    // but the structure is still captured for the resume pass to pre-seed its dedup sets.
     const { chunks, errors } = await collectStreamResult(runPrerender());
     expect(errors).toHaveLength(0);
 
@@ -559,18 +583,7 @@ describe('pprServerRenderedReactComponent', () => {
     expect(manifest).toHaveProperty('initScriptKeys');
     expect(Array.isArray(manifest.stylesheetHrefs)).toBe(true);
     expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
-  });
-
-  it('captures the asset manifest even when the prerender has no RSC payloads (empty arrays)', async () => {
-    // The test components are plain React (no RSC), so the manifest should have empty arrays —
-    // the manifest structure is still captured and stored for the resume pass.
-    const { chunks, errors } = await collectStreamResult(runPrerender());
-    expect(errors).toHaveLength(0);
-
-    const trailingChunk = chunks[chunks.length - 1];
-    const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
-
-    // Empty arrays are valid — the resume pass pre-seeds its dedup sets from them.
+    // Empty arrays are valid when no RSC payloads were registered.
     expect(manifest.stylesheetHrefs).toEqual([]);
     expect(manifest.initScriptKeys).toEqual([]);
   });
@@ -677,9 +690,29 @@ describe('pprServerRenderedReactComponent', () => {
       }
     });
 
-    it('does not throw when both AbortController and real setTimeout are available', () => {
-      // The default Jest/Node environment has both — this is the happy path.
-      expect(() => validatePPRRuntimeEnvironment()).not.toThrow();
+    it('throws when setTimeout is completely undefined (not just stubbed), naming stubTimers', () => {
+      const originalSetTimeout = globalThis.setTimeout;
+      const originalClearTimeout = globalThis.clearTimeout;
+      // @ts-expect-error — deliberately removing setTimeout to simulate supportModules:false VM
+      delete globalThis.setTimeout;
+      try {
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/stubTimers/);
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/RENDERER_STUB_TIMERS/);
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+        globalThis.clearTimeout = originalClearTimeout;
+      }
+    });
+
+    it('throws when clearTimeout is completely undefined, naming stubTimers', () => {
+      const originalClearTimeout = globalThis.clearTimeout;
+      // @ts-expect-error — deliberately removing clearTimeout
+      delete globalThis.clearTimeout;
+      try {
+        expect(() => validatePPRRuntimeEnvironment()).toThrow(/stubTimers/);
+      } finally {
+        globalThis.clearTimeout = originalClearTimeout;
+      }
     });
 
     it('surfaces the preflight error through the prerender stream when no caller signal is provided', async () => {
@@ -707,11 +740,14 @@ describe('pprServerRenderedReactComponent', () => {
         const controller = new AbortController();
         // Abort immediately so the render completes quickly.
         controller.abort();
-        const { errors } = await collectStreamResult(
+        const { chunks, errors } = await collectStreamResult(
           runPrerender({ signal: controller.signal, throwJsErrors: false }),
         );
-        // The render completes (the abort is handled gracefully), no preflight error.
+        // The render completes successfully — no preflight error, no chunk-level errors,
+        // and the prerender is marked complete.
         expect(errors.filter((e) => e.message.includes('stubTimers'))).toHaveLength(0);
+        expect(chunks.every((c) => !c.hasErrors)).toBe(true);
+        expect(chunks.some((c) => c[PPR_PRERENDER_COMPLETE_CHUNK_KEY] === true)).toBe(true);
       } finally {
         globalThis.setTimeout = originalSetTimeout;
       }
@@ -751,13 +787,63 @@ describe('pprServerRenderedReactComponent', () => {
       expect(html).toContain(HOLE_FALLBACK_TEXT);
     });
 
-    it('preserves RSC payload init scripts in the shell even when payload chunks are suppressed', async () => {
-      const { html, trailingChunk } = await runPostponedPrerender(createSlowGenerateRSCPayload());
+    it('warm response pushes payload chunks for the key the cached shell omits, with exactly one init', async () => {
+      const { html: shellHtml, trailingChunk } = await runPostponedPrerender(createSlowGenerateRSCPayload());
 
+      // Key-scoped counters matching injectRSCPayload's exact script shapes:
+      //   init: <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["KEY"];(...)["KEY"]||=[]</script>
+      //   push: <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["KEY"]||=[]).push("chunk")</script>
+      const INIT_RE = /delete \(self\.REACT_ON_RAILS_RSC_ERRORS\|\|=\{\}\)\[("(?:[^"\\]|\\.)*")\]/g;
+      const PUSH_RE = /\[("(?:[^"\\]|\\.)*")\]\|\|=\[\]\)\.push\(/g;
+      const countByKey = (regex, text) => {
+        const counts = new Map();
+        for (const match of text.matchAll(regex)) {
+          counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+        }
+        return counts;
+      };
+
+      // Cached shell: exactly one init script for the postponed payload's key, ZERO pushes
+      // for it (#5019-A: per-request chunks must not be cached), and the asset manifest
+      // records the key so the resume phase suppresses a duplicate init (#4897).
+      const shellInits = countByKey(INIT_RE, shellHtml);
+      expect([...shellInits.keys()]).toHaveLength(1);
+      const [payloadKey] = shellInits.keys();
+      expect(shellInits.get(payloadKey)).toBe(1);
+      const shellPushCount = countByKey(PUSH_RE, shellHtml).get(payloadKey) ?? 0;
+      expect(shellPushCount).toBe(0);
       const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
-      expect(manifest).toHaveProperty('initScriptKeys');
-      expect(Array.isArray(manifest.initScriptKeys)).toBe(true);
-      expect(html).not.toContain(RSC_PAYLOAD_MARKER);
+      expect(manifest.initScriptKeys).toContain(JSON.parse(payloadKey));
+      // The initialization script itself must appear in the shell HTML (the ||=[] declaration),
+      // even though the payload data (.push() calls) was suppressed.
+      expect(shellHtml).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+      expect(shellHtml).not.toContain(RSC_PAYLOAD_MARKER);
+
+      // Warm hit: resume the same component against the shell's PostponedState + asset
+      // manifest; the RSC payload delivers promptly (resume has no settle abort).
+      const { chunks: resumeChunks, errors: resumeErrors } = await collectStreamResult(
+        runResume({
+          component: PprShellWithRSCHole,
+          componentName: 'PprShellWithRSCHole',
+          postponedStateJson: trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY],
+          pprShellAssets: trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY],
+          generateRSCPayload: createSlowGenerateRSCPayload(0),
+        }),
+      );
+      expect(resumeErrors).toHaveLength(0);
+      const resumeHtml = resumeChunks.map((chunk) => chunk.html).join('');
+      const warmHtml = shellHtml + resumeHtml;
+
+      // With the shell's push count pinned to 0 above, this requires the resume stream to
+      // deliver at least one push for the same key — the postponed payload streams fresh on
+      // every warm hit. (The #5019-A "shell caches no pushes" work is done by the toBe(0)
+      // assertion; this line proves the warm side actually delivers.)
+      const warmPushCount = countByKey(PUSH_RE, warmHtml).get(payloadKey) ?? 0;
+      expect(warmPushCount).toBeGreaterThan(shellPushCount);
+      expect(resumeHtml).toContain(RSC_PAYLOAD_MARKER);
+      // ... while initialization still happens exactly once: the resume stream re-emits no
+      // init for a key the shell already initialized.
+      expect(countByKey(INIT_RE, warmHtml).get(payloadKey)).toBe(1);
     });
 
     it('discards partially-delivered RSC payload chunks that arrived before the settle abort', async () => {

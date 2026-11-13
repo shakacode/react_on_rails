@@ -18,6 +18,7 @@ type RenderMetadataSource = {
   hasErrors?: boolean;
   error?: RenderingError;
   isShellReady?: boolean;
+  httpResponse?: { status: number; location?: string };
 };
 
 export function buildRenderMetadata(
@@ -33,6 +34,7 @@ export function buildRenderMetadata(
       stack: remapSourceMappedStack(renderState.error.stack),
     },
     isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
+    httpResponse: renderState.httpResponse,
   };
 }
 

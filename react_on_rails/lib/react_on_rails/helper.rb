@@ -12,6 +12,7 @@ require "react_on_rails/smart_error"
 require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
+require "react_on_rails/ssr_status_handler"
 require "active_support/concern"
 require "react_on_rails/pro_helper"
 require "react_on_rails/font_helper"
@@ -23,6 +24,7 @@ module ReactOnRails
     include ReactOnRails::FontHelper
 
     COMPONENT_HTML_KEY = "componentHtml"
+    CSP_NONCE_OVERRIDE_FIBER_KEY = :react_on_rails_csp_nonce_override
     IMMEDIATE_HYDRATION_WARNING_MUTEX = Mutex.new
 
     class << self
@@ -371,8 +373,6 @@ module ReactOnRails
           end
         end
 
-        add_csp_nonce_to_context(result)
-
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
@@ -408,6 +408,10 @@ module ReactOnRails
       end
 
       context = @rails_context.merge(serverSide: server_side)
+      # Added per call rather than memoized: a component rendered for the Pro component
+      # cache sees a placeholder nonce (see csp_nonce), and that must not leak into the
+      # context later renders of the same request use.
+      add_csp_nonce_to_context(context)
       add_rsc_stream_observability_to_context(context)
       context
     end
@@ -722,10 +726,21 @@ module ReactOnRails
       )
     end
 
+    # Returns the CSP script nonce that framework-emitted scripts carry. React on Rails Pro
+    # sets CSP_NONCE_OVERRIDE_FIBER_KEY while it renders a component whose HTML it will
+    # cache, so every framework script in that HTML carries a random placeholder only the
+    # framework knows. Pro then swaps the placeholder for the serving request's nonce on
+    # every response, which leaves app markup carrying the request nonce unpromoted
+    # (issue #5267). Fiber storage scopes the override to that render and the async tasks
+    # it starts, so concurrent renders of other components keep the request nonce.
+    def csp_nonce
+      Fiber[CSP_NONCE_OVERRIDE_FIBER_KEY] || request_csp_nonce
+    end
+
     # Returns the CSP script nonce for the current request, or nil if CSP is not enabled.
     # Rails 5.2-6.0 use content_security_policy_nonce with no arguments.
     # Rails 6.1+ accept an optional directive argument.
-    def csp_nonce
+    def request_csp_nonce
       return unless respond_to?(:content_security_policy_nonce)
 
       begin
@@ -807,6 +822,12 @@ module ReactOnRails
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+
+      # Store httpResponse metadata (status code, redirect location) in request.env
+      # so SsrStatusHandler can apply it in an after_action callback.
+      # Always called (even for non-Hash results) to clear the per-component key
+      # from any previous render or cache replay on this request.
+      store_ssr_http_response(result.is_a?(Hash) ? result : {})
 
       # clientProps are only expected on successful SSR hashes. Current error hashes do not
       # include that key, so non-SSR/error paths skip this merge entirely.
@@ -1049,6 +1070,34 @@ module ReactOnRails
         JS
       end
       result
+    end
+
+    # Stores httpResponse metadata from the render result in request.env so that
+    # SsrStatusHandler's after_action can set the HTTP status and Location header.
+    # No-op outside a request context (e.g. mailers, tests without a request).
+    #
+    # Writes two keys:
+    # - SSR_HTTP_RESPONSE_ENV_KEY: request-wide "first wins" for SsrStatusHandler
+    # - SSR_HTTP_RESPONSE_CURRENT_ENV_KEY: per-component, overwritten each render,
+    #   used by the Pro caching layer to cache each component's own metadata.
+    #   Always written (nil when absent) to clear stale values from a previous
+    #   component's render or cache replay.
+    def store_ssr_http_response(result)
+      http_response = result["httpResponse"]
+      http_response = nil unless http_response.is_a?(Hash)
+      return unless defined?(request) && request.respond_to?(:env)
+
+      # Per-component: always overwrite — nil clears any stale value from a
+      # previous component so the next cache write does not inherit it.
+      request.env[ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_CURRENT_ENV_KEY] = http_response
+
+      # Request-wide: first httpResponse wins for SsrStatusHandler.
+      return unless http_response
+
+      env_key = ReactOnRails::SsrStatusHandler::SSR_HTTP_RESPONSE_ENV_KEY
+      return if request.env[env_key]
+
+      request.env[env_key] = http_response
     end
 
     def in_mailer?

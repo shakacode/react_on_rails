@@ -203,6 +203,60 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
       end
     end
 
+    context "when the render is not cached" do
+      before do
+        allow(Digest::MD5).to receive(:hexdigest).and_call_original
+        allow(described_class).to receive(:without_random_values).and_call_original
+      end
+
+      streaming_modes = [false, true]
+
+      [
+        ["prerender caching is disabled", false, {}],
+        ["skip_prerender_cache is set", true, { skip_prerender_cache: true }],
+        ["async props are streamed", true, { async_props_block: proc {} }]
+      ].each do |description, prerender_caching, internal_options|
+        it "does not hash js_code when #{description}" do
+          allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(prerender_caching)
+
+          streaming_modes.each do |streaming|
+            render_options = build_render_options(streaming:, internal_options:)
+
+            described_class.exec_server_render_js(js_code, render_options)
+
+            expect(render_options.request_digest).to be_nil
+          end
+          expect(Digest::MD5).not_to have_received(:hexdigest)
+          expect(described_class).not_to have_received(:without_random_values)
+        end
+      end
+    end
+
+    context "when the render is cached" do
+      before do
+        allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)
+        allow(ReactOnRailsPro::StreamCache).to receive_messages(fetch_stream: nil, wrap_and_cache: nil)
+      end
+
+      it "sets the same request digest as before the lazy change before dispatching to the pool" do
+        expected_digest = Digest::MD5.hexdigest(js_code.gsub(/domNodeId:\s*(["'])[\w-]*\1,/, ""))
+
+        [false, true].each do |streaming|
+          render_options = build_render_options(streaming:)
+          digest_at_dispatch = :not_dispatched
+          allow(pool).to receive(:exec_server_render_js) do |_js_code, options|
+            digest_at_dispatch = options.request_digest
+            { html: "rendered" }
+          end
+
+          described_class.exec_server_render_js(js_code.sub("CacheProbe-react-component-1", "probe-#{streaming}"),
+                                                render_options)
+
+          expect(digest_at_dispatch).to eq(expected_digest)
+        end
+      end
+    end
+
     context "when skip_prerender_cache is set" do
       before do
         allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)

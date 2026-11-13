@@ -21,6 +21,7 @@ require_relative "system_checker"
 require_relative "doctor_schema"
 require_relative "pro_migration"
 require_relative "node_renderer_procfile"
+require_relative "version_checker/lockfile_resolution"
 require_relative "../generators/react_on_rails/js_dependency_manager"
 
 begin
@@ -5070,7 +5071,7 @@ module ReactOnRails
     # Each row covers react-on-rails-rsc patches rsc_min_patch..rsc_max_patch (nil = open-ended)
     # on rsc_minor. React must match the Flight line the RSC package bundles:
     # 19.2.x ships Flight 19.2, published 19.3.0 ships Flight 19.2.8 (React on Rails 17.1.0),
-    # and 19.3.1+ (starting with 19.3.1-rc.0) ships Flight 19.3.0.
+    # and 19.3.1+ ships Flight 19.3.0. Only stable react-on-rails-rsc releases are supported.
     RSC_REACT_SUPPORT_RANGES = [
       { rsc_minor: 2, rsc_min_patch: 1, rsc_max_patch: nil, minor: 2, min_patch: 7 },
       { rsc_minor: 3, rsc_min_patch: 0, rsc_max_patch: 0, minor: 2, min_patch: 8 },
@@ -5084,9 +5085,23 @@ module ReactOnRails
       min_patch.positive? ? "#{line} starting at #{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.#{min_patch}" : line
     end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
-    # Admits the 19.3.1-rc.x soak. The generator pin stays on stable 19.2.1.
-    # Remove once react-on-rails-rsc 19.3.1 ships stable.
-    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION = "19.3.1-rc.0"
+    # React's 2026-10-14 RSC advisories (critical RCE GHSA-xqc2-xf4c-x3h3, DoS GHSA-h3gv-c5rc-p453)
+    # affect react-server-dom-webpack 19.0.0 through 19.3.0. Each entry is the first patched release
+    # on its minor line. This is a security floor, separate from the React pairing in
+    # RSC_REACT_SUPPORT_RANGES, so it has no node-renderer counterpart to keep in sync.
+    RSC_FLIGHT_PACKAGE_NAME = "react-server-dom-webpack"
+    RSC_FLIGHT_ADVISORIES = "GHSA-xqc2-xf4c-x3h3 (critical remote code execution) and " \
+                            "GHSA-h3gv-c5rc-p453 (denial of service)"
+    RSC_FLIGHT_PATCHED_VERSIONS = {
+      [19, 0] => "19.0.9",
+      [19, 1] => "19.1.10",
+      [19, 2] => "19.2.9",
+      [19, 3] => "19.3.1"
+    }.freeze
+    # Rejected prerelease lines with a known published stable successor: the 19.3.0-rc.4 pin that
+    # React on Rails 17.1.0 generated, and the 19.3.1-rc.x soak that 17.2.0.rc.0 and rc.1 admitted.
+    # Mirrors prereleaseLinesWithStableSuccessor in rscPeerSupport.ts.
+    RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR = [[19, 3, 0], [19, 3, 1]].freeze
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
     RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
@@ -5142,7 +5157,7 @@ module ReactOnRails
       check_rsc_bundler_config
       check_rsc_rspack_version
       check_rsc_rspack_lazy_compilation
-      check_rsc_react_version
+      check_rsc_package_versions
       check_rsc_procfile_watcher
       check_rsc_client_manifest
       check_rsc_artifacts
@@ -5333,6 +5348,99 @@ module ReactOnRails
       check_legacy_rsc_react_version(react_version)
     end
 
+    def check_rsc_package_versions
+      check_rsc_react_version
+      check_rsc_flight_advisories
+    end
+
+    # Reads every react-server-dom-webpack copy the lockfile resolves, not node_modules, so the
+    # warning matches what a fresh install or deploy would get from the committed lockfile.
+    def check_rsc_flight_advisories
+      package_root = resolved_package_root
+      return if package_root_missing?(package_root)
+
+      versions = ReactOnRails::VersionChecker::LockfileResolution.all_versions(package_root, RSC_FLIGHT_PACKAGE_NAME)
+      if versions.empty?
+        report_unchecked_rsc_flight_advisories(package_root)
+        return
+      end
+
+      by_status = versions.group_by { |version| rsc_flight_version_status(version) }
+      report_vulnerable_rsc_flight_versions(by_status[:vulnerable]) if by_status[:vulnerable]
+      report_unjudged_rsc_flight_versions(by_status[:unknown]) if by_status[:unknown]
+      return unless by_status.keys == [:patched]
+
+      verb = versions.size == 1 ? "is" : "are"
+      checker.add_success("✅ #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} #{verb} not affected by " \
+                          "#{RSC_FLIGHT_ADVISORIES}")
+    end
+
+    # Copies rsc_flight_version_status cannot judge (see there) get this instead of a success.
+    def report_unjudged_rsc_flight_versions(versions)
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Could not tell whether #{RSC_FLIGHT_PACKAGE_NAME} #{versions.join(', ')} includes the fixes for React's RSC
+        security advisories #{RSC_FLIGHT_ADVISORIES}.
+
+        The advisories cover 19.0.0 through 19.3.0, fixed in #{RSC_FLIGHT_PATCHED_VERSIONS.values.join(', ')}.
+        Prefer a stable patched release, or confirm this build was published after 2026-10-14.
+      MSG
+    end
+
+    def report_vulnerable_rsc_flight_versions(vulnerable)
+      # React on Rails Pro 17 RSC supports the 19.2 and 19.3 lines, so older lines move to 19.3.
+      on_19_2_line = vulnerable.map { |version| npm_version_tuple(version)[1] == 2 }.uniq
+      target_text = case on_19_2_line
+                    when [true] then RSC_FLIGHT_PATCHED_VERSIONS.fetch([19, 2])
+                    when [false] then RSC_FLIGHT_PATCHED_VERSIONS.fetch([19, 3])
+                    else "#{RSC_FLIGHT_PATCHED_VERSIONS.fetch([19, 3])} " \
+                         "(or #{RSC_FLIGHT_PATCHED_VERSIONS.fetch([19, 2])} for copies on the 19.2 line)"
+                    end
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Your lockfile resolves #{RSC_FLIGHT_PACKAGE_NAME} #{vulnerable.join(', ')}, which React's RSC security
+        advisories #{RSC_FLIGHT_ADVISORIES} affect.
+
+        Fix: update react, react-dom, and #{RSC_FLIGHT_PACKAGE_NAME} together to #{target_text}
+        (each patched #{RSC_FLIGHT_PACKAGE_NAME} requires the matching React release), then commit the
+        refreshed lockfile. If a copy nested under #{RSC_PACKAGE_NAME} stays behind, pin it with npm
+        `overrides`, pnpm `pnpm.overrides`, or Yarn `resolutions`.
+        Confirm with `npm ls #{RSC_FLIGHT_PACKAGE_NAME}`, `pnpm why #{RSC_FLIGHT_PACKAGE_NAME}`,
+        or `yarn why #{RSC_FLIGHT_PACKAGE_NAME}`.
+      MSG
+    end
+
+    # RSC always installs react-server-dom-webpack, so finding no copy means the check did not run:
+    # the lockfile is missing, unreadable, or at a workspace root above the package root.
+    def report_unchecked_rsc_flight_advisories(package_root)
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Could not check #{RSC_FLIGHT_PACKAGE_NAME} against React's RSC security advisories
+        #{RSC_FLIGHT_ADVISORIES}.
+
+        No readable yarn.lock, package-lock.json, pnpm-lock.yaml, or bun.lock in #{package_root} lists it.
+        If your lockfile lives at a workspace root, confirm every copy is #{RSC_FLIGHT_PATCHED_VERSIONS.values.join(', ')}
+        or later on its line with `npm ls #{RSC_FLIGHT_PACKAGE_NAME}`, `pnpm why #{RSC_FLIGHT_PACKAGE_NAME}`,
+        or `yarn why #{RSC_FLIGHT_PACKAGE_NAME}`.
+      MSG
+    end
+
+    # :vulnerable below its line's patched release, whatever the prerelease tag: even a canary built
+    # after the fix is answered by moving to the stable patched release. :patched for a stable release
+    # at or above it or on a later line. :unknown for what the advisories give no rule for: a
+    # prerelease above the patched release, experimental builds, earlier lines, unparseable versions.
+    def rsc_flight_version_status(version)
+      return :unknown unless Gem::Version.correct?(version)
+
+      major, minor, = npm_version_tuple(version)
+      patched = RSC_FLIGHT_PATCHED_VERSIONS[[major, minor]]
+      stable = npm_prerelease(version).blank?
+      if patched
+        return :vulnerable if Gem::Version.new(version) < Gem::Version.new(patched)
+
+        return stable ? :patched : :unknown
+      end
+
+      stable && ([major, minor] <=> RSC_FLIGHT_PATCHED_VERSIONS.keys.max).positive? ? :patched : :unknown
+    end
+
     def check_legacy_rsc_react_version(react_version)
       if supported_rsc_react_version?(react_version)
         checker.add_success("✅ React #{react_version} is compatible with RSC")
@@ -5407,18 +5515,14 @@ module ReactOnRails
       rsc_version = rsc_package["version"].to_s
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
-      prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
-                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the RC soak)"
-                               else
-                                 ""
-                               end
-
       rsc_install, react_install = rsc_package_floor_install_versions(rsc_version)
+      # A prerelease can satisfy the numeric floor and still be rejected, so say why.
+      stable_only_note = npm_prerelease(rsc_version).present? ? " (stable releases only)" : ""
 
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
-        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
+        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{stable_only_note}
         on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{react_install}+.
 
@@ -5427,27 +5531,26 @@ module ReactOnRails
       false
     end
 
-    # A rejected prerelease (for example the 19.3.0-rc.4 pin React on Rails 17.1.0 generated) usually has a
-    # supported stable release with the same version number; point the Fix there instead of the generator pin.
+    # Only the lines in RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR have a known published stable
+    # successor. Compatibility does not establish publication for other rejected prereleases; use the
+    # generator pin for those versions.
     # Returns [rsc_version_to_install, react_version_to_install].
     def rsc_package_floor_install_versions(rsc_version)
-      if npm_prerelease(rsc_version).present?
+      if npm_prerelease(rsc_version).present? &&
+         RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR.include?(npm_version_tuple(rsc_version))
         stable_version = npm_version_tuple(rsc_version).join(".")
         if rsc_stable_package_version_supported?(stable_version)
           return [stable_version, recommended_react_install_version_for_rsc_package(stable_version)]
         end
       end
 
-      [RSC_PACKAGE_INSTALL_VERSION, RSC_MINIMUM_REACT_VERSION]
+      [RSC_PACKAGE_INSTALL_VERSION, recommended_react_install_version_for_rsc_package(RSC_PACKAGE_INSTALL_VERSION)]
     end
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
       return false if rsc_version.blank?
-      return true if rsc_stable_package_version_supported?(rsc_version)
-      return false if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.blank?
-      return false unless npm_version_tuple(rsc_version) == npm_version_tuple(RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION)
 
-      npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
+      rsc_stable_package_version_supported?(rsc_version)
     end
 
     def rsc_stable_package_version_supported?(rsc_version)
@@ -5650,8 +5753,13 @@ module ReactOnRails
       installed_version = rsc_package["version"].to_s
       return if installed_version.blank?
 
-      rsc_dist_tags(package_root).each do |tag, tag_version|
+      dist_tags = rsc_dist_tags(package_root)
+      latest_version = dist_tags["latest"].to_s
+      dist_tags.each do |tag, tag_version|
         next unless RSC_DIST_TAGS_TO_CHECK.include?(tag)
+        # A prerelease tag that the stable `latest` release has caught up with or passed (for example
+        # next 19.3.1-rc.1 once latest is 19.3.1) is not an upgrade target, and this version rejects it.
+        next if latest_version.present? && !npm_version_greater?(tag_version, latest_version)
         next unless npm_version_greater?(tag_version, installed_version)
 
         checker.add_warning(<<~MSG.strip)

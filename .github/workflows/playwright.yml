@@ -67,6 +67,8 @@ jobs:
           PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
           PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
           EVENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+          # Force-pushes run every test suite (#5119).
+          EVENT_FORCED: ${{ github.event.forced || false }}
         run: |
           # Force-full hosted CI is the explicit escape hatch that bypasses
           # optimized change selection. Hosted readiness alone stays path-based.
@@ -93,7 +95,8 @@ jobs:
 
   playwright:
     needs: detect-changes
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright's browser install rejects.
+    runs-on: ubuntu-24.04
     if: |
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
       needs.detect-changes.outputs.run_e2e_tests == 'true'
