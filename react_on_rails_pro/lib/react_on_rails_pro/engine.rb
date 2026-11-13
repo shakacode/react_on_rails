@@ -51,6 +51,15 @@ module ReactOnRailsPro
       config.after_initialize { ReactOnRailsPro::Engine.log_problematic_compression_middleware_warnings }
     end
 
+    # Install the opt-in PPR event logger when config.ppr_event_logging is on (default off). The
+    # subscriber is idempotent and logs at debug level, so it is inert unless both the flag and a
+    # debug log level are set. See ReactOnRailsPro::Ppr::EventLogger.
+    initializer "react_on_rails_pro.ppr_event_logging" do
+      config.after_initialize do
+        ReactOnRailsPro::Ppr::EventLogger.subscribe if ReactOnRailsPro.configuration.ppr_event_logging
+      end
+    end
+
     # Install ScoutApm instrumentation after ScoutApm is configured via "scout_apm.start" initializer.
     # https://github.com/scoutapp/scout_apm_ruby/blob/v6.1.0/lib/scout_apm.rb#L221
     # If scout_apm is not in the Gemfile, Rails ignores the unknown `after:` target and still
