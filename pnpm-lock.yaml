@@ -643,12 +643,21 @@ importers:
       '@babel/runtime':
         specifier: '7'
         version: 7.28.4
+      '@conform-to/react':
+        specifier: 1.21.3
+        version: 1.21.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@conform-to/zod':
+        specifier: 1.21.3
+        version: 1.21.3(zod@4.1.13)
       '@dr.pogodin/react-helmet':
         specifier: ^3.0.4
         version: 3.0.6(react@19.3.1)
       '@honeybadger-io/js':
         specifier: ^4.3.1
         version: 4.9.3
+      '@hookform/resolvers':
+        specifier: 5.9.1
+        version: 5.9.1(@sinclair/typebox@0.34.48)(ajv-formats@2.1.1(ajv@6.14.0))(ajv@6.14.0)(react-hook-form@7.92.0(@types/react@19.2.7)(react@19.3.1))(zod@4.1.13)
       '@hotwired/turbo-rails':
         specifier: ^8.0.4
         version: 8.0.23
@@ -682,6 +691,9 @@ importers:
       '@shakacode/use-ssr-computation.runtime':
         specifier: ^2.0.0
         version: 2.0.0(react@19.3.1)
+      '@tanstack/react-form':
+        specifier: 1.33.5
+        version: 1.33.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tanstack/react-router':
         specifier: ^1.139.0
         version: 1.163.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -772,6 +784,9 @@ importers:
       react-error-boundary:
         specifier: ^4.1.2
         version: 4.1.2(react@19.3.1)
+      react-hook-form:
+        specifier: 7.92.0
+        version: 7.92.0(@types/react@19.2.7)(react@19.3.1)
       react-intl:
         specifier: ^10
         version: 10.1.13(@types/react@19.2.7)(react@19.3.1)
@@ -856,6 +871,9 @@ importers:
       webpack-merge:
         specifier: '5'
         version: 5.10.0
+      zod:
+        specifier: 4.1.13
+        version: 4.1.13
     devDependencies:
       '@babel/preset-typescript':
         specifier: ^7.23.2
@@ -879,8 +897,8 @@ importers:
         specifier: ^24.8.1
         version: 24.10.12
       '@types/react-dom':
-        specifier: ^18.2.14
-        version: 18.3.7(@types/react@19.2.7)
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.7)
       jsdom:
         specifier: ^16.4.0
         version: 16.7.0
@@ -1761,6 +1779,20 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
+  '@conform-to/dom@1.21.3':
+    resolution: {integrity: sha512-gaFYBWPCLwIJASd+VQWtcLfJnhn3Fo0/U8NS0LAMvUHuWU6UZ354MqYNUgvkaMtEfPfqSai6p4txdDp9JelDww==}
+
+  '@conform-to/react@1.21.3':
+    resolution: {integrity: sha512-HvpdcfIGAzvRzff2dBdJT2utn6jzLKHYzTQ+0jQAdQ2emQkzNw4U1g/50xkaRX/cFuCrh1MokL/8TX7JW7AtAQ==}
+    peerDependencies:
+      react: ~19.0.4
+      react-dom: ~19.0.4
+
+  '@conform-to/zod@1.21.3':
+    resolution: {integrity: sha512-IbFw4iMywJ7fWfZ1MIDEMlUfFa9ZkZhG8hL2K6zcx1eM6SPhwWAmmsFi478POShOLDj72A0qQ9nLCz+2qAEF5A==}
+    peerDependencies:
+      zod: ^3.21.0 || ^4.0.0
+
   '@csstools/css-parser-algorithms@3.0.5':
     resolution: {integrity: sha512-DaDeUkXZKjdGhgYaHNJTV9pV7Y9B3b644jCLs9Upc3VeNGg6LWARAT6O+Q+/COo+2gg/bM5rhpMAtf70WqfBdQ==}
     engines: {node: '>=18'}
@@ -2098,6 +2130,84 @@ packages:
     resolution: {integrity: sha512-CL+9A8tGpjawsJEKE74P94hmimHRsq+B90i5N/pXNgnJbgZG40bs9yZpfn2z3w0+3z9wtH12D2RqBjxsGm9DBg==}
     engines: {node: '>=14'}
     hasBin: true
+
+  '@hookform/resolvers@5.9.1':
+    resolution: {integrity: sha512-7b7vsbraJxKgjVSA1Nur9tLwj539WGJUBLA7QNvXnFoT2pM5Z7G+6rlukk4B2/QrTZy6huRtH6wKeESPKuIr6w==}
+    peerDependencies:
+      '@sinclair/typebox': '>=0.25.24'
+      '@standard-schema/spec': ^1.0.0
+      '@typeschema/main': '>=0.13.7'
+      '@vinejs/vine': ^2.0.0 || ^3.0.0 || ^4.0.0
+      ajv: ^8.12.0
+      ajv-errors: ^3.0.0
+      ajv-formats: ^2.1.1
+      arktype: ^2.0.0
+      ata-validator: ^1.2.0
+      class-transformer: '>=0.4.0'
+      class-validator: '>=0.12.0'
+      computed-types: ^1.0.0
+      effect: ^3.10.3
+      fluentvalidation-ts: ^3.0.0
+      fp-ts: ^2.7.0
+      io-ts: ^2.0.0
+      joi: ^17.0.0 || ^18.0.0
+      nope-validator: '>=0.12.0'
+      react-hook-form: ^7.55.0
+      superstruct: '>=0.12.0'
+      typanion: ^3.3.2
+      valibot: '>=0.31.0 || ^1.0.0-beta.4 || ^1.0.0-rc'
+      vest: '>=6.0.0'
+      yup: ^1.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@sinclair/typebox':
+        optional: true
+      '@standard-schema/spec':
+        optional: true
+      '@typeschema/main':
+        optional: true
+      '@vinejs/vine':
+        optional: true
+      ajv:
+        optional: true
+      ajv-errors:
+        optional: true
+      ajv-formats:
+        optional: true
+      arktype:
+        optional: true
+      ata-validator:
+        optional: true
+      class-transformer:
+        optional: true
+      class-validator:
+        optional: true
+      computed-types:
+        optional: true
+      effect:
+        optional: true
+      fluentvalidation-ts:
+        optional: true
+      fp-ts:
+        optional: true
+      io-ts:
+        optional: true
+      joi:
+        optional: true
+      nope-validator:
+        optional: true
+      superstruct:
+        optional: true
+      typanion:
+        optional: true
+      valibot:
+        optional: true
+      vest:
+        optional: true
+      yup:
+        optional: true
+      zod:
+        optional: true
 
   '@hotwired/turbo-rails@8.0.23':
     resolution: {integrity: sha512-iBILwda3qmQC7FYM70+4s6kEQ7Fx9dJ6+yGxjPyrz9a5JDx1+y7OAA5TA7GGVOZJoicMLrKGdFDNorl40X35lw==}
@@ -3440,6 +3550,9 @@ packages:
     peerDependencies:
       size-limit: 12.0.0
 
+  '@standard-schema/utils@0.3.0':
+    resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
+
   '@swc/core-darwin-arm64@1.15.3':
     resolution: {integrity: sha512-AXfeQn0CvcQ4cndlIshETx6jrAM45oeUrK8YeEY6oUZU/qzz0Id0CyvlEywxkWVC81Ajpd8TQQ1fW5yx6zQWkQ==}
     engines: {node: '>=10'}
@@ -3534,13 +3647,40 @@ packages:
     peerDependencies:
       tailwindcss: '>=3.0.0 || insiders || >=4.0.0-alpha.20 || >=4.0.0-beta.1'
 
+  '@tanstack/devtools-event-client@0.4.4':
+    resolution: {integrity: sha512-6T5Yop/793YI+H+5J8Hsyj4kCih9sl4t3ElLgKioW5hk3ocn+ZdSJ94tT7vL7uabxSugWYBZlOTMPzEw2puvQw==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@tanstack/form-core@1.33.5':
+    resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
+
   '@tanstack/history@1.161.4':
     resolution: {integrity: sha512-Kp/WSt411ZWYvgXy6uiv5RmhHrz9cAml05AQPrtdAp7eUqvIDbMGPnML25OKbzR3RJ1q4wgENxDTvlGPa9+Mww==}
     engines: {node: '>=20.19'}
 
+  '@tanstack/pacer-lite@0.1.1':
+    resolution: {integrity: sha512-y/xtNPNt/YeyoVxE/JCx+T7yjEzpezmbb+toK8DDD1P4m7Kzs5YR956+7OKexG3f8aXgC3rLZl7b1V+yNUSy5w==}
+    engines: {node: '>=18'}
+
+  '@tanstack/react-form@1.33.5':
+    resolution: {integrity: sha512-LlRB28qJwO/QCGaHvWnbdh4haBgTFiZVmzA2uzxSBS3YA7/IqrQ6HOBK70CkFQ+DbflZ7NawsmSln13h5iIdTA==}
+    peerDependencies:
+      '@tanstack/react-start': '*'
+      react: ~19.0.4
+    peerDependenciesMeta:
+      '@tanstack/react-start':
+        optional: true
+
   '@tanstack/react-router@1.163.3':
     resolution: {integrity: sha512-hheBbFVb+PbxtrWp8iy6+TTRTbhx3Pn6hKo8Tv/sWlG89ZMcD1xpQWzx8ukHN9K8YWbh5rdzt4kv6u8X4kB28Q==}
     engines: {node: '>=20.19'}
+    peerDependencies:
+      react: ~19.0.4
+      react-dom: ~19.0.4
+
+  '@tanstack/react-store@0.11.2':
+    resolution: {integrity: sha512-oj5O5DmiMWE+ih+SioX2ayC1kbK7d3fpLx0B75fPJr9nY3zU+hoW010yr64qXsY/9fyiLVE2bn5mGNV3owm8RQ==}
     peerDependencies:
       react: ~19.0.4
       react-dom: ~19.0.4
@@ -3554,6 +3694,9 @@ packages:
   '@tanstack/router-core@1.163.3':
     resolution: {integrity: sha512-jPptiGq/w3nuPzcMC7RNa79aU+b6OjaDzWJnBcV2UAwL4ThJamRS4h42TdhJE+oF5yH9IEnCOGQdfnbw45LbfA==}
     engines: {node: '>=20.19'}
+
+  '@tanstack/store@0.11.2':
+    resolution: {integrity: sha512-sJ4mjol8uQsHV0gOJzzjwXfh2Fwm+Sz0+8deqiTm4jGbMdjzNSW+xZCFm0kUa870uhd8yi+DpKnZb5Kc4apa0Q==}
 
   '@tanstack/store@0.9.1':
     resolution: {integrity: sha512-+qcNkOy0N1qSGsP7omVCW0SDrXtaDcycPqBDE726yryiA5eTDFpjBReaYjghVJwNf1pcPMyzIwTGlYjCSQR0Fg==}
@@ -3731,11 +3874,6 @@ packages:
 
   '@types/range-parser@1.2.7':
     resolution: {integrity: sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==}
-
-  '@types/react-dom@18.3.7':
-    resolution: {integrity: sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==}
-    peerDependencies:
-      '@types/react': ^18.0.0
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -8594,6 +8732,16 @@ packages:
     peerDependencies:
       react: ~19.0.4
 
+  react-hook-form@7.92.0:
+    resolution: {integrity: sha512-O5ILyY5fYHN7N13Pfxpe55KboyNFsJdM03BHpshQkClJd8raugiAUGY7VjifITrfhVxyx81ko25azXCoayhf1w==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@types/react': '*'
+      react: ~19.0.4
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   react-intl@10.1.13:
     resolution: {integrity: sha512-3aKnIOIPN6CWsu3jqPpYMlJZ2U0Qnxhd42xGWQNdGIknK/gBudWOHSIx9vN4XKkITokJLr7YTgs4yLUGtbvP9g==}
     peerDependencies:
@@ -11535,6 +11683,19 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
+  '@conform-to/dom@1.21.3': {}
+
+  '@conform-to/react@1.21.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@conform-to/dom': 1.21.3
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+
+  '@conform-to/zod@1.21.3(zod@4.1.13)':
+    dependencies:
+      '@conform-to/dom': 1.21.3
+      zod: 4.1.13
+
   '@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4)':
     dependencies:
       '@csstools/css-tokenizer': 3.0.4
@@ -11840,6 +12001,16 @@ snapshots:
       '@honeybadger-io/core': 6.7.2
       '@types/aws-lambda': 8.10.159
       '@types/express': 5.0.5
+
+  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.34.48)(ajv-formats@2.1.1(ajv@6.14.0))(ajv@6.14.0)(react-hook-form@7.92.0(@types/react@19.2.7)(react@19.3.1))(zod@4.1.13)':
+    dependencies:
+      '@standard-schema/utils': 0.3.0
+      react-hook-form: 7.92.0(@types/react@19.2.7)(react@19.3.1)
+    optionalDependencies:
+      '@sinclair/typebox': 0.34.48
+      ajv: 6.14.0
+      ajv-formats: 2.1.1(ajv@6.14.0)
+      zod: 4.1.13
 
   '@hotwired/turbo-rails@8.0.23':
     dependencies:
@@ -13357,6 +13528,8 @@ snapshots:
       - uglify-js
       - webpack-cli
 
+  '@standard-schema/utils@0.3.0': {}
+
   '@swc/core-darwin-arm64@1.15.3':
     optional: true
 
@@ -13423,7 +13596,25 @@ snapshots:
       postcss-selector-parser: 6.0.10
       tailwindcss: 3.4.19(tsx@4.22.4)(yaml@2.8.3)
 
+  '@tanstack/devtools-event-client@0.4.4': {}
+
+  '@tanstack/form-core@1.33.5':
+    dependencies:
+      '@tanstack/devtools-event-client': 0.4.4
+      '@tanstack/pacer-lite': 0.1.1
+      '@tanstack/store': 0.11.2
+
   '@tanstack/history@1.161.4': {}
+
+  '@tanstack/pacer-lite@0.1.1': {}
+
+  '@tanstack/react-form@1.33.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@tanstack/form-core': 1.33.5
+      '@tanstack/react-store': 0.11.2(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react: 19.3.1
+    transitivePeerDependencies:
+      - react-dom
 
   '@tanstack/react-router@1.163.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
@@ -13435,6 +13626,13 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
+
+  '@tanstack/react-store@0.11.2(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@tanstack/store': 0.11.2
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      use-sync-external-store: 1.6.0(react@19.3.1)
 
   '@tanstack/react-store@0.9.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
@@ -13452,6 +13650,8 @@ snapshots:
       seroval-plugins: 1.5.0(seroval@1.5.0)
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
+
+  '@tanstack/store@0.11.2': {}
 
   '@tanstack/store@0.9.1': {}
 
@@ -13675,10 +13875,6 @@ snapshots:
   '@types/qs@6.15.1': {}
 
   '@types/range-parser@1.2.7': {}
-
-  '@types/react-dom@18.3.7(@types/react@19.2.7)':
-    dependencies:
-      '@types/react': 19.2.7
 
   '@types/react-dom@19.2.3(@types/react@19.2.7)':
     dependencies:
@@ -14071,6 +14267,11 @@ snapshots:
     dependencies:
       clean-stack: 2.2.0
       indent-string: 4.0.0
+
+  ajv-formats@2.1.1(ajv@6.14.0):
+    optionalDependencies:
+      ajv: 6.14.0
+    optional: true
 
   ajv-formats@2.1.1(ajv@8.20.0):
     optionalDependencies:
@@ -19376,6 +19577,12 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.28.4
       react: 19.3.1
+
+  react-hook-form@7.92.0(@types/react@19.2.7)(react@19.3.1):
+    dependencies:
+      react: 19.3.1
+    optionalDependencies:
+      '@types/react': 19.2.7
 
   react-intl@10.1.13(@types/react@19.2.7)(react@19.3.1):
     dependencies:
