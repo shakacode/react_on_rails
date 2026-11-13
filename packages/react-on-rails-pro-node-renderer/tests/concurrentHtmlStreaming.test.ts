@@ -21,6 +21,7 @@ import buildApp from '../src/worker';
 import { createTestConfig } from './testingNodeRendererConfigs';
 import { makeRequest } from './httpRequestUtils';
 import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
+import { createEmbeddedPayloadKey } from '../../react-on-rails-pro/src/utils';
 
 const { config } = createTestConfig('concurrentHtmlStreaming');
 const app = buildApp(config);
@@ -46,21 +47,21 @@ const sendRedisItemValue = async (redisRequestId: string, itemIndex: number, val
   await sendRedisValue(redisRequestId, `Item${itemIndex}`, value);
 };
 
-const extractHtmlFromChunks = (chunks: string, valuesToStrip: string[] = []) => {
+const extractHtmlFromChunks = (chunks: string, requestIdsToStrip: string[] = []) => {
   const streamParser = new LengthPrefixedStreamParser();
   streamParser.feed(chunks);
   let html = streamParser.htmlChunks.join('');
+  // Strip only the expected request identity so another request's marker stays visible.
+  const valuesToStrip = requestIdsToStrip.flatMap((requestId) => [
+    requestId,
+    createEmbeddedPayloadKey('RedisReceiver', { requestId }),
+  ]);
   valuesToStrip.forEach((value) => {
     html = html.replace(new RegExp(value, 'g'), '');
   });
   const parsedHtml = parser.parse(html);
   // TODO: investigate why ReactOnRails produces different RSC payload on each request
   parsedHtml.querySelectorAll('script').forEach((x) => x.remove());
-  // Committed payload keys include the request-specific props hash. Keep the
-  // marker in the comparison, but normalize its per-request identity.
-  parsedHtml.querySelectorAll('[data-rsc-committed]').forEach((marker) => {
-    marker.setAttribute('data-rsc-committed', '');
-  });
   const sanitizedHtml = parsedHtml.toString();
   return sanitizedHtml;
 };
@@ -108,7 +109,7 @@ const createParallelRenders = (size: number) => {
 
 test('Happy Path', async () => {
   const parallelInstances = 50;
-  expect.assertions(parallelInstances * 7 + 7);
+  expect.assertions(parallelInstances * 7 + 9);
   const redisRequestId = randomUUID();
   const expectedChunks: string[] = [];
   const { waitForNextChunk, finishedPromise, getBuffer } = makeRequest(app, {
@@ -117,6 +118,10 @@ test('Happy Path', async () => {
   });
   let chunk = await waitForNextChunk();
   expect(chunk).not.toContain('Unique Value');
+  expect(extractHtmlFromChunks(chunk, [redisRequestId])).toContain('data-rsc-committed');
+  expect(extractHtmlFromChunks(chunk, [randomUUID()])).not.toEqual(
+    extractHtmlFromChunks(chunk, [redisRequestId]),
+  );
   expectedChunks.push(extractHtmlFromChunks(chunk, [redisRequestId]));
 
   await sendRedisItemValue(redisRequestId, 0, 'First Unique Value');
