@@ -56,6 +56,11 @@ const extractHtmlFromChunks = (chunks: string, valuesToStrip: string[] = []) => 
   const parsedHtml = parser.parse(html);
   // TODO: investigate why ReactOnRails produces different RSC payload on each request
   parsedHtml.querySelectorAll('script').forEach((x) => x.remove());
+  // Committed payload keys include the request-specific props hash. Keep the
+  // marker in the comparison, but normalize its per-request identity.
+  parsedHtml.querySelectorAll('[data-rsc-committed]').forEach((marker) => {
+    marker.setAttribute('data-rsc-committed', '');
+  });
   const sanitizedHtml = parsedHtml.toString();
   return sanitizedHtml;
 };
