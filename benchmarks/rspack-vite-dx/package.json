@@ -17,6 +17,6 @@
     "@rspack/dev-server": "2.1.0",
     "playwright": "1.61.1",
     "prettier": "3.9.5",
-    "vite": "8.1.4"
+    "vite": "8.1.6"
   }
 }
