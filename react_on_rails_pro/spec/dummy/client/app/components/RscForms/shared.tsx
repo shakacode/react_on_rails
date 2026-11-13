@@ -15,7 +15,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createRailsAction, RailsActionRequestError } from 'react-on-rails-pro/railsAction';
 import { useCurrentRSCRoute } from 'react-on-rails-pro/RSCRoute';
 
@@ -62,8 +62,12 @@ export function useReviewSubmission() {
   const [saved, setSaved] = useState(false);
   const [localRefreshError, setLocalRefreshError] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const operation = useRef(0);
 
   async function submit(values: ReviewValues): Promise<ReviewErrors | null> {
+    // A new submission supersedes any refresh retry that is still in flight.
+    operation.current += 1;
+    setRetrying(false);
     setSaved(false);
     setLocalRefreshError(false);
     clearRefetchError();
@@ -88,6 +92,7 @@ export function useReviewSubmission() {
       };
     }
     setSaved(true);
+    clearRefetchError();
     try {
       await refetch();
     } catch {
@@ -97,14 +102,16 @@ export function useReviewSubmission() {
   }
 
   async function retryRefresh() {
+    operation.current += 1;
+    const retryOperation = operation.current;
     setRetrying(true);
     try {
       await retry();
-      setLocalRefreshError(false);
+      if (retryOperation === operation.current) setLocalRefreshError(false);
     } catch {
-      setLocalRefreshError(true);
+      if (retryOperation === operation.current) setLocalRefreshError(true);
     } finally {
-      setRetrying(false);
+      if (retryOperation === operation.current) setRetrying(false);
     }
   }
 

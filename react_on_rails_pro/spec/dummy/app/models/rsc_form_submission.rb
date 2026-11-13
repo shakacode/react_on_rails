@@ -21,9 +21,16 @@ class RscFormSubmission
   validates :name, :comment, presence: true
   validates :name, length: { maximum: 50 }
   validates :comment, length: { maximum: 200 }
+  validate :review_fields_are_strings
   validate :reviewer_name_is_available
 
   private
+
+  def review_fields_are_strings
+    %i[name comment].each do |field|
+      errors.add(field, "must be a string") unless public_send(field).is_a?(String)
+    end
+  end
 
   def reviewer_name_is_available
     errors.add(:name, "This reviewer name is reserved.") if name == "Reserved"

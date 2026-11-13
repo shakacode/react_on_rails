@@ -89,4 +89,23 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
     expect(response.body).to include("Latest saved review.")
     expect(response.body).not_to include("First saved review.", "Rejected review.")
   end
+
+  it "rejects numeric JSON fields without replacing the visitor's saved review" do
+    headers = csrf_headers
+    post "/rsc_forms", params: { review: { name: "Ada", comment: "Original saved review." } }, headers:, as: :json
+    expect(response).to have_http_status(:created)
+
+    post "/rsc_forms", params: { review: { name: 123, comment: 456 } }, headers:, as: :json
+
+    expect(response).to have_http_status(422)
+    expect(response.parsed_body).to eq("errors" => {
+                                         "name" => ["must be a string"],
+                                         "comment" => ["must be a string"]
+                                       })
+
+    get "/rsc_payload/RscFormsPage", params: { props: { library: "builtins" }.to_json }
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Ada", "Original saved review.")
+  end
 end

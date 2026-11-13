@@ -23,6 +23,13 @@ RSpec.describe RscFormSubmission do
     expect(submission.errors.messages).to eq(name: ["can't be blank"], comment: ["can't be blank"])
   end
 
+  it "rejects numeric values instead of returning reviews outside the client contract" do
+    submission = described_class.new(name: 123, comment: 456)
+
+    expect(submission).not_to be_valid
+    expect(submission.errors.messages).to eq(name: ["must be a string"], comment: ["must be a string"])
+  end
+
   it "rejects a reserved name even when client-side presence checks would pass" do
     submission = described_class.new(name: "Reserved", comment: "A useful review.")
 

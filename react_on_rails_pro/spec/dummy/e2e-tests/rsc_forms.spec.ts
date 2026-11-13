@@ -161,5 +161,66 @@ for (const library of libraries) {
       await expect(page.getByTestId('saved-review')).toContainText('Ada');
       expect(writes).toBe(1);
     });
+
+    test('ignores an older refresh retry failing after a newer review is saved', async ({ page }) => {
+      test.skip(
+        !process.env.RSC_FORMS_PRODUCTION,
+        'Refetch recovery is production-only; run with a production-mode client bundle.',
+      );
+      let writes = 0;
+      page.on('request', (request) => {
+        if (request.method() === 'POST' && isWrite(request.url())) writes += 1;
+      });
+      let refreshes = 0;
+      let releaseRetry = () => {};
+      const released = new Promise<void>((resolve) => {
+        releaseRetry = resolve;
+      });
+      let retryStarted = () => {};
+      const started = new Promise<void>((resolve) => {
+        retryStarted = resolve;
+      });
+      await page.route('**/rsc_payload/RscFormsPage*', async (route) => {
+        refreshes += 1;
+        if (refreshes === 1) {
+          await route.abort();
+        } else if (refreshes === 2) {
+          retryStarted();
+          await released;
+          await route.abort();
+        } else {
+          await route.continue();
+        }
+      });
+      await fillReview(page);
+      await page.getByRole('button', { name: 'Save review', exact: true }).click();
+      await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Retry refresh', exact: true }).click();
+      await started;
+
+      try {
+        await fillReview(page, 'Grace');
+        await page.getByRole('button', { name: 'Save review', exact: true }).click();
+        await expect(page.getByTestId('saved-review')).toContainText('Grace');
+        await expect(page.getByRole('status')).toHaveText('Saved.');
+        const failed = page.waitForEvent('requestfailed', (request) => isRefresh(request.url()));
+        releaseRetry();
+        await failed;
+        // Let the rejected fetch's feedback render before checking the final UI.
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) => {
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+            }),
+        );
+        await expect(page.getByRole('status')).toHaveText('Saved.');
+        await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Retry refresh', exact: true })).toHaveCount(0);
+        await expect(page.getByTestId('saved-review')).toContainText('Grace');
+        expect(writes).toBe(2);
+      } finally {
+        releaseRetry();
+      }
+    });
   });
 }
