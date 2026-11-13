@@ -288,7 +288,9 @@ function submissionErrors(error: unknown): ReviewErrors {
     if (Object.keys(errors).length > 0) return errors;
     return { base: ['The server could not validate this review. Please try again.'] };
   }
-  return { base: ['The review could not be saved. Check your connection and try again.'] };
+  return {
+    base: ['Could not confirm the save. Check whether the review was saved before trying again.'],
+  };
 }
 ```
 
@@ -310,7 +312,8 @@ separate from refresh failures:
 
 A failed response is not always proof that no write occurred. If a request loses its response after
 Rails saves, check the saved state before repeating an operation that must not happen twice. The
-helper treats malformed success responses separately for this reason.
+helper asks you to check the saved state when a successful response has an unexpected shape or
+cannot be read as JSON, and when a request's outcome is uncertain.
 
 ### Schema for the library examples
 
@@ -732,7 +735,7 @@ patterns; this is not an exhaustive library feature matrix.
 | Form lives in           | Client Component                 | Client Component                   | Client Component      | Client Component        |
 | Submit mechanism        | React form Action                | React form Action                  | `handleSubmit`        | `form.handleSubmit`     |
 | Client validation       | HTML constraints                 | zod + Conform                      | zod resolver          | zod via Standard Schema |
-| Rails field errors      | Action state                     | `submission.reply()`               | `setError()`          | `setErrorMap()`         |
+| Rails field errors      | Action state                     | `parsed.reply()`                   | `setError()`          | `setErrorMap()`         |
 | Pending state           | `useFormStatus`                  | `useFormStatus`                    | `isSubmitting`        | `form.Subscribe`        |
 | Preserve rejected input | Returned values + `defaultValue` | `lastResult` + cancel native reset | Keep library values   | Keep library values     |
 | Reset after save        | Return empty values              | `resetForm: true`                  | `reset()`             | `formApi.reset()`       |
@@ -764,7 +767,8 @@ For each form:
 4. Reload the page. The latest review should still appear for that browser session.
 
 The fixture's [browser specs](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/e2e-tests/rsc_forms.spec.ts)
-also exercise pending state and failed requests. Its production-only cases cover refresh
+also exercise pending state, failed requests, and successful responses with invalid JSON or an
+unexpected shape. Its production-only cases cover refresh
 failure/retry (`RSC_FORMS_PRODUCTION=1`).
 Set that flag only after building the client with `NODE_ENV=production`; it does not change an
 existing bundle.

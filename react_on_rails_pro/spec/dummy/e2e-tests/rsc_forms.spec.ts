@@ -89,13 +89,55 @@ for (const library of libraries) {
       await page.route('**/rsc_forms', (route) => route.abort());
       await fillReview(page);
       await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      await expect(page.getByRole('alert')).toContainText(/could not be saved/i);
+      await expect(page.getByRole('alert')).toContainText(/could not confirm the save/i);
       await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Ada');
       await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(
         'A review from the browser.',
       );
       await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
       await expect(page.getByTestId('saved-review')).toContainText('No review');
+    });
+
+    test('preserves input and cautions against repeating a write when its response is unusable', async ({
+      page,
+    }) => {
+      // These response cases share a page and must finish in sequence.
+      /* eslint-disable no-await-in-loop */
+      for (const body of ['invalid json', JSON.stringify({ unexpected: true })]) {
+        let writes = 0;
+        await page.route('**/rsc_forms', async (route) => {
+          if (route.request().method() !== 'POST') {
+            await route.continue();
+            return;
+          }
+          writes += 1;
+          // Commit the real Rails write before corrupting only its response.
+          const response = await route.fetch();
+          expect(response.status()).toBe(201);
+          await route.fulfill({ response, body });
+        });
+        await fillReview(page);
+        const delivered = page.waitForResponse((response) => isWrite(response.url()));
+        await page.getByRole('button', { name: 'Save review', exact: true }).click();
+        const browserResponse = await delivered;
+        expect(browserResponse.status()).toBe(201);
+        expect(browserResponse.headers()['content-type']).toMatch(/^application\/json\b/);
+        expect(await browserResponse.text()).toBe(body);
+        await expect(page.getByRole('alert')).toContainText(
+          'Check whether the review was saved before trying again.',
+        );
+        await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Ada');
+        await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(
+          'A review from the browser.',
+        );
+        await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
+        expect(writes).toBe(1);
+        await page.unroute('**/rsc_forms');
+        await page.reload();
+        await expect(page.getByTestId('saved-review')).toContainText('Ada');
+        await expect(page.getByTestId('saved-review')).toContainText('A review from the browser.');
+      }
+      /* eslint-enable no-await-in-loop */
     });
 
     test('retries only the refresh after a successful write', async ({ page }) => {

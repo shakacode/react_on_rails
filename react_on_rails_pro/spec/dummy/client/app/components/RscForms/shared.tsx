@@ -54,7 +54,7 @@ function submissionErrors(error: unknown): ReviewErrors {
     if (Object.keys(errors).length > 0) return errors;
     return { base: ['The server could not validate this review. Please try again.'] };
   }
-  return { base: ['The review could not be saved. Check your connection and try again.'] };
+  return { base: ['Could not confirm the save. Check whether the review was saved before trying again.'] };
 }
 
 export function useReviewSubmission() {
