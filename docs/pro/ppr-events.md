@@ -87,6 +87,29 @@ An abort **after** the cache read pairs with that invocation's `lookup{miss}` (t
 
 **Attribution is process-global.** Subscriptions see every thread in the process; there is no per-request scoping. When counting per request (as the [cache warm-up](./ppr-cache-warm-up.md) tool does), run in a process that is not concurrently serving PPR traffic.
 
+## Development event logger
+
+For a quick, human-readable view of what PPR did during a request, enable the built-in logger:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.ppr_event_logging = true # default false
+end
+```
+
+With a `debug` log level, every PPR event is then written on one line, in arrival order, with a plain explanation — so a request's lookup → write / refused / degraded / abort sequence per component reads top to bottom:
+
+```text
+[ReactOnRailsPro][PPR] ProductPage: cache lookup: hit - serving the cached shell
+[ReactOnRailsPro][PPR] ProductPage: serving the cached shell failed (RuntimeError) - fell back to a fresh render
+[ReactOnRailsPro][PPR] ProductPage: cache write - shell stored
+[ReactOnRailsPro][PPR] Reviews: cache lookup: miss - rendering a fresh shell
+[ReactOnRailsPro][PPR] Reviews: cache write refused (render_error) - nothing cached
+```
+
+Lines are logged at `debug`, so a production log level (`info` and above) silences the output with no other gating. It is a local debugging aid, kept deliberately simple: the subscription is **process-global** (concurrent requests interleave — read it in development with one request in flight), and two same-named components on one page are not distinguished, because the event payloads carry no per-invocation id. For per-request counting with request isolation, use the [cache warm-up](./ppr-cache-warm-up.md) tool's process model instead.
+
 ## Reference consumer
 
 `ReactOnRailsPro::Ppr::CacheWarmer` subscribes to six of these events to classify each warm-up request as `warmed` / `already_warm` / `no_ppr` / `failed` — see [PPR Cache Warm-Up](./ppr-cache-warm-up.md). In particular, "2xx response with zero PPR events" is how it detects a warm path that renders no `ppr_react_component` at all.
