@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Quick pre-review gate: changed-file detection, lint, JS unit, and gem unit specs.
-# Skips dummy-app, generator, example-app, and Pro test suites; validate runs those.
-# Takes no arguments on purpose: Shaka counts only a no-argument run as evidence.
+# Quicker pre-review gate: bin/ci-local --fast. It runs every check the change
+# selects except the dummy-app, gem generator, generated example app, and Pro
+# RSpec suites; validate runs those too. Pro JS tests and Pro lint still run.
+# Takes no arguments: Shaka counts only a no-argument run as evidence.
 set -euo pipefail
 root=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_PREFIX -u GIT_CEILING_DIRECTORIES git -C "$(dirname -- "$0")" rev-parse --show-toplevel) || exit $?
 cd "$root"
