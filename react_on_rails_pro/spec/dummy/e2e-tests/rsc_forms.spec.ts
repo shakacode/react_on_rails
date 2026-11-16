@@ -17,7 +17,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const libraries = ['builtins', 'conform', 'rhf', 'tanstack'];
 const isWrite = (url: string) => new URL(url).pathname === '/rsc_forms';
-const isRefresh = (url: string) => new URL(url).pathname === '/rsc_payload/RscFormsPage';
+const isRefresh = (url: string) =>
+  /^\/rsc_payload\/(BuiltIn|Conform|Hook|TanStack)FormPage$/.test(new URL(url).pathname);
 
 async function fillReview(page: Page, name = 'Ada') {
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
@@ -149,14 +150,14 @@ for (const library of libraries) {
       page.on('request', (request) => {
         if (request.method() === 'POST' && isWrite(request.url())) writes += 1;
       });
-      await page.route('**/rsc_payload/RscFormsPage*', (route) => route.abort());
+      await page.route('**/rsc_payload/*FormPage*', (route) => route.abort());
       await fillReview(page);
       const saved = page.waitForResponse((response) => isWrite(response.url()));
       await page.getByRole('button', { name: 'Save review', exact: true }).click();
       expect((await saved).status()).toBe(201);
       await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toBeVisible();
       await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
-      await page.unroute('**/rsc_payload/RscFormsPage*');
+      await page.unroute('**/rsc_payload/*FormPage*');
       await page.getByRole('button', { name: 'Retry refresh', exact: true }).click();
       await expect(page.getByTestId('saved-review')).toContainText('Ada');
       expect(writes).toBe(1);
@@ -180,7 +181,7 @@ for (const library of libraries) {
       const started = new Promise<void>((resolve) => {
         retryStarted = resolve;
       });
-      await page.route('**/rsc_payload/RscFormsPage*', async (route) => {
+      await page.route('**/rsc_payload/*FormPage*', async (route) => {
         refreshes += 1;
         if (refreshes === 1) {
           await route.abort();

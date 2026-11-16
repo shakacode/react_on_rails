@@ -20,15 +20,11 @@ class RscFormsController < ApplicationController
   # Keep the browser examples protected even when the dummy runs in test mode.
   self.allow_forgery_protection = true
 
-  FORM_LIBRARIES = %w[builtins conform rhf tanstack].freeze
-  private_constant :FORM_LIBRARIES
-
   before_action { response.headers["Cache-Control"] = "no-store" }
 
   def show
-    return head :not_found unless FORM_LIBRARIES.include?(params[:library])
-
-    @form_props = form_props(params[:library])
+    @form_component = rsc_payload_component_name
+    @form_props = form_props
     stream_view_containing_react_components(template: "rsc_forms/show")
   end
 
@@ -44,19 +40,16 @@ class RscFormsController < ApplicationController
 
   private
 
-  def form_props(library)
-    { library:, savedReview: session[:rsc_form_review] }
+  def form_props
+    { savedReview: session[:rsc_form_review] }
   end
 
   def rsc_payload_component_name
-    "RscFormsPage"
+    request.path_parameters.fetch(:component_name)
   end
 
   def rsc_payload_component_props
-    library = super["library"]
-    raise JSON::ParserError, "Unknown form library" unless FORM_LIBRARIES.include?(library)
-
-    # The browser selects the example; saved data always comes from this session.
-    form_props(library)
+    # Saved data always comes from this session, never from browser-supplied props.
+    form_props
   end
 end

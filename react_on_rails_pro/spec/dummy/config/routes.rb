@@ -101,9 +101,19 @@ Rails.application.routes.draw do
   get "react_intl_rsc_demo(/:locale)" => "pages#react_intl_rsc_demo",
       as: :react_intl_rsc_demo,
       constraints: { locale: /en|ar|es/ }
-  get "rsc_forms/:library" => "rsc_forms#show", as: :rsc_forms
+  get "rsc_forms/builtins" => "rsc_forms#show", as: :rsc_forms_builtins,
+      defaults: { component_name: "BuiltInFormPage" }
+  get "rsc_forms/conform" => "rsc_forms#show", as: :rsc_forms_conform,
+      defaults: { component_name: "ConformFormPage" }
+  get "rsc_forms/rhf" => "rsc_forms#show", as: :rsc_forms_rhf,
+      defaults: { component_name: "HookFormPage" }
+  get "rsc_forms/tanstack" => "rsc_forms#show", as: :rsc_forms_tanstack,
+      defaults: { component_name: "TanStackFormPage" }
   post "rsc_forms" => "rsc_forms#create"
-  get "rsc_payload/RscFormsPage" => "rsc_forms#rsc_payload"
+  get "rsc_payload/BuiltInFormPage" => "rsc_forms#rsc_payload", defaults: { component_name: "BuiltInFormPage" }
+  get "rsc_payload/ConformFormPage" => "rsc_forms#rsc_payload", defaults: { component_name: "ConformFormPage" }
+  get "rsc_payload/HookFormPage" => "rsc_forms#rsc_payload", defaults: { component_name: "HookFormPage" }
+  get "rsc_payload/TanStackFormPage" => "rsc_forms#rsc_payload", defaults: { component_name: "TanStackFormPage" }
   rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails

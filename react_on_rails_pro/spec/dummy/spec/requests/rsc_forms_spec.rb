@@ -25,16 +25,22 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
   end
 
   it "rejects unknown form variants" do
-    get "/rsc_forms/unknown"
-
-    expect(response).to have_http_status(:not_found)
+    expect { get "/rsc_forms/unknown" }.to raise_error(ActionController::RoutingError)
   end
 
-  it "rejects malformed or unknown payload variants before rendering" do
-    get "/rsc_payload/RscFormsPage", params: { props: { library: "unknown" }.to_json }
+  it "uses the fixed route component and session data instead of browser-supplied render inputs" do
+    get "/rsc_forms/builtins", params: { component_name: "ConformFormPage" }
 
-    expect(response).to have_http_status(:bad_request)
-    expect(response.body).to eq("Invalid props JSON")
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("React 19 built-ins")
+
+    get "/rsc_payload/BuiltInFormPage", params: {
+      component_name: "ConformFormPage", props: "not JSON"
+    }
+
+    expect(response).to have_http_status(:ok)
+    expect(response.media_type).to eq("application/x-ndjson")
+    expect(response.body).to include("React 19 built-ins", "No review saved yet.")
   end
 
   it "requires a genuine Rails CSRF token for writes, including in test mode" do
@@ -58,8 +64,8 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
     expect(response).to have_http_status(:created)
     expect(response.parsed_body).to eq("review" => { "name" => "Ada", "comment" => "An actual saved review." })
 
-    get "/rsc_payload/RscFormsPage", params: {
-      props: { library: "builtins", savedReview: { name: "Spoofed", comment: "Browser-forged review" } }.to_json
+    get "/rsc_payload/BuiltInFormPage", params: {
+      props: { savedReview: { name: "Spoofed", comment: "Browser-forged review" } }.to_json
     }
 
     expect(response).to have_http_status(:ok)
@@ -68,7 +74,7 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
     expect(response.body).not_to include("Browser-forged review")
 
     other_visitor = ActionDispatch::Integration::Session.new(Rails.application)
-    other_visitor.get "/rsc_payload/RscFormsPage", params: { props: { library: "builtins" }.to_json }
+    other_visitor.get "/rsc_payload/BuiltInFormPage", params: { props: {}.to_json }
 
     expect(other_visitor.response).to have_http_status(:ok)
     expect(other_visitor.response.body).to include("No review saved yet.")
@@ -83,7 +89,7 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
 
     expect(response).to have_http_status(422)
 
-    get "/rsc_payload/RscFormsPage", params: { props: { library: "rhf" }.to_json }
+    get "/rsc_payload/HookFormPage"
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Latest saved review.")
@@ -103,7 +109,7 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
                                          "comment" => ["must be a string"]
                                        })
 
-    get "/rsc_payload/RscFormsPage", params: { props: { library: "builtins" }.to_json }
+    get "/rsc_payload/BuiltInFormPage", params: { props: {}.to_json }
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Ada", "Original saved review.")
