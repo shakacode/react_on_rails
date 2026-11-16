@@ -40,7 +40,7 @@ function SubmitButton() {
 export default function ConformForm() {
   const id = useId();
   const submission = useReviewSubmission();
-  const [lastResult, action] = useActionState(
+  const [lastResult, action, pending] = useActionState(
     async (_previous: SubmissionResult | undefined, data: FormData) => {
       const parsed = parseWithZod(data, { schema: reviewSchema });
       if (parsed.status !== 'success') return parsed.reply();
@@ -74,12 +74,17 @@ export default function ConformForm() {
       >
         <label htmlFor={fields.name.id}>
           Name
-          <input {...getInputProps(fields.name, { type: 'text' })} required maxLength={50} />
+          <input
+            {...getInputProps(fields.name, { type: 'text' })}
+            readOnly={pending}
+            required
+            maxLength={50}
+          />
         </label>
         <p id={fields.name.errorId}>{fields.name.errors?.join(' ')}</p>
         <label htmlFor={fields.comment.id}>
           Comment
-          <textarea {...getTextareaProps(fields.comment)} required maxLength={200} />
+          <textarea {...getTextareaProps(fields.comment)} readOnly={pending} required maxLength={200} />
         </label>
         <p id={fields.comment.errorId}>{fields.comment.errors?.join(' ')}</p>
         {form.errors ? (

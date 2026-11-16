@@ -7884,6 +7884,9 @@ A confirmed save clears the form and shows **Saved.** A `422` displays field err
 input. If the save succeeds but the production RSC refresh fails, the helper shows **Saved, but
 refreshing failed.** The **Retry refresh** button repeats only the read.
 
+Each form keeps its fields read-only while saving and refreshing, so the success reset cannot erase
+new edits. Read-only fields remain focusable and included in the submitted values.
+
 > [!NOTE]
 > Refresh recovery applies in production. In development, failed refetches throw through the route
 > to expose the error and component context; the route may unmount before feedback appears. Late
@@ -7955,7 +7958,7 @@ function SubmitButton() {
 export default function BuiltInForm() {
   const id = useId();
   const submission = useReviewSubmission();
-  const [state, action] = useActionState(
+  const [state, action, pending] = useActionState(
     async (_previous: FormState, data: FormData): Promise<FormState> => {
       const name = data.get('name');
       const comment = data.get('comment');
@@ -7978,6 +7981,7 @@ export default function BuiltInForm() {
             id={`${id}-name`}
             name="name"
             defaultValue={state.values.name}
+            readOnly={pending}
             required
             maxLength={50}
             aria-invalid={Boolean(state.errors.name)}
@@ -7991,6 +7995,7 @@ export default function BuiltInForm() {
             id={`${id}-comment`}
             name="comment"
             defaultValue={state.values.comment}
+            readOnly={pending}
             required
             maxLength={200}
             aria-invalid={Boolean(state.errors.comment)}
@@ -8088,7 +8093,7 @@ function SubmitButton() {
 export default function ConformForm() {
   const id = useId();
   const submission = useReviewSubmission();
-  const [lastResult, action] = useActionState(
+  const [lastResult, action, pending] = useActionState(
     async (_previous: SubmissionResult | undefined, data: FormData) => {
       const parsed = parseWithZod(data, { schema: reviewSchema });
       if (parsed.status !== 'success') return parsed.reply();
@@ -8122,12 +8127,17 @@ export default function ConformForm() {
       >
         <label htmlFor={fields.name.id}>
           Name
-          <input {...getInputProps(fields.name, { type: 'text' })} required maxLength={50} />
+          <input
+            {...getInputProps(fields.name, { type: 'text' })}
+            readOnly={pending}
+            required
+            maxLength={50}
+          />
         </label>
         <p id={fields.name.errorId}>{fields.name.errors?.join(' ')}</p>
         <label htmlFor={fields.comment.id}>
           Comment
-          <textarea {...getTextareaProps(fields.comment)} required maxLength={200} />
+          <textarea {...getTextareaProps(fields.comment)} readOnly={pending} required maxLength={200} />
         </label>
         <p id={fields.comment.errorId}>{fields.comment.errors?.join(' ')}</p>
         {form.errors ? (
@@ -8251,6 +8261,7 @@ export default function HookForm() {
           <input
             {...register('name')}
             id={`${id}-name`}
+            readOnly={isSubmitting}
             required
             maxLength={50}
             aria-invalid={Boolean(errors.name)}
@@ -8263,6 +8274,7 @@ export default function HookForm() {
           <textarea
             {...register('comment')}
             id={`${id}-comment`}
+            readOnly={isSubmitting}
             required
             maxLength={200}
             aria-invalid={Boolean(errors.comment)}
@@ -8330,8 +8342,8 @@ pnpm add @tanstack/react-form@1.33.5 zod@4.1.13
 ### 2. Create the form
 
 Display Rails errors through the `onSubmit` error map and clear fields after a save with
-`formApi.reset()`. Standard Schema support handles the zod schema; `form.Subscribe` updates the
-submit button's pending state.
+`formApi.reset()`. Standard Schema support handles the zod schema; `useSelector` subscribes to
+`isSubmitting` for the read-only fields and submit button.
 
 Save `TanStackForm.tsx` next to `shared.tsx` and `schema.ts`:
 
@@ -8340,7 +8352,7 @@ Save `TanStackForm.tsx` next to `shared.tsx` and `schema.ts`:
 'use client';
 
 import React, { useId, useState } from 'react';
-import { useForm } from '@tanstack/react-form';
+import { useForm, useSelector } from '@tanstack/react-form';
 import { reviewSchema } from './schema';
 import { emptyReview, SubmissionFeedback, useReviewSubmission } from './shared';
 
@@ -8364,6 +8376,7 @@ export default function TanStackForm() {
       formApi.reset();
     },
   });
+  const isSubmitting = useSelector(form.store, (state) => state.isSubmitting);
 
   return (
     <div>
@@ -8385,6 +8398,7 @@ export default function TanStackForm() {
                 onBlur: field.handleBlur,
                 onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
                   field.handleChange(event.target.value),
+                readOnly: isSubmitting,
                 required: true,
                 'aria-invalid': hasErrors,
                 'aria-describedby': hasErrors ? `${id}-${name}-error` : undefined,
@@ -8408,13 +8422,9 @@ export default function TanStackForm() {
           </form.Field>
         ))}
         {baseErrors.length > 0 ? <p role="alert">{baseErrors.join(' ')}</p> : null}
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save review'}
-            </button>
-          )}
-        </form.Subscribe>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving…' : 'Save review'}
+        </button>
       </form>
       <SubmissionFeedback submission={submission} />
     </div>
@@ -8462,14 +8472,14 @@ See TanStack Form's
 
 These recipes demonstrate the following patterns; each library also supports other approaches.
 
-| Concern                 | React 19 built-ins               | Conform                            | React Hook Form + zod | TanStack Form           |
-| ----------------------- | -------------------------------- | ---------------------------------- | --------------------- | ----------------------- |
-| Submit mechanism        | React form Action                | React form Action                  | `handleSubmit`        | `form.handleSubmit`     |
-| Client validation       | HTML constraints                 | zod + Conform                      | zod resolver          | zod via Standard Schema |
-| Rails field errors      | Action state                     | `parsed.reply()`                   | `setError()`          | `setErrorMap()`         |
-| Pending state           | `useFormStatus`                  | `useFormStatus`                    | `isSubmitting`        | `form.Subscribe`        |
-| Preserve rejected input | Returned values + `defaultValue` | `lastResult` + cancel native reset | Keep library values   | Keep library values     |
-| Reset after save        | Return empty values              | `resetForm: true`                  | `reset()`             | `formApi.reset()`       |
+| Concern                 | React 19 built-ins                 | Conform                            | React Hook Form + zod | TanStack Form           |
+| ----------------------- | ---------------------------------- | ---------------------------------- | --------------------- | ----------------------- |
+| Submit mechanism        | React form Action                  | React form Action                  | `handleSubmit`        | `form.handleSubmit`     |
+| Client validation       | HTML constraints                   | zod + Conform                      | zod resolver          | zod via Standard Schema |
+| Rails field errors      | Action state                       | `parsed.reply()`                   | `setError()`          | `setErrorMap()`         |
+| Pending state           | `useActionState` + `useFormStatus` | `useActionState` + `useFormStatus` | `isSubmitting`        | `useSelector`           |
+| Preserve rejected input | Returned values + `defaultValue`   | `lastResult` + cancel native reset | Keep library values   | Keep library values     |
+| Reset after save        | Return empty values                | `resetForm: true`                  | `reset()`             | `formApi.reset()`       |
 
 All four forms are Client Components. The examples use React 19.3.1 and the package versions above; see the
 [fixture package manifest](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/package.json)

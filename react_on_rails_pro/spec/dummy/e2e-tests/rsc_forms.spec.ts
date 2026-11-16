@@ -67,24 +67,47 @@ for (const library of libraries) {
       await expect(page.getByTestId('saved-review')).toContainText('Ada');
     });
 
-    test('disables submission while the Rails write is pending', async ({ page }) => {
-      let releaseWrite = () => {};
-      const released = new Promise<void>((resolve) => {
-        releaseWrite = resolve;
+    for (const stage of ['write', 'refresh']) {
+      test(`protects input while the ${stage} is pending`, async ({ page }) => {
+        let release = () => {};
+        const released = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        let markStarted = () => {};
+        const started = new Promise<void>((resolve) => {
+          markStarted = resolve;
+        });
+        await page.route(stage === 'write' ? '**/rsc_forms' : '**/rsc_payload/*FormPage*', async (route) => {
+          markStarted();
+          await released;
+          await route.continue();
+        });
+        await fillReview(page);
+        await page.getByRole('button', { name: 'Save review', exact: true }).click();
+        try {
+          await started;
+          await expect(page.getByRole('button', { name: /Saving/ })).toBeDisabled();
+          const name = page.getByRole('textbox', { name: 'Name', exact: true });
+          const comment = page.getByRole('textbox', { name: 'Comment', exact: true });
+          // Focus and copying remain available, but a later edit must not be lost on reset.
+          await expect(name).not.toBeEditable();
+          await expect(comment).not.toBeEditable();
+          await name.focus();
+          await name.pressSequentially('Later edit');
+          await comment.focus();
+          await comment.pressSequentially('Later edit');
+          await expect(name).toHaveValue('Ada');
+          await expect(comment).toHaveValue('A review from the browser.');
+        } finally {
+          release();
+        }
+        await expect(page.getByTestId('saved-review')).toContainText('Ada');
+        await expect(page.getByTestId('saved-review')).toContainText('A review from the browser.');
+        await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
+        await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
+        await fillReview(page, 'Grace');
       });
-      await page.route('**/rsc_forms', async (route) => {
-        await released;
-        await route.continue();
-      });
-      await fillReview(page);
-      await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      try {
-        await expect(page.getByRole('button', { name: /Saving/ })).toBeDisabled();
-      } finally {
-        releaseWrite();
-      }
-      await expect(page.getByTestId('saved-review')).toContainText('Ada');
-    });
+    }
 
     test('preserves input after a failed write request', async ({ page }) => {
       await page.route('**/rsc_forms', (route) => route.abort());
@@ -97,6 +120,7 @@ for (const library of libraries) {
       );
       await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
       await expect(page.getByTestId('saved-review')).toContainText('No review');
+      await fillReview(page, 'Grace');
     });
 
     test('preserves input and cautions against repeating a write when its response is unusable', async ({
@@ -157,9 +181,11 @@ for (const library of libraries) {
       expect((await saved).status()).toBe(201);
       await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toBeVisible();
       await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
+      await fillReview(page, 'Grace');
       await page.unroute('**/rsc_payload/*FormPage*');
       await page.getByRole('button', { name: 'Retry refresh', exact: true }).click();
       await expect(page.getByTestId('saved-review')).toContainText('Ada');
+      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Grace');
       expect(writes).toBe(1);
     });
 

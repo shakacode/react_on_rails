@@ -16,7 +16,7 @@
 'use client';
 
 import React, { useId, useState } from 'react';
-import { useForm } from '@tanstack/react-form';
+import { useForm, useSelector } from '@tanstack/react-form';
 import { reviewSchema } from './schema';
 import { emptyReview, SubmissionFeedback, useReviewSubmission } from './shared';
 
@@ -40,6 +40,7 @@ export default function TanStackForm() {
       formApi.reset();
     },
   });
+  const isSubmitting = useSelector(form.store, (state) => state.isSubmitting);
 
   return (
     <div>
@@ -61,6 +62,7 @@ export default function TanStackForm() {
                 onBlur: field.handleBlur,
                 onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
                   field.handleChange(event.target.value),
+                readOnly: isSubmitting,
                 required: true,
                 'aria-invalid': hasErrors,
                 'aria-describedby': hasErrors ? `${id}-${name}-error` : undefined,
@@ -84,13 +86,9 @@ export default function TanStackForm() {
           </form.Field>
         ))}
         {baseErrors.length > 0 ? <p role="alert">{baseErrors.join(' ')}</p> : null}
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save review'}
-            </button>
-          )}
-        </form.Subscribe>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving…' : 'Save review'}
+        </button>
       </form>
       <SubmissionFeedback submission={submission} />
     </div>

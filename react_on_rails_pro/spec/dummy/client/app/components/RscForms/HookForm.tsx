@@ -66,6 +66,7 @@ export default function HookForm() {
           <input
             {...register('name')}
             id={`${id}-name`}
+            readOnly={isSubmitting}
             required
             maxLength={50}
             aria-invalid={Boolean(errors.name)}
@@ -78,6 +79,7 @@ export default function HookForm() {
           <textarea
             {...register('comment')}
             id={`${id}-comment`}
+            readOnly={isSubmitting}
             required
             maxLength={200}
             aria-invalid={Boolean(errors.comment)}

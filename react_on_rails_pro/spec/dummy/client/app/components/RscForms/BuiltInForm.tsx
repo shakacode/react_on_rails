@@ -39,7 +39,7 @@ function SubmitButton() {
 export default function BuiltInForm() {
   const id = useId();
   const submission = useReviewSubmission();
-  const [state, action] = useActionState(
+  const [state, action, pending] = useActionState(
     async (_previous: FormState, data: FormData): Promise<FormState> => {
       const name = data.get('name');
       const comment = data.get('comment');
@@ -62,6 +62,7 @@ export default function BuiltInForm() {
             id={`${id}-name`}
             name="name"
             defaultValue={state.values.name}
+            readOnly={pending}
             required
             maxLength={50}
             aria-invalid={Boolean(state.errors.name)}
@@ -75,6 +76,7 @@ export default function BuiltInForm() {
             id={`${id}-comment`}
             name="comment"
             defaultValue={state.values.comment}
+            readOnly={pending}
             required
             maxLength={200}
             aria-invalid={Boolean(state.errors.comment)}
