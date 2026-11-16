@@ -7558,18 +7558,23 @@ SOURCE: docs/pro/react-server-components/form-libraries.md
 
 # Forms and Form Libraries on RSC Pages
 
-Build a review form that submits to Rails, displays validation errors without losing the user's
-input, and refreshes the surrounding React Server Component after a successful save. Choose one
-recipe: React 19 built-ins, Conform, React Hook Form + zod, or TanStack Form.
+Build a review form that submits to Rails, preserves input when validation fails, and refreshes
+the surrounding React Server Component after a save.
 
-Complete the shared setup once, then follow **only your chosen recipe**. Each recipe supplies a
-Client Component and a small `ReviewPage.jsx` that imports it directly. These are alternative
-versions of the same page; you do not need the other forms or their packages.
+Complete the shared setup, then follow **one recipe**. Each provides a Client Component form and a
+`ReviewPage.jsx` that imports it directly. Install only that recipe's packages.
 
 ## Before you start
 
-Start with an [RSC-enabled Pro app](./index.md#requirements), or follow the
-[existing-app setup guide](./upgrading-existing-pro-app.md). These examples use React 19.
+Use React 19 in an [RSC-enabled Pro app](./index.md#requirements). To enable RSC in an existing app,
+follow the [setup guide](./upgrading-existing-pro-app.md).
+
+All four forms require JavaScript, even with server-rendered initial HTML. For submission without
+JavaScript, use a [standard Rails form](../../oss/building-features/mutations.md#choose-the-rails-entry-point).
+Rails handles every write; passing a browser function to `<form action>` requires no Server Action
+or `'use server'` directive.
+
+## Choose a recipe
 
 - **[React 19 built-ins](#react-19-built-ins):** `useActionState` and `useFormStatus`, without an
   additional form library.
@@ -7579,20 +7584,13 @@ Start with an [RSC-enabled Pro app](./index.md#requirements), or follow the
   with Rails errors mapped through `setError`.
 - **[TanStack Form](#tanstack-form):** typed field APIs and Rails errors mapped through `setErrorMap`.
 
-If you prefer a Rails-specific hook with controlled fields, CSRF handling, pending state, and error
-mapping together, see [`useRailsForm`](../../oss/building-features/forms.md).
-
-All shown forms require JavaScript, including when their initial HTML is server-rendered. For
-submission without JavaScript, use a
-[standard Rails form](../../oss/building-features/mutations.md#choose-the-rails-entry-point).
-A browser function passed to `<form action>` does not require a Server Action or `'use server'`:
-Rails owns the write in every recipe below.
+For a Rails-specific hook combining controlled fields, CSRF handling, pending state, and error
+mapping, see [`useRailsForm`](../../oss/building-features/forms.md).
 
 ## Shared setup
 
-The examples use `client/app/components/RscForms` for form files and
-`client/app/ror-auto-load-components` for the registered page. Use your app's configured JavaScript
-and component registration directories if they differ.
+Save form files in `client/app/components/RscForms` and the registered page in
+`client/app/ror-auto-load-components`, or use your app's configured directories.
 
 ### 1. Add the Rails endpoint
 
@@ -7608,14 +7606,17 @@ X-CSRF-Token: <token from the Rails layout>
 ```json
 {
   "review": {
-    "name": "Reserved",
+    "name": "Ada",
     "comment": "A useful review."
   }
 }
 ```
 
-Rails deliberately rejects `Reserved`, even though it passes the browser and schema checks. The
-response uses HTTP `422` and field names mapped to arrays of messages:
+Rails responds with HTTP `201` and
+`{ "review": { "name": "Ada", "comment": "A useful review." } }`.
+
+To try a server validation error, change the name to `Reserved`. It passes the browser and schema
+checks, but Rails returns HTTP `422` with field names mapped to arrays of messages:
 
 ```json
 {
@@ -7625,12 +7626,8 @@ response uses HTTP `422` and field names mapped to arrays of messages:
 }
 ```
 
-For valid input, Rails responds with HTTP `201` and
-`{ "review": { "name": "Ada", "comment": "A useful review." } }`.
-
-This example keeps the latest review in the visitor's session so it needs no database table. In your
-application, use your normal model, authorization, and persistence; the request and error contract
-can stay the same.
+The example stores the latest review in the visitor's session, without a database table. Use your
+application's model, authorization, and persistence while keeping this request and error contract.
 
 ```ruby
 # app/models/rsc_form_submission.rb
@@ -7659,8 +7656,8 @@ class RscFormSubmission
 end
 ```
 
-Add one page route, one write route, and a fixed RSC payload route. Put the specific payload route
-before your app's general `rsc_payload_route` declaration:
+Add page, write, and fixed RSC payload routes. Place the payload route before your app's general
+`rsc_payload_route` declaration:
 
 ```ruby
 # config/routes.rb
@@ -7669,7 +7666,7 @@ post "rsc_forms" => "rsc_forms#create"
 get "rsc_payload/ReviewPage" => "rsc_forms#rsc_payload"
 ```
 
-The initial page and every payload request load the latest review from the Rails session:
+Load the latest review from the Rails session for both the initial page and payload requests:
 
 ```ruby
 # app/controllers/rsc_forms_controller.rb
@@ -7710,9 +7707,8 @@ class RscFormsController < ApplicationController
 end
 ```
 
-`render_model_errors` comes from the optional `FormResponders` concern. Your existing controller
-can return the same `422` JSON itself. Keep Rails CSRF protection enabled and include the usual
-meta tags in the layout:
+The optional `FormResponders` concern supplies `render_model_errors`; your controller can also return
+the same `422` JSON directly. Keep Rails CSRF protection enabled and include its layout meta tags:
 
 ```erb
 <%= csrf_meta_tags %>
@@ -7720,32 +7716,28 @@ meta tags in the layout:
 
 ### 2. Render and refresh the page
 
-Every recipe below provides its own `ReviewPage.jsx`. Render that registered Server Component from
-the same Rails view:
+Each recipe provides a `ReviewPage.jsx` Server Component. Render it from this Rails view:
 
 ```erb
 <%# app/views/rsc_forms/show.html.erb %>
 <%= stream_react_component("ReviewPage", props: @form_props, id: "review-page") %>
 ```
 
-With auto-bundling enabled, save `ReviewPage.jsx` in your configured component registration directory.
-Otherwise, [register it in the server and client bundles](./create-without-ssr.md#register-the-react-server-component-page)
-using `registerServerComponent`. That registration supplies the `RSCRoute` ancestor used by the
-submission helper below.
+With auto-bundling enabled, save `ReviewPage.jsx` in your component registration directory. Otherwise,
+[register it in the server and client bundles](./create-without-ssr.md#register-the-react-server-component-page)
+with `registerServerComponent`. Registration supplies the `RSCRoute` ancestor the submission helper needs.
 
-After a successful POST, `refetch()` requests `/rsc_payload/ReviewPage`. Rails reloads the session,
-and **Latest saved review** updates without a full page navigation. The payload endpoint must read
-fresh data; replaying the browser's old props would leave the page stale.
+After a save, `refetch()` requests `/rsc_payload/ReviewPage` and updates **Latest saved review** without
+a full page navigation. The payload endpoint must read fresh data, as this controller does, rather
+than replaying the browser's old props.
 
-If your app uses async props, configure the
-[async props provider for refetch](../streaming-ssr.md#rscrouterefetch-and-async-props)
-instead of assuming the initial view's emit block runs again.
+For async props, configure the [provider for refetch](../streaming-ssr.md#rscrouterefetch-and-async-props)
+instead of relying on the initial view's emit block running again.
 
 ### 3. Add shared submission handling
 
-Save the complete helper below as `client/app/components/RscForms/shared.tsx`. Every recipe uses it
-to submit the nested request with the existing CSRF-aware `createRailsAction` API, validate response
-shapes, display request errors, and refresh the page after a confirmed save.
+Save this helper as `client/app/components/RscForms/shared.tsx`. It sends the CSRF-protected request
+with `createRailsAction`, checks responses, displays request errors, and refreshes after a confirmed save.
 
 <details>
 <summary>Complete shared.tsx — used by every recipe</summary>
@@ -7886,28 +7878,27 @@ export function SubmissionFeedback({ submission }: { submission: ReturnType<type
 
 </details>
 
-A `422` returns field errors and keeps the entered values. A confirmed save clears the form and
-shows **Saved.** If the write succeeds but the production RSC refresh fails, the helper shows
-**Saved, but refreshing failed.** and offers **Retry refresh**. That retry repeats only the read;
-it does not submit the form again.
+#### Save and refresh feedback
+
+A confirmed save clears the form and shows **Saved.** A `422` displays field errors and preserves
+input. If the save succeeds but the production RSC refresh fails, the helper shows **Saved, but
+refreshing failed.** The **Retry refresh** button repeats only the read.
 
 > [!NOTE]
-> Recoverable refresh behavior applies in production. In development, failed refetches deliberately
-> throw through the route to expose the error and component context; the route may unmount before
-> form feedback appears. Late streamed errors can also remount Client Components during production
-> recovery. See [Manually refetching a server component](./inside-client-components.md#manually-refetching-a-server-component)
-> for the full behavior and how to place feedback outside the route when it must survive a remount.
+> Refresh recovery applies in production. In development, failed refetches throw through the route
+> to expose the error and component context; the route may unmount before feedback appears. Late
+> streamed errors can also remount Client Components during production recovery. See
+> [Manually refetching a server component](./inside-client-components.md#manually-refetching-a-server-component)
+> for details and how to keep feedback outside the route when it must survive a remount.
 
-A failed or unreadable response does not prove that no write occurred. The helper preserves input
-and asks the user to check the saved state before retrying when it cannot confirm the outcome,
-including invalid JSON or an unexpected success response. Your application's retry behavior should
-respect whether repeating the operation could create a duplicate.
+A failed or unreadable response can leave the save outcome uncertain, including invalid JSON or
+an unexpected success response. The helper preserves input and asks the user to check whether the
+review was saved before retrying. Account for duplicate writes when designing retries in your app.
 
 ### 4. Add a schema if your recipe uses one
 
-Skip this step for React built-ins. Conform, React Hook Form, and TanStack Form use the same client
-schema. Install zod with your chosen recipe's command below, then save this file. Rails still
-validates every submission; client validation provides earlier feedback.
+Skip this step for React built-ins. The other recipes use this client schema for earlier feedback;
+Rails still validates every submission. Install zod with your recipe's command, then save this file.
 
 ```tsx
 // client/app/components/RscForms/schema.ts
@@ -7921,14 +7912,20 @@ export const reviewSchema = z.object({
 
 ## React 19 built-ins
 
-**Dependencies:** none beyond the React 19 and React on Rails Pro packages already configured in
-your app. Skip the shared zod schema.
+### 1. Install dependencies
 
-Create `BuiltInForm.tsx` next to `shared.tsx`. `useActionState` runs a browser function that posts to
-Rails; `useFormStatus` reads pending state from inside the form. On failure, the Action returns the
-submitted values as the next `defaultValue`; on success, it returns empty values. The tested React
-version preserves rejected input when React resets the uncontrolled fields. See
+Use your app's existing React 19 and React on Rails Pro packages. No additional dependencies or
+shared zod schema are needed.
+
+### 2. Create the form
+
+Preserve rejected input and clear fields after a save by returning values from `useActionState`:
+submitted values on failure, empty values on success. These become the next `defaultValue`, preserving
+input across React's uncontrolled field reset in the tested version. See
 [React's value-preservation example](https://react.dev/reference/react/useActionState#displaying-validation-errors-and-preserving-form-values).
+
+Save `BuiltInForm.tsx` next to `shared.tsx`. Its Action posts to Rails from the browser;
+`useFormStatus` tracks pending state from inside the form.
 
 ```tsx
 // client/app/components/RscForms/BuiltInForm.tsx
@@ -8010,7 +8007,9 @@ export default function BuiltInForm() {
 }
 ```
 
-Create the page with a direct import of this form:
+### 3. Create the page
+
+Save `ReviewPage.jsx` with a direct import of the form:
 
 ```jsx
 // client/app/ror-auto-load-components/ReviewPage.jsx
@@ -8035,24 +8034,30 @@ export default function ReviewPage({ savedReview }) {
 }
 ```
 
-Open `/rsc_forms`. Submit `Reserved` with a comment to see the Rails error and retained input, then
-change the name to `Ada` and save. The form should clear and **Latest saved review** should update.
+### 4. Try the form
+
+1. Open `/rsc_forms`. Save `Ada` with a comment. The fields clear and **Latest saved review** updates.
+2. Submit `Reserved` with a comment. Rails shows a name error and both values remain.
 
 ## Conform
 
-Install only the dependencies for this recipe and add the shared schema:
+### 1. Install dependencies
+
+Install these packages and add the shared schema:
 
 ```bash
 pnpm add @conform-to/react@1.21.3 @conform-to/zod@1.21.3 zod@4.1.13
 ```
 
-Create `ConformForm.tsx` next to `shared.tsx` and `schema.ts`. `lastResult` connects submission results
-to field metadata and values. Map Rails errors with `parsed.reply({ fieldErrors, formErrors })` and
-reset after a save with `parsed.reply({ resetForm: true })`.
+### 2. Create the form
 
-The `onReset` handler cancels React's automatic native reset so Conform controls when fields clear.
-Without it, the tested Conform/React combination loses rejected values. With zod v4, import
-`parseWithZod` from `@conform-to/zod/v4`.
+Display Rails errors and preserve values through `lastResult`, which connects submission results to
+Conform's field metadata. Use `parsed.reply({ fieldErrors, formErrors })` for errors and
+`parsed.reply({ resetForm: true })` to clear the form after a save.
+
+Save `ConformForm.tsx` next to `shared.tsx` and `schema.ts`. Keep the `onReset` handler: it cancels
+React's automatic native reset, which otherwise loses rejected values in the tested combination.
+For zod v4, import `parseWithZod` from `@conform-to/zod/v4`.
 
 ```tsx
 // client/app/components/RscForms/ConformForm.tsx
@@ -8138,7 +8143,9 @@ export default function ConformForm() {
 }
 ```
 
-Use this version of `ReviewPage.jsx`:
+### 3. Create the page
+
+Save `ReviewPage.jsx` with a direct import of the form:
 
 ```jsx
 // client/app/ror-auto-load-components/ReviewPage.jsx
@@ -8163,22 +8170,31 @@ export default function ReviewPage({ savedReview }) {
 }
 ```
 
-Open `/rsc_forms`. Submit `Reserved` with a comment, check that both values remain with the Rails
-error, then change the name to `Ada` and save. The form should clear and the saved review should update.
+### 4. Try the form
+
+1. Open `/rsc_forms`. Save `Ada` with a comment. The fields clear and **Latest saved review** updates.
+2. Submit `Reserved` with a comment. Rails shows a name error and both values remain.
+
 See Conform's [React form API](https://conform.guide/api/react/useForm) and
 [zod adapter](https://conform.guide/api/zod/parseWithZod) for other validation modes.
 
 ## React Hook Form + zod
 
-Install only the dependencies for this recipe and add the shared schema:
+### 1. Install dependencies
+
+Install these packages and add the shared schema:
 
 ```bash
 pnpm add react-hook-form@7.92.0 @hookform/resolvers@5.9.1 zod@4.1.13
 ```
 
-Create `HookForm.tsx` next to `shared.tsx` and `schema.ts`. The resolver handles client validation;
-Rails `422` messages go to `setError`, with request-level errors under `root.server`. Returning
-without `reset()` keeps the entered values. `isSubmitting` includes the awaited save and RSC refresh.
+### 2. Create the form
+
+Keep rejected input by calling `reset()` only after a save. Display Rails `422` messages with
+`setError` and request errors under `root.server`; the zod resolver handles client validation.
+
+Save `HookForm.tsx` next to `shared.tsx` and `schema.ts`. Its `isSubmitting` state includes both the
+awaited save and RSC refresh.
 
 ```tsx
 // client/app/components/RscForms/HookForm.tsx
@@ -8265,7 +8281,9 @@ export default function HookForm() {
 }
 ```
 
-Use this version of `ReviewPage.jsx`:
+### 3. Create the page
+
+Save `ReviewPage.jsx` with a direct import of the form:
 
 ```jsx
 // client/app/ror-auto-load-components/ReviewPage.jsx
@@ -8290,22 +8308,32 @@ export default function ReviewPage({ savedReview }) {
 }
 ```
 
-Open `/rsc_forms`. Submit `Reserved` with a comment, check the Rails field error and retained input,
-then save as `Ada`. The form should clear and the saved review should update. See React Hook Form's
+### 4. Try the form
+
+1. Open `/rsc_forms`. Save `Ada` with a comment. The fields clear and **Latest saved review** updates.
+2. Submit `Reserved` with a comment. Rails shows a name error and both values remain.
+
+See React Hook Form's
 [`setError`](https://react-hook-form.com/docs/useform/seterror) and
 [`reset`](https://react-hook-form.com/docs/useform/reset) references.
 
 ## TanStack Form
 
-Install only the dependencies for this recipe and add the shared schema:
+### 1. Install dependencies
+
+Install these packages and add the shared schema:
 
 ```bash
 pnpm add @tanstack/react-form@1.33.5 zod@4.1.13
 ```
 
-Create `TanStackForm.tsx` next to `shared.tsx` and `schema.ts`. Its Standard Schema support accepts
-the zod schema. Map Rails errors into the `onSubmit` error map and call `formApi.reset()` after
-success. `form.Subscribe` keeps the submit button's pending state reactive.
+### 2. Create the form
+
+Display Rails errors through the `onSubmit` error map and clear fields after a save with
+`formApi.reset()`. Standard Schema support handles the zod schema; `form.Subscribe` updates the
+submit button's pending state.
+
+Save `TanStackForm.tsx` next to `shared.tsx` and `schema.ts`:
 
 ```tsx
 // client/app/components/RscForms/TanStackForm.tsx
@@ -8394,7 +8422,9 @@ export default function TanStackForm() {
 }
 ```
 
-Use this version of `ReviewPage.jsx`:
+### 3. Create the page
+
+Save `ReviewPage.jsx` with a direct import of the form:
 
 ```jsx
 // client/app/ror-auto-load-components/ReviewPage.jsx
@@ -8419,14 +8449,18 @@ export default function ReviewPage({ savedReview }) {
 }
 ```
 
-Open `/rsc_forms`. Submit `Reserved` with a comment, check the Rails field error and retained input,
-then save as `Ada`. The form should clear and the saved review should update. See TanStack Form's
+### 4. Try the form
+
+1. Open `/rsc_forms`. Save `Ada` with a comment. The fields clear and **Latest saved review** updates.
+2. Submit `Reserved` with a comment. Rails shows a name error and both values remain.
+
+See TanStack Form's
 [validation guide](https://tanstack.com/form/latest/docs/framework/react/guides/validation) and
 [submission guide](https://tanstack.com/form/latest/docs/framework/react/guides/submission-handling).
 
 ## Compare the tested patterns
 
-This table covers only these recipes; the libraries support other submission and validation patterns.
+These recipes demonstrate the following patterns; each library also supports other approaches.
 
 | Concern                 | React 19 built-ins               | Conform                            | React Hook Form + zod | TanStack Form           |
 | ----------------------- | -------------------------------- | ---------------------------------- | --------------------- | ----------------------- |
@@ -8437,16 +8471,15 @@ This table covers only these recipes; the libraries support other submission and
 | Preserve rejected input | Returned values + `defaultValue` | `lastResult` + cancel native reset | Keep library values   | Keep library values     |
 | Reset after save        | Return empty values              | `resetForm: true`                  | `reset()`             | `formApi.reset()`       |
 
-All four forms are Client Components, use the shared CSRF-aware request, and refresh RSC content
-after a confirmed save. The examples use React 19.3.1 and the package versions shown above; see the
+All four forms are Client Components. The examples use React 19.3.1 and the package versions above; see the
 [fixture package manifest](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/package.json)
-for the complete test dependencies. Measure your app's build if bundle cost affects your choice.
+for all test dependencies. Measure your app's build if bundle cost affects your choice.
 
 ## Try the runnable examples
 
-The guide uses one `ReviewPage` for your chosen recipe. The
+This guide uses one `ReviewPage` for your chosen recipe. The
 [Pro dummy app](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy)
-provides four independently registered pages so you can try each form without changing files:
+has four registered pages so you can try every form without changing files:
 
 | Recipe                | Dummy app path        |
 | --------------------- | --------------------- |
@@ -8455,19 +8488,22 @@ provides four independently registered pages so you can try each form without ch
 | React Hook Form + zod | `/rsc_forms/rhf`      |
 | TanStack Form         | `/rsc_forms/tanstack` |
 
-For any recipe, try an empty required field, then `Reserved`, then a valid name. After saving, reload
-the page to confirm the latest review remains in that browser session.
+Save a review as `Ada`, then reload to confirm it remains in that browser session. Try `Reserved`
+and an empty required field to see validation errors.
+
+<details>
+<summary>How these examples were verified</summary>
 
 The [browser specs](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/e2e-tests/rsc_forms.spec.ts)
-cover pending state, Rails validation, retained input, successful saves, and unusable responses.
-Production-only cases exercise refresh failures, refresh-only retry, and an older retry failing
-after a newer save. Set `RSC_FORMS_PRODUCTION=1` only after building the client with
-`NODE_ENV=production`; the flag does not change an existing bundle.
+cover pending state, Rails validation, retained input, saves, and unusable responses. Production-only
+cases cover refresh failures, refresh-only retry, and an older retry failing after a newer save.
+To run those cases, build the client with `NODE_ENV=production` before setting `RSC_FORMS_PRODUCTION=1`;
+the flag does not change an existing bundle.
+
 The [request specs](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/spec/requests/rsc_forms_spec.rb)
 check CSRF protection, field types, strong parameters, session isolation, and fresh RSC props.
 
-The [Marketplace form examples](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc/pull/250)
-provide another application reference.
+</details>
 
 ## Related guides
 
@@ -8475,6 +8511,7 @@ provide another application reference.
 - [Mutations without Server Actions](../../oss/building-features/mutations.md)
 - [RSC data fetching](../../oss/migrating/rsc-data-fetching.md)
 - [RSC inside Client Components](./inside-client-components.md)
+- [Marketplace form examples](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc/pull/250)
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/pro/react-server-components/static-shell-global-js-opt-out
