@@ -13,9 +13,25 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { z } from 'zod';
+import React from 'react';
+import ReviewForm from '../components/RscForms/ReviewForm';
 
-export const reviewSchema = z.object({
-  name: z.string().min(1, 'Enter your name.').max(50, 'Use 50 characters or fewer.'),
-  comment: z.string().min(1, 'Enter a comment.').max(200, 'Use 200 characters or fewer.'),
-});
+export default function ReviewFormPage({ savedReview }) {
+  return (
+    <section>
+      <h2>Write a review</h2>
+      <ReviewForm />
+      <h3>Latest saved review</h3>
+      <div data-testid="saved-review">
+        {savedReview ? (
+          <>
+            <p>{savedReview.name}</p>
+            <p>{savedReview.comment}</p>
+          </>
+        ) : (
+          <p>No review saved yet.</p>
+        )}
+      </div>
+    </section>
+  );
+}

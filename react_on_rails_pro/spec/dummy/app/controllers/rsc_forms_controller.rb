@@ -17,7 +17,7 @@ class RscFormsController < ApplicationController
   include ReactOnRailsPro::RSCPayloadRenderer
   include ReactOnRails::Controller::FormResponders
 
-  # Keep the browser examples protected even when the dummy runs in test mode.
+  # Keep the browser example protected even when the dummy runs in test mode.
   self.allow_forgery_protection = true
 
   before_action { response.headers["Cache-Control"] = "no-store" }
@@ -29,7 +29,7 @@ class RscFormsController < ApplicationController
   end
 
   def create
-    submission = RscFormSubmission.new(params.require(:review).permit(:name, :comment))
+    submission = RscFormSubmission.new(params.permit(:name, :comment))
     return render_model_errors(submission) unless submission.valid?
 
     # An anonymous demo stores just this visitor's latest review, without a database.

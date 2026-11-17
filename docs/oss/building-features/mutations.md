@@ -385,6 +385,10 @@ For the migration-specific warning, see
 
 ## Refreshing after a mutation with `RSCRoute.refetch()`
 
+A form that uses React state or browser event handlers belongs in a Client Component. Keep using
+your form library's submission and validation APIs, or [`useRailsForm`](./forms.md). The RSC-specific
+step is refreshing the surrounding Server Component after Rails confirms the write.
+
 If your page uses `registerServerComponent` (which wraps the component in `<RSCRoute>`),
 you can call `refetch()` from a client component to re-render the server component
 without a full page reload:
@@ -404,6 +408,31 @@ function SaveButton({ onSave }) {
   return <button onClick={handleSave}>Save</button>;
 }
 ```
+
+The sketch assumes `onSave()` rejects if the write fails. In a complete form, display Rails
+validation errors and retain rejected input; call `refetch()` only after a confirmed save.
+
+`refetch()` makes a new RSC payload request. It does not rerun the initial page action or make
+old browser props current. The payload endpoint must load fresh, authorized data using the
+Rails session or current user. Do not trust browser-supplied records as the saved state.
+
+Keep a successful write separate from a successful refresh. If Rails saves the record but
+refreshing fails, report “Saved, but refreshing failed.” Offer `retry()` to repeat only the
+read; repeating the POST could duplicate the write. Use the route's `refetchError` for feedback,
+because a rejected promise does not cover every streamed rendering failure.
+
+Production recovery can remount client state; failed refetches throw through the route in
+development. See [refetch and recovery](../../pro/react-server-components/inside-client-components.md#manually-refetching-a-server-component)
+for those boundaries and the available APIs.
+
+For a complete, runnable example, open `/rsc_forms` in the
+[Pro dummy app](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy).
+The [client form](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/app/components/RscForms/ReviewForm.tsx)
+uses `useRailsForm` to post to Rails, then refreshes its surrounding
+[Server Component page](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/ReviewFormPage.jsx).
+The [controller](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/app/controllers/rsc_forms_controller.rb)
+reloads the visitor's latest review from the session for every payload request. Submit `Reserved`
+to see a Rails validation error, then save another name to see the server-rendered review update.
 
 > [!IMPORTANT]
 > If your page uses async props (`stream_react_component_with_async_props`),
@@ -432,8 +461,6 @@ function SaveButton({ onSave }) {
 ## Related docs
 
 - [Forms and Mutations with `useRailsForm`](./forms.md)
-- [Forms and Form Libraries on RSC Pages](../../pro/react-server-components/form-libraries.md) —
-  complete React 19, Conform, React Hook Form, and TanStack Form examples with Rails validation and RSC refresh
 - [Using TanStack Query](./tanstack-query.md)
 - [Generated Rails response types](./generated-rails-response-types.md)
 - [RSC data fetching and mutation guidance](../migrating/rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)

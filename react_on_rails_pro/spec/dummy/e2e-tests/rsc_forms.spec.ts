@@ -13,245 +13,148 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
-const libraries = ['builtins', 'conform', 'rhf', 'tanstack'];
-const isWrite = (url: string) => new URL(url).pathname === '/rsc_forms';
-const isRefresh = (url: string) =>
-  /^\/rsc_payload\/(BuiltIn|Conform|Hook|TanStack)FormPage$/.test(new URL(url).pathname);
+const isWrite = (request: Request) =>
+  request.method() === 'POST' && new URL(request.url()).pathname === '/rsc_forms';
+const isRefresh = (request: Request) => new URL(request.url()).pathname === '/rsc_payload/ReviewFormPage';
+const refreshRoute = '**/rsc_payload/ReviewFormPage*';
+const reviewComment = 'A review from the browser.';
 
 async function fillReview(page: Page, name = 'Ada') {
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
-  await page.getByRole('textbox', { name: 'Comment', exact: true }).fill('A review from the browser.');
+  await page.getByRole('textbox', { name: 'Comment', exact: true }).fill(reviewComment);
 }
 
-for (const library of libraries) {
-  test.describe(`${library} form on an RSC page`, () => {
-    test.beforeEach(async ({ page }) => {
-      await page.goto(`/rsc_forms/${library}`);
-      await expect(page.getByTestId('saved-review')).toContainText('No review');
+test.beforeEach(async ({ page }) => {
+  await page.goto('/rsc_forms');
+  await expect(page.getByTestId('saved-review')).toContainText('No review');
+});
+
+test('retains Rails validation errors, then saves and refreshes server content', async ({ page }) => {
+  await fillReview(page, 'Reserved');
+  const rejected = page.waitForResponse((response) => isWrite(response.request()));
+  await page.getByRole('button', { name: 'Save review', exact: true }).click();
+  expect((await rejected).status()).toBe(422);
+  await expect(page.getByText('This reviewer name is reserved.', { exact: true })).toBeVisible();
+  const name = page.getByRole('textbox', { name: 'Name', exact: true });
+  const comment = page.getByRole('textbox', { name: 'Comment', exact: true });
+  await expect(name).toHaveValue('Reserved');
+  await expect(comment).toHaveValue(reviewComment);
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+
+  const submittedName = '  Ada  ';
+  await name.fill(submittedName);
+  const saved = page.waitForResponse((response) => isWrite(response.request()));
+  const refreshed = page.waitForResponse((response) => isRefresh(response.request()));
+  await page.getByRole('button', { name: 'Save review', exact: true }).click();
+  const response = await saved;
+  expect(response.status()).toBe(201);
+  expect(response.request().postDataJSON()).toEqual({ name: submittedName, comment: reviewComment });
+  expect((await refreshed).ok()).toBe(true);
+  await expect(page.getByTestId('saved-review')).toContainText('Ada');
+  await expect(page.getByTestId('saved-review')).toContainText(reviewComment);
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+  await expect(name).toHaveValue('');
+  await expect(comment).toHaveValue('');
+  await page.reload();
+  await expect(page.getByTestId('saved-review')).toContainText('Ada');
+  await expect(page.getByTestId('saved-review')).toContainText(reviewComment);
+});
+
+for (const stage of ['write', 'refresh']) {
+  test(`protects input while the ${stage} is pending`, async ({ page }) => {
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
     });
-
-    test('maps real Rails errors, preserves input, then saves and refreshes server content', async ({
-      page,
-    }) => {
-      await fillReview(page, 'Reserved');
-      const rejected = page.waitForResponse((response) => isWrite(response.url()));
-      await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      const invalidResponse = await rejected;
-      expect(invalidResponse.status()).toBe(422);
-      expect(await invalidResponse.json()).toMatchObject({
-        errors: { name: ['This reviewer name is reserved.'] },
-      });
-      await expect(page.getByText('This reviewer name is reserved.', { exact: true })).toBeVisible();
-      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Reserved');
-      await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(
-        'A review from the browser.',
-      );
-      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveAttribute(
-        'aria-invalid',
-        'true',
-      );
-
-      const name = '  Ada  ';
-      await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
-      const saved = page.waitForResponse((response) => isWrite(response.url()));
-      const refreshed = page.waitForResponse((response) => isRefresh(response.url()));
-      await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      const savedResponse = await saved;
-      expect(savedResponse.status()).toBe(201);
-      expect(savedResponse.request().postDataJSON()).toMatchObject({ review: { name } });
-      expect(await savedResponse.json()).toMatchObject({ review: { name } });
-      expect((await refreshed).ok()).toBe(true);
-      await expect(page.getByTestId('saved-review')).toContainText('Ada');
-      await expect(page.getByTestId('saved-review')).toContainText('A review from the browser.');
-      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
-      await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
-      await page.reload();
-      await expect(page.getByTestId('saved-review')).toContainText('Ada');
+    await page.route(stage === 'write' ? '**/rsc_forms' : refreshRoute, async (route) => {
+      await released;
+      await route.continue();
     });
-
-    for (const stage of ['write', 'refresh']) {
-      test(`protects input while the ${stage} is pending`, async ({ page }) => {
-        let release = () => {};
-        const released = new Promise<void>((resolve) => {
-          release = resolve;
-        });
-        let markStarted = () => {};
-        const started = new Promise<void>((resolve) => {
-          markStarted = resolve;
-        });
-        await page.route(stage === 'write' ? '**/rsc_forms' : '**/rsc_payload/*FormPage*', async (route) => {
-          markStarted();
-          await released;
-          await route.continue();
-        });
-        await fillReview(page);
-        await page.getByRole('button', { name: 'Save review', exact: true }).click();
-        try {
-          await started;
-          await expect(page.getByRole('button', { name: /Saving/ })).toBeDisabled();
-          const name = page.getByRole('textbox', { name: 'Name', exact: true });
-          const comment = page.getByRole('textbox', { name: 'Comment', exact: true });
-          // Focus and copying remain available, but a later edit must not be lost on reset.
-          await expect(name).not.toBeEditable();
-          await expect(comment).not.toBeEditable();
-          await name.focus();
-          await name.pressSequentially('Later edit');
-          await comment.focus();
-          await comment.pressSequentially('Later edit');
-          await expect(name).toHaveValue('Ada');
-          await expect(comment).toHaveValue('A review from the browser.');
-        } finally {
-          release();
-        }
-        await expect(page.getByTestId('saved-review')).toContainText('Ada');
-        await expect(page.getByTestId('saved-review')).toContainText('A review from the browser.');
-        await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
-        await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
-        await fillReview(page, 'Grace');
-      });
+    await fillReview(page);
+    const pending = page.waitForRequest(stage === 'write' ? isWrite : isRefresh);
+    await page.getByRole('button', { name: 'Save review', exact: true }).click();
+    try {
+      await pending;
+      await expect(page.getByRole('button', { name: 'Saving…', exact: true })).toBeDisabled();
+      const name = page.getByRole('textbox', { name: 'Name', exact: true });
+      const comment = page.getByRole('textbox', { name: 'Comment', exact: true });
+      await expect(name).not.toBeEditable();
+      await expect(comment).not.toBeEditable();
+      await name.focus();
+      await name.pressSequentially('Later edit');
+      await comment.focus();
+      await comment.pressSequentially('Later edit');
+      // Confirmed writes reset before refetch; neither stage may accept edits that would be lost.
+      await expect(name).toHaveValue(stage === 'write' ? 'Ada' : '');
+      await expect(comment).toHaveValue(stage === 'write' ? reviewComment : '');
+    } finally {
+      release();
     }
-
-    test('preserves input after a failed write request', async ({ page }) => {
-      await page.route('**/rsc_forms', (route) => route.abort());
-      await fillReview(page);
-      await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      await expect(page.getByRole('alert')).toContainText(/could not confirm the save/i);
-      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Ada');
-      await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(
-        'A review from the browser.',
-      );
-      await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
-      await expect(page.getByTestId('saved-review')).toContainText('No review');
-      await fillReview(page, 'Grace');
-    });
-
-    test('preserves input and cautions against repeating a write when its response is unusable', async ({
-      page,
-    }) => {
-      // These response cases share a page and must finish in sequence.
-      /* eslint-disable no-await-in-loop */
-      for (const body of ['invalid json', JSON.stringify({ unexpected: true })]) {
-        let writes = 0;
-        await page.route('**/rsc_forms', async (route) => {
-          if (route.request().method() !== 'POST') {
-            await route.continue();
-            return;
-          }
-          writes += 1;
-          // Commit the real Rails write before corrupting only its response.
-          const response = await route.fetch();
-          expect(response.status()).toBe(201);
-          await route.fulfill({ response, body });
-        });
-        await fillReview(page);
-        const delivered = page.waitForResponse((response) => isWrite(response.url()));
-        await page.getByRole('button', { name: 'Save review', exact: true }).click();
-        const browserResponse = await delivered;
-        expect(browserResponse.status()).toBe(201);
-        expect(browserResponse.headers()['content-type']).toMatch(/^application\/json\b/);
-        expect(await browserResponse.text()).toBe(body);
-        await expect(page.getByRole('alert')).toContainText(
-          'Check whether the review was saved before trying again.',
-        );
-        await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Ada');
-        await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(
-          'A review from the browser.',
-        );
-        await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
-        expect(writes).toBe(1);
-        await page.unroute('**/rsc_forms');
-        await page.reload();
-        await expect(page.getByTestId('saved-review')).toContainText('Ada');
-        await expect(page.getByTestId('saved-review')).toContainText('A review from the browser.');
-      }
-      /* eslint-enable no-await-in-loop */
-    });
-
-    test('retries only the refresh after a successful write', async ({ page }) => {
-      test.skip(
-        !process.env.RSC_FORMS_PRODUCTION,
-        'Refetch recovery is production-only; run with a production-mode client bundle.',
-      );
-      let writes = 0;
-      page.on('request', (request) => {
-        if (request.method() === 'POST' && isWrite(request.url())) writes += 1;
-      });
-      await page.route('**/rsc_payload/*FormPage*', (route) => route.abort());
-      await fillReview(page);
-      const saved = page.waitForResponse((response) => isWrite(response.url()));
-      await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      expect((await saved).status()).toBe(201);
-      await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toBeVisible();
-      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
-      await fillReview(page, 'Grace');
-      await page.unroute('**/rsc_payload/*FormPage*');
-      await page.getByRole('button', { name: 'Retry refresh', exact: true }).click();
-      await expect(page.getByTestId('saved-review')).toContainText('Ada');
-      await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Grace');
-      expect(writes).toBe(1);
-    });
-
-    test('ignores an older refresh retry failing after a newer review is saved', async ({ page }) => {
-      test.skip(
-        !process.env.RSC_FORMS_PRODUCTION,
-        'Refetch recovery is production-only; run with a production-mode client bundle.',
-      );
-      let writes = 0;
-      page.on('request', (request) => {
-        if (request.method() === 'POST' && isWrite(request.url())) writes += 1;
-      });
-      let refreshes = 0;
-      let releaseRetry = () => {};
-      const released = new Promise<void>((resolve) => {
-        releaseRetry = resolve;
-      });
-      let retryStarted = () => {};
-      const started = new Promise<void>((resolve) => {
-        retryStarted = resolve;
-      });
-      await page.route('**/rsc_payload/*FormPage*', async (route) => {
-        refreshes += 1;
-        if (refreshes === 1) {
-          await route.abort();
-        } else if (refreshes === 2) {
-          retryStarted();
-          await released;
-          await route.abort();
-        } else {
-          await route.continue();
-        }
-      });
-      await fillReview(page);
-      await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Retry refresh', exact: true }).click();
-      await started;
-
-      try {
-        await fillReview(page, 'Grace');
-        await page.getByRole('button', { name: 'Save review', exact: true }).click();
-        await expect(page.getByTestId('saved-review')).toContainText('Grace');
-        await expect(page.getByRole('status')).toHaveText('Saved.');
-        const failed = page.waitForEvent('requestfailed', (request) => isRefresh(request.url()));
-        releaseRetry();
-        await failed;
-        // Let the rejected fetch's feedback render before checking the final UI.
-        await page.evaluate(
-          () =>
-            new Promise<void>((resolve) => {
-              requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-            }),
-        );
-        await expect(page.getByRole('status')).toHaveText('Saved.');
-        await expect(page.getByText('Saved, but refreshing failed.', { exact: true })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Retry refresh', exact: true })).toHaveCount(0);
-        await expect(page.getByTestId('saved-review')).toContainText('Grace');
-        expect(writes).toBe(2);
-      } finally {
-        releaseRetry();
-      }
-    });
+    await expect(page.getByTestId('saved-review')).toContainText('Ada');
+    await expect(page.getByTestId('saved-review')).toContainText(reviewComment);
+    await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
+    await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
+    await fillReview(page, 'Grace');
   });
 }
+
+test('preserves input after a failed write request', async ({ page }) => {
+  await page.route('**/rsc_forms', (route) => route.abort());
+  await fillReview(page);
+  await page.getByRole('button', { name: 'Save review', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Could not confirm the save.');
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Ada');
+  await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(reviewComment);
+  await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
+  await expect(page.getByTestId('saved-review')).toContainText('No review');
+  await fillReview(page, 'Grace');
+});
+
+test('retries the read after a confirmed write without submitting the new draft', async ({ page }) => {
+  test.skip(
+    !process.env.RSC_FORMS_PRODUCTION,
+    'Refetch recovery is production-only; run with a production-mode client bundle.',
+  );
+  let writes = 0;
+  page.on('request', (request) => {
+    if (isWrite(request)) writes += 1;
+  });
+  await page.route(refreshRoute, (route) => route.abort());
+  await fillReview(page);
+  const saved = page.waitForResponse((response) => isWrite(response.request()));
+  await page.getByRole('button', { name: 'Save review', exact: true }).click();
+  expect((await saved).status()).toBe(201);
+  await expect(page.getByRole('status')).toHaveText('Saved, but refreshing failed.');
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
+  await fillReview(page, 'Grace');
+
+  await page.unroute(refreshRoute);
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(refreshRoute, async (route) => {
+    await released;
+    await route.continue();
+  });
+  const retry = page.waitForRequest(isRefresh);
+  await page.getByRole('button', { name: 'Retry refresh', exact: true }).click();
+  try {
+    expect((await retry).method()).toBe('GET');
+    await expect(page.getByRole('button', { name: 'Retry refresh', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Saving…', exact: true })).toBeDisabled();
+    await expect(page.getByRole('textbox', { name: 'Name', exact: true })).not.toBeEditable();
+    await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).not.toBeEditable();
+    expect(writes).toBe(1);
+  } finally {
+    release();
+  }
+  await expect(page.getByTestId('saved-review')).toContainText('Ada');
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Grace');
+  await expect(page.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(reviewComment);
+  await expect(page.getByRole('button', { name: 'Save review', exact: true })).toBeEnabled();
+  expect(writes).toBe(1);
+});

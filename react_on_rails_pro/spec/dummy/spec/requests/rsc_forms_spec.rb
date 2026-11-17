@@ -16,41 +16,39 @@
 require "rails_helper"
 
 # These requests use the real RSC renderer, session cookies, and CSRF protection.
-RSpec.describe "Form libraries on RSC pages", :server_rendering do
+RSpec.describe "Saving a review and refreshing an RSC page", :server_rendering do
   def csrf_headers
-    get "/rsc_forms/builtins"
+    get "/rsc_forms"
     token = Nokogiri::HTML(response.body).at_css('meta[name="csrf-token"]')&.[]("content")
     expect(token).to be_present
     { "X-CSRF-Token" => token }
   end
 
-  it "rejects unknown form variants" do
-    expect { get "/rsc_forms/unknown" }.to raise_error(ActionController::RoutingError)
-  end
-
   it "uses the fixed route component and session data instead of browser-supplied render inputs" do
-    get "/rsc_forms/builtins", params: { component_name: "ConformFormPage" }
+    get "/rsc_forms", params: { component_name: "OtherPage" }
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("React 19 built-ins")
+    expect(response.headers["Cache-Control"]).to eq("no-store")
+    expect(response.body).to include("Write a review")
 
-    get "/rsc_payload/BuiltInFormPage", params: {
-      component_name: "ConformFormPage", props: "not JSON"
+    get "/rsc_payload/ReviewFormPage", params: {
+      component_name: "OtherPage", props: "not JSON"
     }
 
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("application/x-ndjson")
-    expect(response.body).to include("React 19 built-ins", "No review saved yet.")
+    expect(response.headers["Cache-Control"]).to eq("no-store")
+    expect(response.body).to include("Write a review", "No review saved yet.")
   end
 
   it "requires a genuine Rails CSRF token for writes, including in test mode" do
     expect do
-      post "/rsc_forms", params: { review: { name: "Ada", comment: "A useful review." } }, as: :json
+      post "/rsc_forms", params: { name: "Ada", comment: "A useful review." }, as: :json
     end.to raise_error(ActionController::InvalidAuthenticityToken)
   end
 
   it "returns field errors from Rails when browser-side validation would accept the review" do
-    post "/rsc_forms", params: { review: { name: "Reserved", comment: "A useful review." } },
+    post "/rsc_forms", params: { name: "Reserved", comment: "A useful review." },
                        headers: csrf_headers, as: :json
 
     expect(response).to have_http_status(422)
@@ -58,13 +56,13 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
   end
 
   it "refreshes from the session instead of accepting saved data supplied by the browser" do
-    post "/rsc_forms", params: { review: { name: "Ada", comment: "An actual saved review.", admin: true } },
+    post "/rsc_forms", params: { name: "Ada", comment: "An actual saved review.", admin: true },
                        headers: csrf_headers, as: :json
 
     expect(response).to have_http_status(:created)
     expect(response.parsed_body).to eq("review" => { "name" => "Ada", "comment" => "An actual saved review." })
 
-    get "/rsc_payload/BuiltInFormPage", params: {
+    get "/rsc_payload/ReviewFormPage", params: {
       props: { savedReview: { name: "Spoofed", comment: "Browser-forged review" } }.to_json
     }
 
@@ -74,7 +72,7 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
     expect(response.body).not_to include("Browser-forged review")
 
     other_visitor = ActionDispatch::Integration::Session.new(Rails.application)
-    other_visitor.get "/rsc_payload/BuiltInFormPage", params: { props: {}.to_json }
+    other_visitor.get "/rsc_payload/ReviewFormPage", params: { props: {}.to_json }
 
     expect(other_visitor.response).to have_http_status(:ok)
     expect(other_visitor.response.body).to include("No review saved yet.")
@@ -83,13 +81,13 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
 
   it "keeps only the latest valid review and preserves it after a rejected submission" do
     headers = csrf_headers
-    post "/rsc_forms", params: { review: { name: "Ada", comment: "First saved review." } }, headers:, as: :json
-    post "/rsc_forms", params: { review: { name: "Grace", comment: "Latest saved review." } }, headers:, as: :json
-    post "/rsc_forms", params: { review: { name: "Reserved", comment: "Rejected review." } }, headers:, as: :json
+    post "/rsc_forms", params: { name: "Ada", comment: "First saved review." }, headers:, as: :json
+    post "/rsc_forms", params: { name: "Grace", comment: "Latest saved review." }, headers:, as: :json
+    post "/rsc_forms", params: { name: "Reserved", comment: "Rejected review." }, headers:, as: :json
 
     expect(response).to have_http_status(422)
 
-    get "/rsc_payload/HookFormPage"
+    get "/rsc_payload/ReviewFormPage"
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Latest saved review.")
@@ -98,10 +96,10 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
 
   it "rejects numeric JSON fields without replacing the visitor's saved review" do
     headers = csrf_headers
-    post "/rsc_forms", params: { review: { name: "Ada", comment: "Original saved review." } }, headers:, as: :json
+    post "/rsc_forms", params: { name: "Ada", comment: "Original saved review." }, headers:, as: :json
     expect(response).to have_http_status(:created)
 
-    post "/rsc_forms", params: { review: { name: 123, comment: 456 } }, headers:, as: :json
+    post "/rsc_forms", params: { name: 123, comment: 456 }, headers:, as: :json
 
     expect(response).to have_http_status(422)
     expect(response.parsed_body).to eq("errors" => {
@@ -109,7 +107,7 @@ RSpec.describe "Form libraries on RSC pages", :server_rendering do
                                          "comment" => ["must be a string"]
                                        })
 
-    get "/rsc_payload/BuiltInFormPage", params: { props: {}.to_json }
+    get "/rsc_payload/ReviewFormPage", params: { props: {}.to_json }
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Ada", "Original saved review.")

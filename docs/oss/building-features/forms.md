@@ -30,10 +30,6 @@ For the framework-level comparison with Next.js Server Actions and TanStack
 Start server functions, see
 [Mutations without Server Actions](./mutations.md).
 
-For React 19, Conform, React Hook Form, and TanStack Form examples that submit to
-Rails and refresh an RSC page, see
-[Forms and Form Libraries on RSC Pages](../../pro/react-server-components/form-libraries.md).
-
 Compatibility: `react-on-rails/useRailsForm` requires React 16.8 or newer
 because it is a hook. Apps still on React 16.0-16.7 can continue using the
 package's other React 16 APIs, but this subpath throws a clear error until React
@@ -263,8 +259,7 @@ stays a normal Rails JSON action you can curl or reuse for mobile clients.
 | Automatic visit/redirect           | Not automatic — `redirectTo` is surfaced |
 
 React 19's `useActionState` and `useFormStatus` also work with browser-side form
-Actions that submit to Rails; see the
-[built-in React form example](../../pro/react-server-components/form-libraries.md#react-19-built-ins).
+Actions that submit to Rails.
 Next.js can instead pair these hooks with Server Actions (`'use server'`).
 React on Rails keeps mutations in Rails controllers — `useRailsForm` provides
 a Rails-specific form API, and the separate

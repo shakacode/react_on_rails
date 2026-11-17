@@ -14,21 +14,13 @@ https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE
 -%>
 <% content_for :head do %>
   <style>
-    /* The dummy's fixed-width menu would otherwise hide these forms on phones. */
+    /* The dummy's fixed-width menu would otherwise hide the form on phones. */
     @media (max-width: 640px) {
       .app-shell > .app-sidebar { display: none; }
     }
   </style>
 <% end %>
-<h1>Form libraries on RSC pages</h1>
-<nav aria-label="Form library examples">
-  <ul>
-    <li><%= link_to "React 19 built-ins", rsc_forms_builtins_path %></li>
-    <li><%= link_to "Conform", rsc_forms_conform_path %></li>
-    <li><%= link_to "React Hook Form + zod", rsc_forms_rhf_path %></li>
-    <li><%= link_to "TanStack Form", rsc_forms_tanstack_path %></li>
-  </ul>
-</nav>
+<h1>Save with Rails, refresh an RSC page</h1>
 <p>
   Rails validates each review. Try the name Reserved to see a server validation error.
   Only your latest review is kept in this browser session.
