@@ -250,11 +250,11 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.5)
-    nokogiri (1.19.4-arm64-darwin)
+    nokogiri (1.19.5-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.4-x86_64-darwin)
+    nokogiri (1.19.5-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.4-x86_64-linux-gnu)
+    nokogiri (1.19.5-x86_64-linux-gnu)
       racc (~> 1.4)
     opentelemetry-api (1.11.0)
       logger
@@ -302,7 +302,7 @@ GEM
     puma (6.5.0)
       nio4r (~> 2.0)
     racc (1.8.1)
-    rack (3.2.7)
+    rack (3.2.8)
     rack-proxy (1.0.1)
       rack (>= 2.0, < 4)
     rack-session (2.1.2)
