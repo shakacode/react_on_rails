@@ -157,21 +157,27 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
     `  (Set REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1 to downgrade this error to a warning.)`,
   ].join('\n');
 
-// Only the prerelease lines in `prereleaseLinesWithStableSuccessor` have a known published stable
-// successor. Compatibility alone does not establish publication for other rejected prereleases.
+// Only the prerelease lines in `prereleaseSuccessors` have a known published stable successor.
+// Compatibility alone does not establish publication for other rejected prereleases.
+const patchedFlightFloors = RSC_PEER_SUPPORT.patchedFlightVersions
+  .map((version) => {
+    const [major, minor] = version.split('.');
+    return `${version} or later on ${major}.${minor}.x`;
+  })
+  .join(', ');
+
 const stableReleaseAdvice = (
   { tuple, prerelease }: ParsedVersion,
-  { minimumVersion, prereleaseLinesWithStableSuccessor }: typeof RSC_PEER_SUPPORT.reactOnRailsRsc,
-  react: typeof RSC_PEER_SUPPORT.react,
+  successors: typeof RSC_PEER_SUPPORT.prereleaseSuccessors,
 ): string | undefined => {
-  if (!prerelease || !prereleaseLinesWithStableSuccessor.some((line) => sameTuple(tuple, line))) {
-    return undefined;
-  }
-  const stableVersion = tuple.join('.');
-  const reactRange = supportedReactRange(tuple, react);
-  if (!reactRange || !isAtLeastVersion(stableVersion, minimumVersion)) return undefined;
+  const successor = prerelease
+    ? successors.find(({ prereleaseLine }) => sameTuple(tuple, prereleaseLine))
+    : undefined;
+  if (!successor) return undefined;
 
-  return `Upgrade react-on-rails-rsc to the stable ${stableVersion} release, with react and react-dom ${reactRange}.`;
+  const { rscVersion, reactVersion } = successor;
+  const [reactMajor, reactMinor] = reactVersion.split('.');
+  return `Upgrade react-on-rails-rsc to the stable ${rscVersion} release, with react and react-dom ${reactMajor}.${reactMinor}.x with patch >= ${reactVersion} (stable releases only), then refresh the lockfile so every react-server-dom-webpack copy is patched: ${patchedFlightFloors}.`;
 };
 
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
@@ -209,7 +215,7 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
         rscVersion,
         rscFloorRange(reactOnRailsRsc, rscParsedVersion),
         proVersion,
-        stableReleaseAdvice(rscParsedVersion, reactOnRailsRsc, react),
+        stableReleaseAdvice(rscParsedVersion, RSC_PEER_SUPPORT.prereleaseSuccessors),
       ),
     };
   }

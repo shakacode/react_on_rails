@@ -11849,9 +11849,24 @@ RSpec.describe ReactOnRails::Doctor do
         rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
       )
       expect(rsc_support).not_to include("minimumPrereleaseVersion")
-      successor_lines = rsc_support.match(/prereleaseLinesWithStableSuccessor:\s*\[(?<lines>[\d\s,\[\]]+)\]/)[:lines]
-      expect(described_class::RSC_PRERELEASE_LINES_WITH_STABLE_SUCCESSOR).to eq(
-        successor_lines.scan(/\[\s*(\d+),\s*(\d+),\s*(\d+)\s*\]/).map { |line| line.map(&:to_i) }
+      successors = support_source.scan(
+        /
+          prereleaseLine:\s*\[\s*(\d+),\s*(\d+),\s*(\d+)\s*\],\s*
+          rscVersion:\s*'([^']+)',\s*
+          reactVersion:\s*'([^']+)'
+        /x
+      )
+      expect(successors).not_to be_empty
+      patched_flight = support_source.match(/patchedFlightVersions:\s*\[(?<versions>[^\]]+)\]/)[:versions]
+      expect(patched_flight.scan(/'([^']+)'/).flatten).to eq(
+        described_class::RSC_SUPPORTED_REACT_MINORS.map do |minor|
+          described_class::RSC_FLIGHT_PATCHED_VERSIONS.fetch([described_class::RSC_SUPPORTED_REACT_MAJOR, minor])
+        end
+      )
+      expect(described_class::RSC_PRERELEASE_STABLE_SUCCESSORS).to eq(
+        successors.to_h do |major, minor, patch, rsc, react|
+          [[major.to_i, minor.to_i, patch.to_i], { rsc:, react: }]
+        end
       )
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
@@ -11878,6 +11893,20 @@ RSpec.describe ReactOnRails::Doctor do
           "#{described_class::RSC_SUPPORTED_REACT_MAJOR}.#{range.fetch(:minor)}.x"
         end.uniq.join(" or ")
       )
+    end
+
+    it "names stable RSC successors whose React floor admits only patched Flight" do
+      described_class::RSC_PRERELEASE_STABLE_SUCCESSORS.each_value do |successor|
+        rsc_version = successor.fetch(:rsc)
+        react_version = successor.fetch(:react)
+        react_major, react_minor, = doctor.send(:npm_version_tuple, react_version)
+        patched_flight = described_class::RSC_FLIGHT_PATCHED_VERSIONS.fetch([react_major, react_minor])
+
+        expect(doctor.send(:rsc_stable_package_version_supported?, rsc_version)).to be true
+        expect(doctor.send(:npm_version_compare, react_version,
+                           doctor.send(:recommended_react_install_version_for_rsc_package, rsc_version))).to be >= 0
+        expect(doctor.send(:npm_version_compare, react_version, patched_flight)).to be >= 0
+      end
     end
 
     it "derives the RSC React support predicate from the configured floor and line" do
@@ -12317,15 +12346,17 @@ RSpec.describe ReactOnRails::Doctor do
         end
 
         %w[19.3.1-rc.0 19.3.1-rc.1].each do |rsc_version|
-          it "rejects the superseded #{rsc_version} soak prerelease and points the Fix at stable 19.3.1" do
+          it "rejects the superseded #{rsc_version} soak prerelease and points the Fix at patched stable 19.3.2" do
             errors = rsc_errors_for(rsc_version:, react_version: "19.3.0", react_peer: "^19.3.0")
 
             expect(errors).to contain_exactly(
               a_string_including(
                 "react-on-rails-rsc #{rsc_version} is not supported by React on Rails Pro 17 RSC",
                 "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
-                "with React/React DOM 19.3.0+.",
-                "Fix: npm install react@~19.3.0 react-dom@~19.3.0 react-on-rails-rsc@19.3.1 --save-exact"
+                "with React/React DOM 19.3.1+.",
+                "Fix: npm install react@~19.3.1 react-dom@~19.3.1 react-on-rails-rsc@19.3.2 --save-exact",
+                "Then refresh the lockfile so every react-server-dom-webpack copy is patched: " \
+                "19.2.9 or later on 19.2.x, 19.3.1 or later on 19.3.x."
               )
             )
             expect(errors.none? { |error| error.include?("RC soak") }).to be true
@@ -12413,15 +12444,17 @@ RSpec.describe ReactOnRails::Doctor do
           end
         end
 
-        it "rejects the superseded 19.3.0-rc.4 prerelease that React on Rails 17.1.0 accepted" do
+        it "rejects the superseded 19.3.0-rc.4 prerelease and names React 19.2.9 for the patched Flight" do
           errors = rsc_errors_for(rsc_version: "19.3.0-rc.4", react_version: "19.2.8", react_peer: "^19.2.8")
 
           expect(errors).to contain_exactly(
             a_string_including(
               "react-on-rails-rsc 19.3.0-rc.4 is not supported by React on Rails Pro 17 RSC",
               "requires react-on-rails-rsc >= 19.2.1 (stable releases only)\non the supported",
-              "with React/React DOM 19.2.8+.",
-              "Fix: npm install react@~19.2.8 react-dom@~19.2.8 react-on-rails-rsc@19.3.0 --save-exact"
+              "with React/React DOM 19.2.9+.",
+              "Fix: npm install react@~19.2.9 react-dom@~19.2.9 react-on-rails-rsc@19.3.0 --save-exact",
+              "Then refresh the lockfile so every react-server-dom-webpack copy is patched: " \
+              "19.2.9 or later on 19.2.x, 19.3.1 or later on 19.3.x."
             )
           )
         end

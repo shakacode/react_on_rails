@@ -135,13 +135,13 @@ describe('runRscPeerCompatibilityCheck', () => {
   });
 
   it.each(['19.3.1-rc.0', '19.3.1-rc.1'])(
-    'throws at startup for the superseded %s soak prerelease and names stable 19.3.1',
+    'throws at startup for the superseded %s soak prerelease and names patched stable 19.3.2',
     (prerelease) => {
       expect(() =>
         runRscPeerCompatibilityCheck({
           resolveVersion: resolveVersions(prerelease, '19.3.0'),
         }),
-      ).toThrow('Upgrade react-on-rails-rsc to the stable 19.3.1 release');
+      ).toThrow('Upgrade react-on-rails-rsc to the stable 19.3.2 release');
       expect(warnSpy).not.toHaveBeenCalled();
     },
   );

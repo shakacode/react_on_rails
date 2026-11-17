@@ -170,7 +170,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it.each(['19.3.1-rc.0', '19.3.1-rc.1'])(
-    'errors for the superseded %s soak prerelease and names the stable 19.3.1 release',
+    'errors for the superseded %s soak prerelease and names the patched stable 19.3.2 release',
     (rscVersion) => {
       const r = checkRscPeerCompatibility({
         rscVersion,
@@ -184,7 +184,7 @@ describe('checkRscPeerCompatibility', () => {
       );
       expect(r.message).not.toContain('RC soak');
       expect(r.message).toContain(
-        'Upgrade react-on-rails-rsc to the stable 19.3.1 release, with react and react-dom 19.3.x with patch >= 19.3.0 (stable releases only).',
+        'Upgrade react-on-rails-rsc to the stable 19.3.2 release, with react and react-dom 19.3.x with patch >= 19.3.1 (stable releases only), then refresh the lockfile so every react-server-dom-webpack copy is patched: 19.2.9 or later on 19.2.x, 19.3.1 or later on 19.3.x.',
       );
     },
   );
@@ -232,8 +232,16 @@ describe('checkRscPeerCompatibility', () => {
       'requires react-on-rails-rsc >= 19.2.1 (stable releases only) (found 19.3.0-rc.4)',
     );
     expect(r.message).toContain(
-      'Upgrade react-on-rails-rsc to the stable 19.3.0 release, with react and react-dom 19.2.x with patch >= 19.2.8 (stable releases only).',
+      'Upgrade react-on-rails-rsc to the stable 19.3.0 release, with react and react-dom 19.2.x with patch >= 19.2.9 (stable releases only), then refresh the lockfile so every react-server-dom-webpack copy is patched: 19.2.9 or later on 19.2.x, 19.3.1 or later on 19.3.x.',
     );
+  });
+
+  it.each(
+    RSC_PEER_SUPPORT.prereleaseSuccessors.map(({ rscVersion, reactVersion }) => [rscVersion, reactVersion]),
+  )('accepts the recommended successor react-on-rails-rsc %s with React %s', (rscVersion, reactVersion) => {
+    expect(checkRscPeerCompatibility({ rscVersion, reactVersion, reactDomVersion: reactVersion })).toEqual({
+      level: 'ok',
+    });
   });
 
   it.each(['19.3.2-rc.0', '19.3.3-beta.0', '19.2.2-beta.0', '19.4.0-rc.0'])(

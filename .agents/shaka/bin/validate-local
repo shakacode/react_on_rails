@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Quicker pre-review gate: bin/ci-local --fast skips the slow suites it gates
+# (see bin/ci-local); validate runs them. Takes no arguments on purpose:
+# Shaka counts only a no-argument run as validation evidence.
+set -euo pipefail
+[[ $# -eq 0 ]] || { echo "validate-local takes no arguments; use validate for flags" >&2; exit 2; }
+root=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_PREFIX -u GIT_CEILING_DIRECTORIES git -C "$(dirname -- "$0")" rev-parse --show-toplevel) || exit $?
+cd "$root"
+exec bin/ci-local --fast
