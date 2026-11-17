@@ -60,7 +60,6 @@ function submissionErrors(error: unknown): ReviewErrors {
 export function useReviewSubmission() {
   const { refetch, retry, refetchError, clearRefetchError } = useCurrentRSCRoute();
   const [saved, setSaved] = useState(false);
-  const [localRefreshError, setLocalRefreshError] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const operation = useRef(0);
 
@@ -69,7 +68,6 @@ export function useReviewSubmission() {
     operation.current += 1;
     setRetrying(false);
     setSaved(false);
-    setLocalRefreshError(false);
     clearRefetchError();
     let response: unknown;
     try {
@@ -96,7 +94,7 @@ export function useReviewSubmission() {
     try {
       await refetch();
     } catch {
-      setLocalRefreshError(true);
+      // RSCRoute exposes refresh failures through refetchError; the save succeeded.
     }
     return null;
   }
@@ -107,9 +105,8 @@ export function useReviewSubmission() {
     setRetrying(true);
     try {
       await retry();
-      if (retryOperation === operation.current) setLocalRefreshError(false);
     } catch {
-      if (retryOperation === operation.current) setLocalRefreshError(true);
+      // RSCRoute owns the error state and ignores failures from older refreshes.
     } finally {
       if (retryOperation === operation.current) setRetrying(false);
     }
@@ -118,7 +115,7 @@ export function useReviewSubmission() {
   return {
     submit,
     saved,
-    refreshFailed: saved && (localRefreshError || refetchError !== null),
+    refreshFailed: saved && refetchError !== null,
     retrying,
     retryRefresh,
   };

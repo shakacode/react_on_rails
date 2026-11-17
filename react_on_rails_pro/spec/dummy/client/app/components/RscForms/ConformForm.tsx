@@ -16,7 +16,6 @@
 'use client';
 
 import React, { useActionState, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 import {
   useForm,
   getFormProps,
@@ -27,15 +26,6 @@ import {
 import { parseWithZod } from '@conform-to/zod/v4';
 import { reviewSchema } from './schema';
 import { emptyReview, SubmissionFeedback, useReviewSubmission } from './shared';
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending}>
-      {pending ? 'Saving…' : 'Save review'}
-    </button>
-  );
-}
 
 export default function ConformForm() {
   const id = useId();
@@ -92,7 +82,9 @@ export default function ConformForm() {
             {form.errors.join(' ')}
           </p>
         ) : null}
-        <SubmitButton />
+        <button type="submit" disabled={pending}>
+          {pending ? 'Saving…' : 'Save review'}
+        </button>
       </form>
       <SubmissionFeedback submission={submission} />
     </div>

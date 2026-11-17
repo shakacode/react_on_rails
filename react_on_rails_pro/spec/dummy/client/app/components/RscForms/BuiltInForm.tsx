@@ -16,7 +16,6 @@
 'use client';
 
 import React, { useActionState, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 import {
   emptyReview,
   SubmissionFeedback,
@@ -26,15 +25,6 @@ import {
 } from './shared';
 
 type FormState = { values: ReviewValues; errors: ReviewErrors };
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending}>
-      {pending ? 'Saving…' : 'Save review'}
-    </button>
-  );
-}
 
 export default function BuiltInForm() {
   const id = useId();
@@ -85,7 +75,9 @@ export default function BuiltInForm() {
         </label>
         <p id={`${id}-comment-error`}>{state.errors.comment?.join(' ')}</p>
         {state.errors.base ? <p role="alert">{state.errors.base.join(' ')}</p> : null}
-        <SubmitButton />
+        <button type="submit" disabled={pending}>
+          {pending ? 'Saving…' : 'Save review'}
+        </button>
       </form>
       <SubmissionFeedback submission={submission} />
     </div>

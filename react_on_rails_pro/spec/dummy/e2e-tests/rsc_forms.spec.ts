@@ -53,11 +53,15 @@ for (const library of libraries) {
         'true',
       );
 
-      await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Ada');
+      const name = '  Ada  ';
+      await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
       const saved = page.waitForResponse((response) => isWrite(response.url()));
       const refreshed = page.waitForResponse((response) => isRefresh(response.url()));
       await page.getByRole('button', { name: 'Save review', exact: true }).click();
-      expect((await saved).status()).toBe(201);
+      const savedResponse = await saved;
+      expect(savedResponse.status()).toBe(201);
+      expect(savedResponse.request().postDataJSON()).toMatchObject({ review: { name } });
+      expect(await savedResponse.json()).toMatchObject({ review: { name } });
       expect((await refreshed).ok()).toBe(true);
       await expect(page.getByTestId('saved-review')).toContainText('Ada');
       await expect(page.getByTestId('saved-review')).toContainText('A review from the browser.');

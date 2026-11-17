@@ -16,6 +16,6 @@
 import { z } from 'zod';
 
 export const reviewSchema = z.object({
-  name: z.string().trim().min(1, 'Enter your name.').max(50, 'Use 50 characters or fewer.'),
-  comment: z.string().trim().min(1, 'Enter a comment.').max(200, 'Use 200 characters or fewer.'),
+  name: z.string().min(1, 'Enter your name.').max(50, 'Use 50 characters or fewer.'),
+  comment: z.string().min(1, 'Enter a comment.').max(200, 'Use 200 characters or fewer.'),
 });
