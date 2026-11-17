@@ -9529,12 +9529,14 @@ old browser props current. The payload endpoint must load fresh, authorized data
 Rails session or current user. Do not trust browser-supplied records as the saved state.
 
 Keep a successful write separate from a successful refresh. If Rails saves the record but
-refreshing fails, report “Saved, but refreshing failed.” Offer `retry()` to repeat only the
-read; repeating the POST could duplicate the write. Use the route's `refetchError` for feedback,
+refreshing fails, offer `retry()` to repeat only the read; repeating the POST could duplicate
+the write. Use the route's `refetchError` for feedback,
 because a rejected promise does not cover every streamed rendering failure.
 
-Production recovery can remount client state; failed refetches throw through the route in
-development. See [refetch and recovery](../../pro/react-server-components/inside-client-components.md#manually-refetching-a-server-component)
+Production recovery can remount Client Components, resetting local success state and other
+form state. The example may therefore show “Could not refresh the saved review.” after a
+confirmed save. Failed refetches throw through the route in development.
+See [refetch and recovery](../../pro/react-server-components/inside-client-components.md#manually-refetching-a-server-component)
 for those boundaries and the available APIs.
 
 For a complete, runnable example, open `/rsc_forms` in the
