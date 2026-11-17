@@ -258,10 +258,11 @@ stays a normal Rails JSON action you can curl or reuse for mobile clients.
 | `progress` (file uploads)          | Planned (v2 — requires an XHR transport) |
 | Automatic visit/redirect           | Not automatic — `redirectTo` is surfaced |
 
-Versus React 19 / Next.js `useActionState` + `useFormStatus`: those pair with
-Server Actions (`'use server'`), which introduce an RPC endpoint per action.
-React on Rails intentionally keeps mutations in Rails controllers —
-`useRailsForm` is the ergonomic path for that, and the separate
+React 19's `useActionState` and `useFormStatus` also work with browser-side form
+Actions that submit to Rails.
+Next.js can instead pair these hooks with Server Actions (`'use server'`).
+React on Rails keeps mutations in Rails controllers — `useRailsForm` provides
+a Rails-specific form API, and the separate
 [Server Functions RFC (Issue 3867)](https://github.com/shakacode/react_on_rails/issues/3867)
 explores the complementary RSC-side story. The two are designed to compose: if
 Server Functions land, this hook remains the plain-controller bridge.

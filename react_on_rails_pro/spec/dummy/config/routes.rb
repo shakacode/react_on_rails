@@ -101,6 +101,10 @@ Rails.application.routes.draw do
   get "react_intl_rsc_demo(/:locale)" => "pages#react_intl_rsc_demo",
       as: :react_intl_rsc_demo,
       constraints: { locale: /en|ar|es/ }
+  get "rsc_forms" => "rsc_forms#show", as: :rsc_forms,
+      defaults: { component_name: "ReviewFormPage" }
+  post "rsc_forms" => "rsc_forms#create"
+  get "rsc_payload/ReviewFormPage" => "rsc_forms#rsc_payload", defaults: { component_name: "ReviewFormPage" }
   rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails
