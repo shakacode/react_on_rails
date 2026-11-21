@@ -401,8 +401,12 @@ function RSCRoute({
           fallback. The PPR prerender path scans the prelude for these markers to
           determine which RSC streams belong to committed boundaries and must be kept
           in the cached shell. Streams whose marker is absent are cancelled.
-          Rendered on both server and client for hydration parity (inert on the client). */}
-      <span data-rsc-committed={committedMarkerKey} style={{ display: 'none' }} />
+          Rendered on both server and client so the trees match, but only the server reads the
+          value. On a warm PPR request the cached shell carries the cold request's props hash
+          while the client computes this request's, so suppressHydrationWarning silences that
+          expected mismatch (#5295). It applies to this element only; mismatches inside the
+          route content are still reported. */}
+      <span data-rsc-committed={committedMarkerKey} style={{ display: 'none' }} suppressHydrationWarning />
     </>
   );
 }
