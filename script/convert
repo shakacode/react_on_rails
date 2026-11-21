@@ -145,6 +145,7 @@ minimum_pro_non_rsc_ignored_tests = %w[
   boundedCacheProvider[.]client[.]test
   imperativeRefetch[.]client[.]test
   inlineRefreshButton[.]client[.]test
+  rscRouteCommittedMarker[.]client[.]test
   wrapServerComponentRenderer[.]client
 ].join("|")
 minimum_pro_non_rsc_script = [
