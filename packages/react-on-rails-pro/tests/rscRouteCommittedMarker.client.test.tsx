@@ -31,11 +31,20 @@ const COLD_PROPS = { dynamicValue: 'cold-request-value' };
 const WARM_PROPS = { dynamicValue: 'warm-request-value' };
 const ATTRIBUTE_MISMATCH_WARNING = "didn't match the client properties";
 
-const PageContent = ({ contentAttribute }: { contentAttribute: string }) => (
-  <p data-testid="route-content" data-content-attribute={contentAttribute}>
-    Shell content
-  </p>
-);
+// Counts client commits of the route content. Effects never run during server rendering, so a
+// commit here means the client hydrated the route's Suspense boundary.
+let routeContentCommits = 0;
+
+const PageContent = ({ contentAttribute }: { contentAttribute: string }) => {
+  React.useEffect(() => {
+    routeContentCommits += 1;
+  }, []);
+  return (
+    <p data-testid="route-content" data-content-attribute={contentAttribute}>
+      Shell content
+    </p>
+  );
+};
 
 // Same tree shape as wrapServerComponentRenderer's server and client roots.
 const renderRoute = (componentProps: Record<string, string>, contentAttribute = 'same') => {
@@ -71,6 +80,7 @@ describe('RSCRoute data-rsc-committed marker hydration', () => {
   let root: Root | undefined;
 
   beforeEach(() => {
+    routeContentCommits = 0;
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -123,11 +133,10 @@ describe('RSCRoute data-rsc-committed marker hydration', () => {
     expect(coldKey).not.toBe(createEmbeddedPayloadKey(ROUTE_NAME, WARM_PROPS));
     expect(serverMarker?.getAttribute('data-rsc-committed')).toBe(coldKey);
 
-    // Hydration really ran: React attached to the server's marker node in place (an expando React
-    // adds to every node it owns), so a missing warning cannot come from a boundary left dehydrated.
-    const marker = container.querySelector('[data-rsc-committed]');
-    expect(marker).toBe(serverMarker);
-    expect(Object.keys(marker ?? {}).some((key) => key.startsWith('__reactFiber$'))).toBe(true);
+    // Hydration really ran, in place: the route content committed on the client and the server's
+    // marker node survived, so a missing warning cannot come from a boundary left dehydrated.
+    expect(routeContentCommits).toBe(1);
+    expect(container.querySelector('[data-rsc-committed]')).toBe(serverMarker);
 
     expect(consoleErrors.filter((message) => message.includes(ATTRIBUTE_MISMATCH_WARNING))).toEqual([]);
     expect(recoverableErrors).toEqual([]);
