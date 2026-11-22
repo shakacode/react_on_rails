@@ -36,6 +36,7 @@ import {
 import handleError from './handleError.ts';
 import { createRSCDiagnosticsEnricher, ownerStackAugmentedStack } from './streamRenderErrorSupport.ts';
 import { getRegisteredPPRApis, type RegisteredPPRApis } from './pprApiRegistry.ts';
+import { createEmbeddedPayloadKey } from './utils.ts';
 
 /**
  * Chunk-metadata keys of the PPR prerender wire protocol. The prerender response is a normal
@@ -442,6 +443,30 @@ const pprPrerenderRenderReactComponent = (
               committedKeys.add(markerMatch[1]);
             }
           }
+
+          // PPR #5278: never keep the page-level route's payload in a shell with holes. A
+          // component registered with registerServerComponent renders as one RSCRoute named
+          // after the page, so the whole page is one Flight stream. Its marker sits outside every
+          // Suspense boundary inside the page, so it is committed even when one of those
+          // boundaries is postponed. The postponed content is part of that same stream, which
+          // therefore stays open past the settle abort; keeping it would cache the holes' rows
+          // (and, in development, debug rows carrying the props) from this request. The resume
+          // pass replays the path to each postponed boundary, which re-renders the page route
+          // and sends its complete payload for the current request, so the shell copy is never
+          // needed. Treating the route as not committed drops its rows like those of a route
+          // inside a postponed boundary; the shell keeps only its init script.
+          //
+          // Match the page route's exact payload key, not just its name: a nested RSCRoute with
+          // the page's name but other props is not re-rendered by the resume pass when it has no
+          // postponed content, so its rows must stay in the shell. The route receives the render
+          // props the way wrapServerComponentRenderer passes them (<Component {...props} />):
+          // nullish props become {}, and React strips a `key` prop. This assumes the component
+          // registered under the page's name is that server component. A client component
+          // registered under a server component's name that renders it with the same props
+          // would lose that route's shell rows too; the browser then fetches them over HTTP.
+          const pageRouteProps: Record<string, unknown> = { ...options.props };
+          delete pageRouteProps.key;
+          committedKeys.delete(createEmbeddedPayloadKey(componentName, pageRouteProps));
 
           streamingTrackers.rscRequestTracker.cancelInFlightStreams(committedKeys);
 
