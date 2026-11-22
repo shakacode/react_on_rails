@@ -186,6 +186,90 @@ const createMixedGenerateRSCPayload = () =>
     return source;
   });
 
+// A server-component page, shaped the way registerServerComponent renders one (#5278): the page
+// is itself an RSCRoute, so it requests its OWN payload under the page's component name, and its
+// committed marker sits outside every Suspense boundary inside the page. The marker is therefore
+// always in the visible prelude, while the page's Flight stream stays open until the hole inside
+// the page resolves. The first row arrives before the settle abort (in development Flight writes
+// component debug rows, which carry the props, as soon as a component starts rendering); the hole
+// row arrives after it.
+const PAGE_COMPONENT_NAME = 'PprServerComponentPage';
+const COLD_PAGE_PROPS = { userValue: 'COLD_REQUEST_USER_VALUE' };
+const WARM_PAGE_PROPS = { userValue: 'WARM_REQUEST_USER_VALUE' };
+const PAGE_HOLE_ROW = 'PAGE_HOLE_ROW_WRITTEN_AFTER_SETTLE';
+// The props the page's RSCRoute receives. wrapServerComponentRenderer renders
+// <Component {...props} />, so take them from a React element built the same way rather than
+// restating React's rules (it strips a `key` prop; nullish props become {}).
+const RoutePropsProbe = () => null;
+const routePropsFor = (props) => React.createElement(RoutePropsProbe, props).props;
+const PprServerComponentPage = (props, railsContext) => {
+  const routeProps = routePropsFor(props);
+  if (railsContext.getRSCPayloadStream) {
+    railsContext.getRSCPayloadStream(PAGE_COMPONENT_NAME, routeProps);
+  }
+  return (
+    <div>
+      <h1>{SHELL_HEADER_TEXT}</h1>
+      <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        <DelayedHole />
+      </React.Suspense>
+      <span
+        data-rsc-committed={createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, routeProps)}
+        style={{ display: 'none' }}
+      />
+    </div>
+  );
+};
+
+// The same page plus a fully committed nested RSCRoute that shares the page's component name but
+// has other props. Its stream ends before the settle abort, and nothing inside it is postponed.
+const NESTED_ROUTE_PROPS = { userValue: 'NESTED_SAME_NAME_ROUTE_VALUE' };
+const PprPageWithSameNameNestedRoute = (props, railsContext) => {
+  const routeProps = routePropsFor(props);
+  if (railsContext.getRSCPayloadStream) {
+    railsContext.getRSCPayloadStream(PAGE_COMPONENT_NAME, routeProps);
+    railsContext.getRSCPayloadStream(PAGE_COMPONENT_NAME, NESTED_ROUTE_PROPS);
+  }
+  return (
+    <div>
+      <h1>{SHELL_HEADER_TEXT}</h1>
+      <span
+        data-rsc-committed={createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, NESTED_ROUTE_PROPS)}
+        style={{ display: 'none' }}
+      />
+      <React.Suspense fallback={<div>{HOLE_FALLBACK_TEXT}</div>}>
+        <DelayedHole />
+      </React.Suspense>
+      <span
+        data-rsc-committed={createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, routeProps)}
+        style={{ display: 'none' }}
+      />
+    </div>
+  );
+};
+
+/**
+ * Creates a generateRSCPayload mock for PprServerComponentPage. Each stream writes a row carrying
+ * the requested props at once, then — after `holeRowDelayMs` — the hole row, then ends. Pass 0 for
+ * the resume phase, which has no settle abort. The created source streams are returned so a test
+ * can check whether the prerender stopped them.
+ */
+const createPagePayloadGenerator = (holeRowDelayMs = HOLE_DELAY_MS * 3) => {
+  const sources = [];
+  const generateRSCPayload = jest.fn().mockImplementation(async (_componentName, props) => {
+    const source = new PassThrough();
+    sources.push(source);
+    source.push(new TextEncoder().encode(toLengthPrefixed(`page-row:${JSON.stringify(props)}`)));
+    setTimeout(() => {
+      if (source.destroyed) return;
+      source.push(new TextEncoder().encode(toLengthPrefixed(PAGE_HOLE_ROW)));
+      source.push(null);
+    }, holeRowDelayMs);
+    return source;
+  });
+  return { generateRSCPayload, sources };
+};
+
 // Regression component for the in-band flaw (#4890): user content deliberately contains the
 // EXACT bytes of the old #4659 prototype delimiter. The metadata-based protocol must transport
 // the PostponedState correctly regardless of what the rendered HTML contains.
@@ -778,6 +862,19 @@ describe('pprServerRenderedReactComponent', () => {
       return { html, trailingChunk, chunks };
     };
 
+    // Key-scoped counters matching injectRSCPayload's exact script shapes:
+    //   init: <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["KEY"];(...)["KEY"]||=[]</script>
+    //   push: <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["KEY"]||=[]).push("chunk")</script>
+    const INIT_RE = /delete \(self\.REACT_ON_RAILS_RSC_ERRORS\|\|=\{\}\)\[("(?:[^"\\]|\\.)*")\]/g;
+    const PUSH_RE = /\[("(?:[^"\\]|\\.)*")\]\|\|=\[\]\)\.push\(/g;
+    const countByKey = (regex, text) => {
+      const counts = new Map();
+      for (const match of text.matchAll(regex)) {
+        counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+      }
+      return counts;
+    };
+
     it('does not include RSC payload push scripts for postponed boundaries in the prerender output', async () => {
       const { html } = await runPostponedPrerender(createSlowGenerateRSCPayload());
 
@@ -789,19 +886,6 @@ describe('pprServerRenderedReactComponent', () => {
 
     it('warm response pushes payload chunks for the key the cached shell omits, with exactly one init', async () => {
       const { html: shellHtml, trailingChunk } = await runPostponedPrerender(createSlowGenerateRSCPayload());
-
-      // Key-scoped counters matching injectRSCPayload's exact script shapes:
-      //   init: <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["KEY"];(...)["KEY"]||=[]</script>
-      //   push: <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["KEY"]||=[]).push("chunk")</script>
-      const INIT_RE = /delete \(self\.REACT_ON_RAILS_RSC_ERRORS\|\|=\{\}\)\[("(?:[^"\\]|\\.)*")\]/g;
-      const PUSH_RE = /\[("(?:[^"\\]|\\.)*")\]\|\|=\[\]\)\.push\(/g;
-      const countByKey = (regex, text) => {
-        const counts = new Map();
-        for (const match of text.matchAll(regex)) {
-          counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
-        }
-        return counts;
-      };
 
       // Cached shell: exactly one init script for the postponed payload's key, ZERO pushes
       // for it (#5019-A: per-request chunks must not be cached), and the asset manifest
@@ -954,6 +1038,197 @@ describe('pprServerRenderedReactComponent', () => {
       expect(html).toContain(FAST_PAYLOAD_MARKER);
       // Slow (still in-flight at settle) → EXCLUDED from the shell
       expect(html).not.toContain(SLOW_PAYLOAD_MARKER);
+    });
+
+    describe('page-level route of a server-component page (#5278)', () => {
+      const pageMarkerKey = createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, COLD_PAGE_PROPS);
+      // Script keys are JSON string literals and include the DOM node id.
+      const coldPayloadKey = JSON.stringify(
+        createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, COLD_PAGE_PROPS, 'pprDomId'),
+      );
+      const warmPayloadKey = JSON.stringify(
+        createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, WARM_PAGE_PROPS, 'pprDomId'),
+      );
+      const countOccurrences = (text, needle) => text.split(needle).length - 1;
+
+      const prerenderPage = async () => {
+        const { generateRSCPayload, sources } = createPagePayloadGenerator();
+        const { chunks, errors } = await collectStreamResult(
+          runPrerender({
+            component: PprServerComponentPage,
+            componentName: PAGE_COMPONENT_NAME,
+            props: COLD_PAGE_PROPS,
+            generateRSCPayload,
+          }),
+        );
+        expect(errors).toHaveLength(0);
+        const trailingChunk = chunks[chunks.length - 1];
+        expect(trailingChunk[PPR_PRERENDER_COMPLETE_CHUNK_KEY]).toBe(true);
+        expect(trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY]).toBeDefined();
+        return { shellHtml: chunks.map((chunk) => chunk.html).join(''), trailingChunk, sources };
+      };
+
+      const resumePage = async (trailingChunk, props) => {
+        const { generateRSCPayload } = createPagePayloadGenerator(0);
+        const { chunks, errors } = await collectStreamResult(
+          runResume({
+            component: PprServerComponentPage,
+            componentName: PAGE_COMPONENT_NAME,
+            props,
+            postponedStateJson: trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY],
+            pprShellAssets: trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY],
+            generateRSCPayload,
+          }),
+        );
+        expect(errors).toHaveLength(0);
+        return chunks.map((chunk) => chunk.html).join('');
+      };
+
+      it('caches none of the page payload rows, although the page marker is committed', async () => {
+        const { shellHtml, trailingChunk, sources } = await prerenderPage();
+
+        // The shape #5096's marker check keeps: the page's marker is in the visible prelude.
+        expect(shellHtml).toContain(`data-rsc-committed="${pageMarkerKey}"`);
+        // Neither the row written before the settle abort (it carries the cold request's props)
+        // nor the hole row written after it is cached.
+        expect(shellHtml).not.toContain(COLD_PAGE_PROPS.userValue);
+        expect(shellHtml).not.toContain(PAGE_HOLE_ROW);
+        expect(countByKey(PUSH_RE, shellHtml).get(coldPayloadKey) ?? 0).toBe(0);
+        // The shell still declares the payload array once and the asset manifest records it, so the
+        // resume pass pushes into it without a second init, and the browser waits for those rows
+        // instead of fetching the payload over HTTP.
+        expect(countByKey(INIT_RE, shellHtml).get(coldPayloadKey)).toBe(1);
+        const manifest = JSON.parse(trailingChunk[PPR_ASSET_MANIFEST_CHUNK_KEY]);
+        expect(manifest.initScriptKeys).toContain(JSON.parse(coldPayloadKey));
+        // The prerender stopped the page's RSC stream instead of waiting for the hole to resolve.
+        // `destroyed` alone would not show this: the tracker's clear() destroys every source once
+        // the prerender completes, including one that was read to its end.
+        expect(sources).toHaveLength(1);
+        expect(sources[0].readableEnded).toBe(false);
+        expect(sources[0].destroyed).toBe(true);
+      });
+
+      it('cold request: the browser receives the page payload rows once, from the resume pass', async () => {
+        const { shellHtml, trailingChunk } = await prerenderPage();
+        const resumeHtml = await resumePage(trailingChunk, COLD_PAGE_PROPS);
+        const coldResponseHtml = shellHtml + resumeHtml;
+
+        // Same props, so the shell and the resume share one payload key. When the shell also
+        // carried the page rows, the browser's array received the page payload twice.
+        expect(countOccurrences(coldResponseHtml, COLD_PAGE_PROPS.userValue)).toBe(1);
+        expect(resumeHtml).toContain(PAGE_HOLE_ROW);
+        expect(countByKey(PUSH_RE, resumeHtml).get(coldPayloadKey)).toBeGreaterThan(0);
+        expect(countByKey(INIT_RE, coldResponseHtml).get(coldPayloadKey)).toBe(1);
+      });
+
+      it('warm request with other props: nothing from the cold request reaches the response', async () => {
+        const { shellHtml, trailingChunk } = await prerenderPage();
+        const resumeHtml = await resumePage(trailingChunk, WARM_PAGE_PROPS);
+        const warmResponseHtml = shellHtml + resumeHtml;
+
+        // The renderer-level form of the request spec's stale-props tripwire (#5002).
+        expect(warmResponseHtml).not.toContain(COLD_PAGE_PROPS.userValue);
+        // The resume pass sends this request's page payload under this request's key.
+        expect(resumeHtml).toContain(WARM_PAGE_PROPS.userValue);
+        expect(countByKey(INIT_RE, warmResponseHtml).get(warmPayloadKey)).toBe(1);
+        expect(countByKey(PUSH_RE, resumeHtml).get(warmPayloadKey)).toBeGreaterThan(0);
+      });
+
+      it('keeps the rows of a committed nested route that shares the page name but not its props', async () => {
+        const nestedPayloadKey = JSON.stringify(
+          createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, NESTED_ROUTE_PROPS, 'pprDomId'),
+        );
+        const { generateRSCPayload: pageGenerateRSCPayload } = createPagePayloadGenerator();
+        const generateRSCPayload = jest
+          .fn()
+          .mockImplementation(async (componentName, props, railsContext) => {
+            if (props.userValue !== NESTED_ROUTE_PROPS.userValue) {
+              return pageGenerateRSCPayload(componentName, props, railsContext);
+            }
+            const source = new PassThrough();
+            source.push(
+              new TextEncoder().encode(toLengthPrefixed(`nested-row:${NESTED_ROUTE_PROPS.userValue}`)),
+            );
+            source.push(null);
+            return source;
+          });
+
+        const { chunks, errors } = await collectStreamResult(
+          runPrerender({
+            component: PprPageWithSameNameNestedRoute,
+            componentName: PAGE_COMPONENT_NAME,
+            props: COLD_PAGE_PROPS,
+            generateRSCPayload,
+          }),
+        );
+        const shellHtml = chunks.map((chunk) => chunk.html).join('');
+
+        expect(errors).toHaveLength(0);
+        expect(chunks[chunks.length - 1][PPR_POSTPONED_STATE_CHUNK_KEY]).toBeDefined();
+        // The resume pass does not re-render a committed route with nothing postponed inside it,
+        // so the shell is the only place its rows can come from.
+        expect(shellHtml).toContain(NESTED_ROUTE_PROPS.userValue);
+        expect(countByKey(PUSH_RE, shellHtml).get(nestedPayloadKey)).toBeGreaterThan(0);
+        // The page route itself is still dropped.
+        expect(shellHtml).not.toContain(COLD_PAGE_PROPS.userValue);
+        expect(countByKey(PUSH_RE, shellHtml).get(coldPayloadKey) ?? 0).toBe(0);
+      });
+
+      it('drops the page payload when the page props include a prop named key', async () => {
+        const { generateRSCPayload } = createPagePayloadGenerator();
+        const { chunks, errors } = await collectStreamResult(
+          runPrerender({
+            component: PprServerComponentPage,
+            componentName: PAGE_COMPONENT_NAME,
+            props: { key: 'page-key-prop', ...COLD_PAGE_PROPS },
+            generateRSCPayload,
+          }),
+        );
+        const shellHtml = chunks.map((chunk) => chunk.html).join('');
+
+        expect(errors).toHaveLength(0);
+        expect(chunks[chunks.length - 1][PPR_POSTPONED_STATE_CHUNK_KEY]).toBeDefined();
+        // React strips `key` before the route sees its props, so the route's payload key is the
+        // one computed without it.
+        expect(shellHtml).toContain(`data-rsc-committed="${pageMarkerKey}"`);
+        expect(shellHtml).not.toContain(COLD_PAGE_PROPS.userValue);
+        expect(countByKey(PUSH_RE, shellHtml).get(coldPayloadKey) ?? 0).toBe(0);
+      });
+
+      it('keeps the page payload in a fully static shell, which has no resume pass to send it', async () => {
+        const PprStaticServerComponentPage = (props, railsContext) => {
+          if (railsContext.getRSCPayloadStream) {
+            railsContext.getRSCPayloadStream(PAGE_COMPONENT_NAME, props);
+          }
+          return (
+            <div>
+              <h1>{SHELL_HEADER_TEXT}</h1>
+              <span
+                data-rsc-committed={createEmbeddedPayloadKey(PAGE_COMPONENT_NAME, props)}
+                style={{ display: 'none' }}
+              />
+            </div>
+          );
+        };
+        const { generateRSCPayload } = createPagePayloadGenerator(0);
+
+        const { chunks, errors } = await collectStreamResult(
+          runPrerender({
+            component: PprStaticServerComponentPage,
+            componentName: PAGE_COMPONENT_NAME,
+            props: COLD_PAGE_PROPS,
+            generateRSCPayload,
+          }),
+        );
+        const html = chunks.map((chunk) => chunk.html).join('');
+        const trailingChunk = chunks[chunks.length - 1];
+
+        expect(errors).toHaveLength(0);
+        expect(trailingChunk[PPR_POSTPONED_STATE_CHUNK_KEY]).toBeUndefined();
+        expect(html).toContain(COLD_PAGE_PROPS.userValue);
+        expect(html).toContain(PAGE_HOLE_ROW);
+        expect(countByKey(PUSH_RE, html).get(coldPayloadKey)).toBeGreaterThan(0);
+      });
     });
   });
 });
