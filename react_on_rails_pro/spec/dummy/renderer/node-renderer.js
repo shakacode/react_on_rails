@@ -70,7 +70,9 @@ const config = {
 
   // additionalContext enables you to specify additional NodeJS modules to add to the VM context in
   // addition to our supportModules defaults.
-  additionalContext: { URL, AbortController },
+  // Response and Headers are required by TanStack Router: `redirect()` creates a Response,
+  // and the router checks `instanceof Response` for every route that has a loader or beforeLoad.
+  additionalContext: { URL, AbortController, Response, Headers },
 
   // Required to use setTimeout, setInterval, & clearTimeout during server rendering
   stubTimers: false,

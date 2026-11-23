@@ -74,7 +74,20 @@ export interface TanStackRouter {
     };
     resolvedLocation: unknown;
     matches: unknown[];
+    // Older TanStack Router versions (seen in 1.139.0 to 1.170.0) store the result of a
+    // server-side load here: `statusCode` is 200, 404, 500 or the redirect status, and
+    // `redirect` is set when the load ended in a redirect.
+    statusCode?: number;
+    redirect?: TanStackRouterRedirect;
   };
+  // Newer TanStack Router versions (seen in 1.170.46) store the result of a server-side load
+  // in this private field instead. TanStack Router's own request handler reads it the same way.
+  _serverResult?:
+    | { type: 'render'; status?: number }
+    | { type: 'redirect'; redirect?: TanStackRouterRedirect };
+  // Public TanStack Router event API. Used on the server to learn whether the router
+  // reached the point where route code (beforeLoad / loader) is allowed to run.
+  subscribe?: (eventType: 'onBeforeLoad', fn: (event: unknown) => void) => () => void;
   options?: {
     /** Called once on the server after router.load(); the result is passed to `hydrate` on the client. */
     dehydrate?: () => Promise<unknown> | unknown;
@@ -85,6 +98,16 @@ export interface TanStackRouter {
   // Set during client hydration to prevent a duplicate initial load that
   // causes hydration mismatch.
   ssr?: { manifest?: unknown };
+}
+
+/**
+ * The redirect object that TanStack Router stores after a server-side load.
+ * It is a Fetch API `Response`; only the parts this package reads are modeled here.
+ */
+export interface TanStackRouterRedirect {
+  status: number;
+  headers: { get: (name: string) => string | null };
+  options?: { href?: string };
 }
 
 export interface TanStackHistory {

@@ -9,6 +9,7 @@
 require "react_on_rails/prerender_error"
 require "react_on_rails/json_parse_error"
 require "react_on_rails/smart_error"
+require "react_on_rails/server_render_http_response"
 require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
@@ -826,6 +827,10 @@ module ReactOnRails
       # include that key, so non-SSR/error paths skip this merge entirely.
       merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
 
+      # A render function can report an HTTP status or a redirect next to the HTML.
+      # The TanStack Router integration does this for route redirects, 404 and 500.
+      apply_server_render_http_response(render_options, result) if result.is_a?(Hash)
+
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!
       # The reason is that React is smart about not doing extra work if the server rendering did its job.
       component_specification_tag = generate_component_script(render_options)
@@ -835,6 +840,21 @@ module ReactOnRails
         tag: component_specification_tag,
         result:
       }
+    end
+
+    def apply_server_render_http_response(render_options, result)
+      http_response = result["httpResponse"]
+      # `apply_http_response: false` on react_component turns this feature off for that component.
+      return if http_response.nil? || render_options.internal_option(:apply_http_response) == false
+
+      # `controller` is nil or missing when the helper runs outside a controller request.
+      current_controller = respond_to?(:controller) ? controller : nil
+      ReactOnRails::ServerRenderHttpResponse.apply(
+        http_response,
+        response: current_controller.respond_to?(:response) ? current_controller.response : nil,
+        current_path: current_controller.respond_to?(:request) ? current_controller.request&.fullpath : nil,
+        component_name: render_options.react_component_name
+      )
     end
 
     def merge_server_rendered_client_props!(render_options, result)

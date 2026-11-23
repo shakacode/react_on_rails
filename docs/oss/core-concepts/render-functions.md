@@ -240,6 +240,12 @@ Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode
    - This merge requires your original `props:` to be a Ruby `Hash` or a JSON string representing an object. If you pass any other type (including `nil`), the helper raises an error with a message pointing to this requirement.
    - **Symbol vs string keys:** If your original props use a symbol key (`:locale`) and `clientProps` returns the same name as a string (`"locale"`), the merge writes to the existing symbol key to preserve its type. If your original props contain **both** forms of the same key (`:locale` and `"locale"`), the merge raises an error rather than guessing which one you meant.
 
+6. **`httpResponse` sets the HTTP status or a redirect** - A server render hash can include `httpResponse: { status, location? }` next to `renderedHtml`. `react_component` applies it to the Rails response.
+   - `{ status: 404 }` keeps the rendered HTML and sets the status. Any status from 400 to 599 is accepted.
+   - `{ status: 307, location: '/login' }` sets the status and the `Location` header. The status must be 301, 302, 303, 307 or 308. `location` must be a path on the same site.
+   - Nothing changes if the controller already set a status other than 200, if the response was already sent, or if the helper is called with `apply_http_response: false`.
+   - `httpResponse` alone does not make an object a server render hash. Return it together with `renderedHtml`.
+
 ## Ruby Helper Functions
 
 ### 1. react_component
