@@ -291,9 +291,12 @@ function readLoadOutcome(router: TanStackRouter): RouterLoadOutcome {
   return { redirect: toRouterRedirect(rawRedirect), statusCode };
 }
 
-/** True for a path on the same site ("/about"). False for "//other.com/x" and "https://other.com/x". */
+/**
+ * True for a path on the same site ("/about"). False for "https://other.com/x", and for
+ * "//other.com/x" and "/\other.com/x", which browsers read as another website.
+ */
 function isLocalPath(location: string): boolean {
-  return location.startsWith('/') && !location.startsWith('//');
+  return location.startsWith('/') && !location.startsWith('//') && !location.startsWith('/\\');
 }
 
 /**
@@ -347,6 +350,8 @@ export async function serverRenderTanStackAppAsync(
 
   const dehydratedState: DehydratedRouterState = {
     url,
+    // Only when the router normalized the URL: the client uses it to align the browser path.
+    ...(url !== requestedUrl ? { requestedUrl } : {}),
     dehydratedRouter: dehydratedData === undefined ? null : { dehydratedData },
     // Keep ssrRouter payload for compatibility and to restore server match data
     // before first client render.

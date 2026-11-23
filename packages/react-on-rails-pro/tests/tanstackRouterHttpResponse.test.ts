@@ -100,12 +100,16 @@ async function serverRender(pathname: string, search = '') {
     search,
   } as unknown as RailsContext)) as ServerRenderResult;
   const html = renderToString(result.renderedHtml as React.ReactElement);
-  const dehydratedState = result.clientProps?.__tanstackRouterDehydratedState as { url: string };
+  const dehydratedState = result.clientProps?.__tanstackRouterDehydratedState as {
+    url: string;
+    requestedUrl?: string;
+  };
 
   return {
     result,
     html,
     renderedUrl: dehydratedState.url,
+    requestedUrl: dehydratedState.requestedUrl,
     routersCreated: createRouterSpy.mock.calls.length,
     okLoaderCalls: okLoader.mock.calls.length,
   };
@@ -239,11 +243,13 @@ describe('tanstack-router server render: httpResponse', () => {
 
   describe('URL normalization (no route code asked for a redirect)', () => {
     it('renders the page in place for a trailing slash', async () => {
-      const { result, html, routersCreated, renderedUrl, okLoaderCalls } = await serverRender('/ok/');
+      const { result, html, routersCreated, renderedUrl, requestedUrl, okLoaderCalls } =
+        await serverRender('/ok/');
 
       expect(result).not.toHaveProperty('httpResponse');
       expect(html).toContain('ok page');
       expect(renderedUrl).toBe('/ok');
+      expect(requestedUrl).toBe('/ok/');
       // One router for the requested URL, one for the normalized URL.
       expect(routersCreated).toBe(2);
       // The first router stopped before route code, so the loader ran only once.

@@ -80,6 +80,17 @@ module ReactOnRails
         expect(rails_response.location).to be_nil
       end
 
+      it "does nothing when the redirect points at the current URL plus a fragment" do
+        expect(apply({ "status" => 307, "location" => "/current#team" }, current_path: "/current")).to be(false)
+        expect(rails_response.status).to eq(200)
+        expect(rails_response.location).to be_nil
+      end
+
+      it "keeps the fragment of a redirect to another path" do
+        expect(apply({ "status" => 302, "location" => "/login#form" }, current_path: "/current")).to be(true)
+        expect(rails_response.location).to eq("/login#form")
+      end
+
       it "ignores a redirect to another website or an unsafe location" do
         [
           "https://example.com/x",

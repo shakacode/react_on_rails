@@ -23,14 +23,16 @@ module ReactOnRails
       #   - the value is absent, malformed or not allowed (see .normalize),
       #   - there is no response object, or the response was already sent (streaming),
       #   - the controller already chose a status other than 200,
-      #   - the redirect points at the URL of the current request (it would loop).
+      #   - the redirect points at the URL of the current request (it would loop). The fragment
+      #     (`#...`) is ignored for this check: browsers never send it, so `/about` redirecting to
+      #     `/about#team` would loop too.
       def apply(http_response, response:, current_path:, component_name:)
         normalized = normalize(http_response, component_name:)
-        return false if normalized.nil? || response.nil?
+        return false unless normalized && response
         return false if response.committed? || response.status != 200
 
         location = normalized[:location]
-        if location && location == current_path
+        if location && location.split("#", 2).first == current_path
           log(:warn, component_name, "the redirect points at the current URL", http_response)
           return false
         end

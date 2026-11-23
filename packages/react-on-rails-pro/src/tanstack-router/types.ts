@@ -180,6 +180,11 @@ export interface DehydratedRouterState {
   /** The URL that was server-rendered */
   url: string;
   /**
+   * The URL Rails received. Present only when TanStack Router normalized it (for example
+   * `/about/` rendered as `/about`). The client then moves the browser to `url` before hydration.
+   */
+  requestedUrl?: string;
+  /**
    * `{ dehydratedData }` holding the return value of `RouterOptions.dehydrate()`, or null when
    * the router defines no `dehydrate` option (or it returned undefined).
    */

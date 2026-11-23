@@ -142,13 +142,19 @@ retain their existing JSON representation; applications must keep those objects 
 On a full page load, the router decides the HTTP response on the server.
 React on Rails Pro reads that decision and applies it to the Rails response.
 
-| Router result on the server                                      | Rails response                                                 |
-| ---------------------------------------------------------------- | -------------------------------------------------------------- |
-| A route matched and rendered                                     | `200` with the rendered page                                   |
-| No route matched, or a route threw `notFound()`                  | `404` with the rendered not-found component                    |
-| A loader threw an error                                          | `500` with the rendered error component                        |
-| `beforeLoad` or a loader threw `redirect()`                      | The redirect status (`307` by default) and a `Location` header |
-| The URL only needed normalization (for example a trailing slash) | `200` with the rendered page. The URL does not change.         |
+| Router result on the server                                      | Rails response                                                          |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| A route matched and rendered                                     | `200` with the rendered page                                            |
+| No route matched, or a route threw `notFound()`                  | `404` with the rendered not-found component                             |
+| A loader threw an error                                          | `500` with the rendered error component                                 |
+| `beforeLoad` or a loader threw `redirect()`                      | The redirect status (`307` by default) and a `Location` header          |
+| The URL only needed normalization (for example a trailing slash) | `200` with the page rendered at the normalized URL. See the note below. |
+
+URL normalization: TanStack Router has one canonical form for each URL (for example no trailing slash).
+Rails does not redirect to it. The helper renders the canonical URL instead. Before hydration, the
+browser's path is changed to the rendered path (for example `/about/` becomes `/about`), so the first
+client render matches the server HTML. The query string stays as the visitor sent it, so a reload sends
+Rails the same params.
 
 Rules:
 

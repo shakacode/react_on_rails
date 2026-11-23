@@ -279,6 +279,39 @@ function applyDehydratedMatchData(
   });
 }
 
+function pathOf(url: string): string {
+  const queryStart = url.indexOf('?');
+  return queryStart === -1 ? url : url.slice(0, queryStart);
+}
+
+/**
+ * When TanStack Router normalized the requested path on the server (for example `/about/` was
+ * rendered as `/about`), the server HTML shows the normalized location. Move the browser to that
+ * path before the client router reads `window.location`, so the first client render matches.
+ *
+ * Only the path changes. The query string stays as the visitor sent it: TanStack's normalized query
+ * can encode repeated keys differently (for example `a=1&a=2`), and a reload would then send Rails
+ * different params. Rails routes `/about/` and `/about` to the same action, so the path is safe.
+ */
+function alignBrowserPathWithServerRender(dehydratedState: DehydratedRouterState | null | undefined): void {
+  if (typeof window === 'undefined' || !dehydratedState?.requestedUrl) {
+    return;
+  }
+
+  const serverPath = pathOf(dehydratedState.url);
+  const requestedPath = pathOf(dehydratedState.requestedUrl);
+  // The browser must still be at the path Rails received; otherwise leave the URL alone.
+  if (serverPath === requestedPath || window.location.pathname !== requestedPath) {
+    return;
+  }
+
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${serverPath}${window.location.search}${window.location.hash}`,
+  );
+}
+
 function TanStackHydrationApp({
   options,
   incomingProps,
@@ -337,6 +370,10 @@ function TanStackHydrationApp({
     // React 18 StrictMode's double-render-with-fresh-hooks behavior — which
     // resets useRef on each pass, so this `routerRef.current === null` guard
     // alone fires twice when options.createRouter returns the same instance.
+    //
+    // The router reads window.location when it is created, so align the browser path first.
+    // This is idempotent: a second render sees the browser already at the server path.
+    alignBrowserPathWithServerRender(dehydratedState);
     const router = options.createRouter();
     const cachedInit = sharedHydrationInitStates.get(router);
 
