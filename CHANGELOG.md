@@ -106,6 +106,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`server_render_js` no longer replays earlier calls' console output**: With an ExecJS runtime that keeps its
+  JavaScript context between calls (such as `mini_racer`), console output from one `server_render_js` call,
+  including the error message, JS code and stack trace logged when an expression throws, was replayed into later,
+  unrelated responses and written to the Rails log again until a `react_component` prerender cleared it. The code
+  `server_render_js` generates now clears the console history after each call. Fixes
+  [Issue 5356](https://github.com/shakacode/react_on_rails/issues/5356).
+  [PR 5357](https://github.com/shakacode/react_on_rails/pull/5357) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** TanStack Router loader errors now hydrate consistently after JSON transport. Production SSR and hydration use a generic error message, omitting private error details. Development preserves names, messages, and stacks, and warns about non-JSON loader data such as Date values.
   [PR 5340](https://github.com/shakacode/react_on_rails/pull/5340) by [justin808](https://github.com/justin808).
 
