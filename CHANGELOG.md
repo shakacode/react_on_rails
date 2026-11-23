@@ -106,6 +106,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **TanStack Router SSR returns the router's HTTP status and redirects**: On a full page load, pages
+  built with `createTanStackRouterRenderFunction` answered HTTP 200 for every URL. They now answer `404` for
+  not-found routes, `500` for loader errors, and the redirect status plus a `Location` header for a `redirect()`
+  thrown by `beforeLoad` or a loader. Rails follows only redirects to paths on the same site. URLs that only need
+  normalization, such as a trailing slash, are now server-rendered in place instead of returning empty HTML.
+  Render functions can return the new optional `httpResponse: { status, location? }` key next to `renderedHtml`.
+  The `react_component` view helper gains an `apply_http_response:` option (default `true`); pass `false` to keep
+  the old behavior for one component. `ReactOnRails::Helper#internal_react_component` now calls the new private
+  method `apply_server_render_http_response`. The status is not changed when the controller already set one.
+  Fixes [Issue 5125](https://github.com/shakacode/react_on_rails/issues/5125).
+  [PR 5355](https://github.com/shakacode/react_on_rails/pull/5355) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** TanStack Router loader errors now hydrate consistently after JSON transport. Production SSR and hydration use a generic error message, omitting private error details. Development preserves names, messages, and stacks, and warns about non-JSON loader data such as Date values.
   [PR 5340](https://github.com/shakacode/react_on_rails/pull/5340) by [justin808](https://github.com/justin808).
 
