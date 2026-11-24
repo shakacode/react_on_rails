@@ -279,37 +279,28 @@ function applyDehydratedMatchData(
   });
 }
 
-function pathOf(url: string): string {
-  const queryStart = url.indexOf('?');
-  return queryStart === -1 ? url : url.slice(0, queryStart);
-}
-
 /**
- * When TanStack Router normalized the requested path on the server (for example `/about/` was
- * rendered as `/about`), the server HTML shows the normalized location. Move the browser to that
- * path before the client router reads `window.location`, so the first client render matches.
+ * When TanStack Router normalized the requested URL on the server, the server HTML shows the
+ * normalized location. Examples: `/about/` rendered as `/about`, `?email=a@b.com` rendered as
+ * `?email=a%40b.com`, or a `validateSearch` default added as `?page=1`. Move the browser to that
+ * URL before the client router reads `window.location`, so the first client render matches.
  *
- * Only the path changes. The query string stays as the visitor sent it: TanStack's normalized query
- * can encode repeated keys differently (for example `a=1&a=2`), and a reload would then send Rails
- * different params. Rails routes `/about/` and `/about` to the same action, so the path is safe.
+ * This is the URL TanStack Router's own redirect and links would show. Rails already received the
+ * original URL for this request. The browser's fragment (`#...`) is kept.
  */
-function alignBrowserPathWithServerRender(dehydratedState: DehydratedRouterState | null | undefined): void {
+function alignBrowserUrlWithServerRender(dehydratedState: DehydratedRouterState | null | undefined): void {
   if (typeof window === 'undefined' || !dehydratedState?.requestedUrl) {
     return;
   }
 
-  const serverPath = pathOf(dehydratedState.url);
-  const requestedPath = pathOf(dehydratedState.requestedUrl);
-  // The browser must still be at the path Rails received; otherwise leave the URL alone.
-  if (serverPath === requestedPath || window.location.pathname !== requestedPath) {
+  const { url, requestedUrl } = dehydratedState;
+  const browserUrl = `${window.location.pathname}${window.location.search}`;
+  // The browser must still be at the URL Rails received; otherwise leave the URL alone.
+  if (url === requestedUrl || browserUrl !== requestedUrl) {
     return;
   }
 
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${serverPath}${window.location.search}${window.location.hash}`,
-  );
+  window.history.replaceState(window.history.state, '', `${url}${window.location.hash}`);
 }
 
 function TanStackHydrationApp({
@@ -371,9 +362,9 @@ function TanStackHydrationApp({
     // resets useRef on each pass, so this `routerRef.current === null` guard
     // alone fires twice when options.createRouter returns the same instance.
     //
-    // The router reads window.location when it is created, so align the browser path first.
-    // This is idempotent: a second render sees the browser already at the server path.
-    alignBrowserPathWithServerRender(dehydratedState);
+    // The router reads window.location when it is created, so align the browser URL first.
+    // This is idempotent: a second render sees the browser already at the server URL.
+    alignBrowserUrlWithServerRender(dehydratedState);
     const router = options.createRouter();
     const cachedInit = sharedHydrationInitStates.get(router);
 

@@ -111,7 +111,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   not-found routes, `500` for loader errors, and the redirect status plus a `Location` header for a `redirect()`
   thrown by `beforeLoad` or a loader. Rails follows only redirects to paths on the same site. URLs that only need
   normalization, such as a trailing slash, are now server-rendered in place instead of returning empty HTML;
-  before hydration the browser's path changes to the normalized path, and the query string is kept.
+  before hydration the browser's URL changes to the normalized URL that was rendered.
   Render functions can return the new optional `httpResponse: { status, location? }` key next to `renderedHtml`.
   The `react_component` view helper gains an `apply_http_response:` option (default `true`); pass `false` to keep
   the old behavior for one component. `ReactOnRails::Helper#internal_react_component` now calls the new private

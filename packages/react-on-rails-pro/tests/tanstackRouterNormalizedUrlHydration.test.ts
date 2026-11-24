@@ -84,19 +84,102 @@ async function compatAct(callback: () => void | Promise<void>): Promise<void> {
   await actFn(callback);
 }
 
-function buildRouter(isServer: boolean): TanStackRouter {
+type SearchValidator = (search: Record<string, unknown>) => Record<string, unknown>;
+
+function buildRouter(isServer: boolean, validateSearch?: SearchValidator): TanStackRouter {
   const rootRoute = createRootRoute();
-  const productsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/products' });
+  const productsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/products',
+    ...(validateSearch ? { validateSearch } : {}),
+  });
   return createRouter({
     routeTree: rootRoute.addChildren([productsRoute]),
     isServer,
   }) as unknown as TanStackRouter;
 }
 
-// Renders what `useLocation().pathname` returns. It reads router state directly instead of using
-// TanStack's hooks, like the hydration test in tanstackRouter.test.ts, to avoid nested-React issues.
-const PathnameProvider = ({ router }: { router: TanStackRouter }) =>
-  React.createElement('main', null, `path:${router.state.location.pathname}`);
+// Renders what `useLocation().pathname` and `useLocation().searchStr` return. It reads router state
+// directly instead of using TanStack's hooks, like the hydration test in tanstackRouter.test.ts, to
+// avoid nested-React issues.
+const LocationProvider = ({ router }: { router: TanStackRouter }) =>
+  React.createElement(
+    'main',
+    null,
+    `location:${router.state.location.pathname}${router.state.location.searchStr ?? ''}`,
+  );
+
+interface HydrationRun {
+  dehydratedState: DehydratedRouterState;
+  serverHtml: string;
+  clientText: string | null;
+  recoverableErrors: unknown[];
+}
+
+/**
+ * Server-renders `pathname` + `search` the way Rails would request it, puts the browser at
+ * `browserUrl`, then hydrates the server HTML with a real browser history.
+ */
+async function serverRenderThenHydrate({
+  pathname,
+  search,
+  browserUrl,
+  validateSearch,
+}: {
+  pathname: string;
+  search: string;
+  browserUrl: string;
+  validateSearch?: SearchValidator;
+}): Promise<HydrationRun> {
+  const serverResult = await serverRenderTanStackAppAsync(
+    { createRouter: () => buildRouter(true, validateSearch) },
+    {},
+    { serverSide: true, pathname, search } as unknown as RailsContext & { serverSide: true },
+    LocationProvider,
+    ({ initialEntries }) => createMemoryHistory({ initialEntries }),
+  );
+  const { dehydratedState } = serverResult;
+  const serverHtml = renderToString(serverResult.appElement);
+
+  window.history.replaceState(null, '', browserUrl);
+
+  const renderFn = createTanStackRouterRenderFunction(
+    { createRouter: () => buildRouter(false, validateSearch) },
+    {
+      RouterProvider: LocationProvider,
+      createMemoryHistory: ({ initialEntries }) => createMemoryHistory({ initialEntries }),
+      createBrowserHistory: () => createBrowserHistory(),
+    },
+  );
+  const props = { __tanstackRouterDehydratedState: dehydratedState };
+  const clientApp = renderFn(props, { serverSide: false, pathname, search } as unknown as RailsContext);
+
+  const container = document.createElement('div');
+  container.innerHTML = serverHtml;
+  document.body.appendChild(container);
+  const recoverableErrors: unknown[] = [];
+  let root: ReturnType<typeof hydrateRoot> | undefined;
+
+  try {
+    await compatAct(async () => {
+      root = hydrateRoot(
+        container,
+        React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props),
+        { onRecoverableError: (error) => recoverableErrors.push(error) },
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    return { dehydratedState, serverHtml, clientText: container.textContent, recoverableErrors };
+  } finally {
+    if (root) {
+      await compatAct(async () => {
+        root?.unmount();
+      });
+    }
+    container.remove();
+  }
+}
 
 describe('tanstack-router: a URL that the router normalizes', () => {
   const globalWithFetchApi = globalThis as unknown as GlobalWithFetchApi;
@@ -114,125 +197,50 @@ describe('tanstack-router: a URL that the router normalizes', () => {
     window.history.replaceState(null, '', '/');
   });
 
-  it('hydrates without errors and moves the browser to the URL the server rendered', async () => {
-    const serverResult = await serverRenderTanStackAppAsync(
-      { createRouter: () => buildRouter(true) },
-      {},
-      { serverSide: true, pathname: '/products/', search: '' } as unknown as RailsContext & {
-        serverSide: true;
-      },
-      PathnameProvider,
-      ({ initialEntries }) => createMemoryHistory({ initialEntries }),
-    );
-    const dehydratedState: DehydratedRouterState = serverResult.dehydratedState;
-    const serverHtml = renderToString(serverResult.appElement);
-
-    expect(dehydratedState.url).toBe('/products');
-    expect(dehydratedState.requestedUrl).toBe('/products/');
-    expect(serverHtml).toContain('path:/products<');
-
-    // The visitor's browser is at the URL Rails received.
-    window.history.replaceState(null, '', '/products/#reviews');
-
-    const renderFn = createTanStackRouterRenderFunction(
-      { createRouter: () => buildRouter(false) },
-      {
-        RouterProvider: PathnameProvider,
-        createMemoryHistory: ({ initialEntries }) => createMemoryHistory({ initialEntries }),
-        createBrowserHistory: () => createBrowserHistory(),
-      },
-    );
-    const props = { __tanstackRouterDehydratedState: dehydratedState };
-    const clientApp = renderFn(props, {
-      serverSide: false,
+  it('hydrates a trailing-slash URL without errors and moves the browser to the rendered URL', async () => {
+    const run = await serverRenderThenHydrate({
       pathname: '/products/',
       search: '',
-    } as unknown as RailsContext);
+      browserUrl: '/products/#reviews',
+    });
 
-    const container = document.createElement('div');
-    container.innerHTML = serverHtml;
-    document.body.appendChild(container);
-    const recoverableErrors: unknown[] = [];
-    let root: ReturnType<typeof hydrateRoot> | undefined;
-
-    try {
-      await compatAct(async () => {
-        root = hydrateRoot(
-          container,
-          React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props),
-          { onRecoverableError: (error) => recoverableErrors.push(error) },
-        );
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      expect(recoverableErrors).toEqual([]);
-      expect(container.textContent).toBe('path:/products');
-      expect(window.location.pathname).toBe('/products');
-      // The fragment is kept: browsers never send it to the server.
-      expect(window.location.hash).toBe('#reviews');
-    } finally {
-      if (root) {
-        await compatAct(async () => {
-          root?.unmount();
-        });
-      }
-      container.remove();
-    }
+    expect(run.dehydratedState.url).toBe('/products');
+    expect(run.dehydratedState.requestedUrl).toBe('/products/');
+    expect(run.serverHtml).toContain('location:/products<');
+    expect(run.recoverableErrors).toEqual([]);
+    expect(run.clientText).toBe('location:/products');
+    expect(window.location.pathname + window.location.search).toBe('/products');
+    // The fragment is kept: browsers never send it to the server.
+    expect(window.location.hash).toBe('#reviews');
   });
 
-  it('keeps the query string the visitor sent when only the query was normalized', async () => {
+  it('hydrates a URL whose query string was normalized', async () => {
     // TanStack Router 1.163.3 encodes "@" in query values, so it normalizes this URL.
-    const serverResult = await serverRenderTanStackAppAsync(
-      { createRouter: () => buildRouter(true) },
-      {},
-      { serverSide: true, pathname: '/products', search: 'email=a@b.com' } as unknown as RailsContext & {
-        serverSide: true;
-      },
-      PathnameProvider,
-      ({ initialEntries }) => createMemoryHistory({ initialEntries }),
-    );
-    const { dehydratedState } = serverResult;
-    window.history.replaceState(null, '', '/products?email=a@b.com');
-
-    const renderFn = createTanStackRouterRenderFunction(
-      { createRouter: () => buildRouter(false) },
-      {
-        RouterProvider: PathnameProvider,
-        createMemoryHistory: ({ initialEntries }) => createMemoryHistory({ initialEntries }),
-        createBrowserHistory: () => createBrowserHistory(),
-      },
-    );
-    const props = { __tanstackRouterDehydratedState: dehydratedState };
-    const clientApp = renderFn(props, {
-      serverSide: false,
+    const run = await serverRenderThenHydrate({
       pathname: '/products',
       search: 'email=a@b.com',
-    } as unknown as RailsContext);
+      browserUrl: '/products?email=a@b.com',
+    });
 
-    const container = document.createElement('div');
-    container.innerHTML = renderToString(serverResult.appElement);
-    document.body.appendChild(container);
-    let root: ReturnType<typeof hydrateRoot> | undefined;
+    expect(run.dehydratedState.url).toBe('/products?email=a%40b.com');
+    expect(run.recoverableErrors).toEqual([]);
+    expect(run.clientText).toBe('location:/products?email=a%40b.com');
+    expect(window.location.pathname + window.location.search).toBe('/products?email=a%40b.com');
+  });
 
-    try {
-      await compatAct(async () => {
-        root = hydrateRoot(
-          container,
-          React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props),
-        );
-        await Promise.resolve();
-      });
+  it('hydrates a URL that gained a search parameter from validateSearch on the server', async () => {
+    // The router adds validated search defaults when it builds the canonical URL on the server.
+    const run = await serverRenderThenHydrate({
+      pathname: '/products',
+      search: '',
+      browserUrl: '/products',
+      validateSearch: (search) => ({ page: Number(search.page ?? 1) }),
+    });
 
-      expect(window.location.pathname + window.location.search).toBe('/products?email=a@b.com');
-    } finally {
-      if (root) {
-        await compatAct(async () => {
-          root?.unmount();
-        });
-      }
-      container.remove();
-    }
+    expect(run.dehydratedState.url).toBe('/products?page=1');
+    expect(run.recoverableErrors).toEqual([]);
+    expect(run.clientText).toBe('location:/products?page=1');
+    expect(window.location.pathname + window.location.search).toBe('/products?page=1');
   });
 
   it('does not add requestedUrl when the router did not normalize the URL', async () => {
@@ -242,7 +250,7 @@ describe('tanstack-router: a URL that the router normalizes', () => {
       { serverSide: true, pathname: '/products', search: '' } as unknown as RailsContext & {
         serverSide: true;
       },
-      PathnameProvider,
+      LocationProvider,
       ({ initialEntries }) => createMemoryHistory({ initialEntries }),
     );
 

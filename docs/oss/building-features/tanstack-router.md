@@ -150,11 +150,12 @@ React on Rails Pro reads that decision and applies it to the Rails response.
 | `beforeLoad` or a loader threw `redirect()`                      | The redirect status (`307` by default) and a `Location` header          |
 | The URL only needed normalization (for example a trailing slash) | `200` with the page rendered at the normalized URL. See the note below. |
 
-URL normalization: TanStack Router has one canonical form for each URL (for example no trailing slash).
-Rails does not redirect to it. The helper renders the canonical URL instead. Before hydration, the
-browser's path is changed to the rendered path (for example `/about/` becomes `/about`), so the first
-client render matches the server HTML. The query string stays as the visitor sent it, so a reload sends
-Rails the same params.
+URL normalization: TanStack Router has one canonical form for each URL. Examples: no trailing slash,
+its own query-string encoding, and defaults added by `validateSearch`. Rails does not redirect to it.
+The helper renders the canonical URL instead. Before hydration, the browser's URL is changed to the
+rendered URL (for example `/about/` becomes `/about`), so the first client render matches the server
+HTML. This is the URL TanStack Router's own redirect and links would show; the browser's fragment
+(`#...`) is kept. Rails received the original URL for this request. A reload requests the new URL.
 
 Rules:
 
