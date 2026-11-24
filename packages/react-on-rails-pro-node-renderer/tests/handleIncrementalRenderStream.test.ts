@@ -356,6 +356,108 @@ describe('handleIncrementalRenderStream', () => {
       );
       expect(onResponseStart).toHaveBeenCalledTimes(1);
     });
+
+    function splitIntoChunks(data: Buffer, chunkSize: number): Buffer[] {
+      const chunks: Buffer[] = [];
+      for (let offset = 0; offset < data.length; offset += chunkSize) {
+        chunks.push(data.subarray(offset, offset + chunkSize));
+      }
+      return chunks;
+    }
+
+    it('reassembles lines from tiny chunks that split lines, CRLF endings, and multi-byte characters', async () => {
+      const initial = { id: 1, text: `héllo 🌍 ${'ü'.repeat(500)}` };
+      const update1 = { id: 2, text: '—'.repeat(300) };
+      const update2 = { id: 3, text: 'last' };
+      const ndjson = Buffer.from(
+        `${JSON.stringify(initial)}\r\n${JSON.stringify(update1)}\n\n${JSON.stringify(update2)}\n`,
+      );
+      // Chunk sizes 1-16 split multi-byte characters and the CRLF pair, and start chunks on a newline.
+      for (let chunkSize = 1; chunkSize <= 16; chunkSize += 1) {
+        const onRenderRequestReceived = jest.fn().mockResolvedValue({
+          response: createMockResponse(),
+          shouldContinue: true,
+        });
+        const onUpdateReceived = jest.fn().mockResolvedValue(undefined);
+
+        // eslint-disable-next-line no-await-in-loop
+        await handleIncrementalRenderStream({
+          request: createMockStream(splitIntoChunks(ndjson, chunkSize)),
+          onRenderRequestReceived,
+          onResponseStart: jest.fn(),
+          onUpdateReceived,
+          onRequestEnded: jest.fn(),
+        });
+
+        expect(onRenderRequestReceived).toHaveBeenCalledTimes(1);
+        expect(onRenderRequestReceived).toHaveBeenCalledWith(initial);
+        expect(onUpdateReceived.mock.calls).toEqual([[update1], [update2]]);
+      }
+    });
+
+    it('applies the line size limit per line when long lines arrive in many small chunks', async () => {
+      const longLine = (id: number) =>
+        `${JSON.stringify({ id, data: 'x'.repeat(Math.floor(FIELD_SIZE_LIMIT * 0.6)) })}\n`;
+      const onUpdateReceived = jest.fn().mockResolvedValue(undefined);
+
+      // Two lines of 60% of the limit: together they exceed it, but each line is within it.
+      await handleIncrementalRenderStream({
+        request: createMockStream(splitIntoChunks(Buffer.from(longLine(1) + longLine(2)), 64 * 1024)),
+        onRenderRequestReceived: jest.fn().mockResolvedValue({
+          response: createMockResponse(),
+          shouldContinue: true,
+        }),
+        onResponseStart: jest.fn(),
+        onUpdateReceived,
+        onRequestEnded: jest.fn(),
+      });
+      expect(onUpdateReceived).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+
+      // The last 64 KB chunk ends exactly at the limit; the final 1 KB chunk pushes the line over it.
+      await expect(
+        handleIncrementalRenderStream({
+          request: createMockStream(splitIntoChunks(Buffer.alloc(FIELD_SIZE_LIMIT + 1024, 'x'), 64 * 1024)),
+          onRenderRequestReceived: jest.fn(),
+          onResponseStart: jest.fn(),
+          onUpdateReceived: jest.fn(),
+          onRequestEnded: jest.fn(),
+        }),
+      ).rejects.toThrow(`Current buffer: ${FIELD_SIZE_LIMIT + 1024} bytes`);
+    });
+
+    it('buffers a long line delivered in 16 KB chunks in time linear in its length', async () => {
+      // HTTP/2 delivers request bodies in DATA frames of at most 16 KB by default. Rescanning the whole
+      // partial line on every chunk made an 8 MB line take over a second instead of a few milliseconds.
+      const line = Buffer.from(`${JSON.stringify({ renderingRequest: 'x'.repeat(8 * 1024 * 1024) })}\n`);
+
+      const timeDelivery = async (chunks: Buffer[]) => {
+        let fastest = Infinity;
+        for (let run = 0; run < 2; run += 1) {
+          const onRenderRequestReceived = jest.fn().mockResolvedValue({
+            response: createMockResponse(),
+            shouldContinue: false,
+          });
+          const startedAt = performance.now();
+          // eslint-disable-next-line no-await-in-loop
+          await handleIncrementalRenderStream({
+            request: createMockStream(chunks),
+            onRenderRequestReceived,
+            onResponseStart: jest.fn(),
+            onUpdateReceived: jest.fn(),
+            onRequestEnded: jest.fn(),
+          });
+          fastest = Math.min(fastest, performance.now() - startedAt);
+          expect(onRenderRequestReceived).toHaveBeenCalledTimes(1);
+        }
+        return fastest;
+      };
+
+      const singleChunkMs = await timeDelivery([line]);
+      const smallChunksMs = await timeDelivery(splitIntoChunks(line, 16 * 1024));
+
+      // Linear buffering keeps small-chunk delivery within a small factor of one-chunk delivery.
+      expect(smallChunksMs).toBeLessThan(Math.max(singleChunkMs * 10, 300));
+    }, 30_000);
   });
 
   describe('shouldContinue flag', () => {

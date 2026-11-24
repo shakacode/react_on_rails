@@ -16,8 +16,9 @@
 import { StringDecoder } from 'string_decoder';
 import type { ResponseResult } from '../shared/utils';
 import * as errorReporter from '../shared/errorReporter';
-import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from '../shared/constants';
+import { BODY_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from '../shared/constants';
 import { subSpan } from '../shared/tracing.js';
+import NdjsonLineSplitter from './ndjsonLineSplitter';
 
 /**
  * Error thrown when waiting for a stream chunk times out.
@@ -184,7 +185,7 @@ export async function handleIncrementalRenderStream(
 
     let hasReceivedFirstObject = false;
     const decoder = new StringDecoder('utf8');
-    let buffer = '';
+    const lineSplitter = new NdjsonLineSplitter();
     let totalBytesReceived = 0;
     let onResponseStartPromise: Promise<void> | null = null;
 
@@ -206,23 +207,13 @@ export async function handleIncrementalRenderStream(
           );
         }
 
-        const str = decoder.write(chunkBuffer);
-        buffer += str;
+        // Throws when the partial line plus this chunk exceeds the line size limit (protects against
+        // missing newlines)
+        const lines = lineSplitter.push(decoder.write(chunkBuffer));
 
-        // Check single line size limit (protects against missing newlines)
-        if (buffer.length > FIELD_SIZE_LIMIT) {
-          throw new Error(
-            `NDJSON line exceeds maximum size of ${FIELD_SIZE_LIMIT} bytes (${Math.round(FIELD_SIZE_LIMIT / 1024 / 1024)}MB). ` +
-              `Current buffer: ${buffer.length} bytes. Ensure each JSON object is followed by a newline.`,
-          );
-        }
-
-        // Process all complete JSON objects in the buffer
-        let boundary = buffer.indexOf('\n');
-        while (boundary !== -1) {
-          const rawObject = buffer.slice(0, boundary).trim();
-          buffer = buffer.slice(boundary + 1);
-          boundary = buffer.indexOf('\n');
+        // Process all complete JSON objects in this chunk
+        for (const line of lines) {
+          const rawObject = line.trim();
 
           if (rawObject) {
             let parsed: unknown;
