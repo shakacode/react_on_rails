@@ -68,6 +68,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Improved
 
+- **[Pro]** **Large async-props render requests no longer cost quadratic CPU in the Node Renderer**: The renderer
+  buffered each incremental-render (NDJSON) line by rescanning the whole partial line on every 16 KB chunk, so a
+  5 MB first line (the rendering request with its props) took about 0.7 s to reach the render and a 9 MB line
+  about 2.2 s. Lines are now buffered in linear time: about 40 ms and 65 ms. Line size limits and all other
+  request handling are unchanged.
+  [PR 5360](https://github.com/shakacode/react_on_rails/pull/5360) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
   request digest over `js_code` and its serialized props only when prerender caching needs it as a
   cache key. Uncached renders send the Node Renderer a cheap `Component-pid-counter` id in the same
