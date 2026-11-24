@@ -24,7 +24,7 @@ import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import { Readable, Transform } from 'stream';
 import fastify, { type FastifyServerOptions } from 'fastify';
-import type { Http2Server } from 'http2';
+import type { Http2Server, ServerOptions as Http2ServerOptions } from 'http2';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
@@ -51,7 +51,13 @@ import {
   type IncrementalRenderSink,
 } from './worker/handleIncrementalRenderRequest.js';
 import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
-import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from './shared/constants.js';
+import {
+  BODY_SIZE_LIMIT,
+  FIELD_SIZE_LIMIT,
+  HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE,
+  HTTP2_STREAM_RECEIVE_WINDOW_SIZE,
+  STREAM_CHUNK_TIMEOUT_MS,
+} from './shared/constants.js';
 import {
   badRequestResponseResult,
   errorResponseResult,
@@ -106,6 +112,20 @@ const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
 // TODO: Reassess the duplicated-route message format when upgrading Fastify.
 const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
 const READY_RETRY_AFTER_SECONDS = 5;
+
+// Node's HTTP/2 defaults give a client only 64KB of flow-control window per stream and per connection,
+// so a larger render request uploads in 64KB steps, each waiting a round trip for a WINDOW_UPDATE.
+// Fastify passes `http` to `http2.createServer`, so this per-stream window goes out in the server's
+// first SETTINGS frame. A window the user sets in `fastifyServerOptions.http.settings` wins.
+function withDefaultHttp2StreamWindow(serverOptions: object): { http: Http2ServerOptions } {
+  const userHttpOptions = (serverOptions as { http?: Http2ServerOptions | null }).http ?? {};
+  return {
+    http: {
+      ...userHttpOptions,
+      settings: { initialWindowSize: HTTP2_STREAM_RECEIVE_WINDOW_SIZE, ...userHttpOptions.settings },
+    },
+  };
+}
 
 function multipartBodyTooLargeError() {
   const error = new Error(`Multipart request body exceeds the ${BODY_SIZE_LIMIT}-byte limit.`) as Error & {
@@ -621,10 +641,24 @@ export default function run(config: Partial<Config>) {
     http2Enabled
       ? fastify<Http2Server>({
           ...(commonServerOptions as FastifyServerOptions<Http2Server>),
+          ...withDefaultHttp2StreamWindow(serverOptions),
           http2: true,
         })
       : fastify(commonServerOptions as FastifyServerOptions)
   ) as FastifyInstance;
+
+  if (http2Enabled) {
+    // The connection-level window has no server option, so raise it as each session opens. Node refills
+    // it as data arrives, so it holds no extra memory; it only stops one 64KB cap being shared by every
+    // upload on the connection. A throw here would crash the worker, so only log it.
+    (app.server as Http2Server).on('session', (session) => {
+      try {
+        session.setLocalWindowSize(HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE);
+      } catch (error: unknown) {
+        log.warn({ msg: 'Could not raise the HTTP/2 connection receive window', error });
+      }
+    });
+  }
 
   handleGracefulShutdown(app);
 
