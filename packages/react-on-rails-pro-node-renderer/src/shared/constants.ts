@@ -25,6 +25,17 @@ export const BODY_SIZE_LIMIT = 100 * 1024 * 1024;
 export const FIELD_SIZE_LIMIT = 10 * 1024 * 1024;
 
 /**
+ * HTTP/2 receive windows advertised to clients. Node's default of 64KB for both makes a client upload a
+ * large render request in 64KB steps, each waiting a network round trip for a WINDOW_UPDATE.
+ *
+ * The per-stream window also caps how much unread request data one stream can hold in memory, so it is
+ * kept smaller than the connection window. Node refills the connection window as data arrives, so a
+ * large connection window does not hold memory.
+ */
+export const HTTP2_STREAM_RECEIVE_WINDOW_SIZE = 1024 * 1024;
+export const HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE = 8 * 1024 * 1024;
+
+/**
  * Timeout in milliseconds for waiting for the next chunk in an incremental render stream.
  * If no chunk is received within this timeout, the request is cancelled.
  * This prevents requests from hanging forever when clients disconnect without properly closing the stream.

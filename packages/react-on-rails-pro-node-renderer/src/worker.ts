@@ -24,7 +24,12 @@ import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import { Readable, Transform } from 'stream';
 import fastify, { type FastifyServerOptions } from 'fastify';
-import type { Http2Server } from 'http2';
+import type {
+  Http2Server,
+  Http2Session,
+  SecureServerOptions,
+  ServerOptions as Http2ServerOptions,
+} from 'http2';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
@@ -51,7 +56,13 @@ import {
   type IncrementalRenderSink,
 } from './worker/handleIncrementalRenderRequest.js';
 import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
-import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from './shared/constants.js';
+import {
+  BODY_SIZE_LIMIT,
+  FIELD_SIZE_LIMIT,
+  HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE,
+  HTTP2_STREAM_RECEIVE_WINDOW_SIZE,
+  STREAM_CHUNK_TIMEOUT_MS,
+} from './shared/constants.js';
 import {
   badRequestResponseResult,
   errorResponseResult,
@@ -106,6 +117,37 @@ const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
 // TODO: Reassess the duplicated-route message format when upgrading Fastify.
 const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
 const READY_RETRY_AFTER_SECONDS = 5;
+
+type UserHttp2ServerOptions = {
+  http?: Http2ServerOptions | null;
+  https?: SecureServerOptions | boolean | null;
+};
+
+// Node's HTTP/2 defaults give a client only 64KB of flow-control window per stream and per connection,
+// so a larger render request uploads in 64KB steps, each waiting a round trip for a WINDOW_UPDATE.
+// Fastify builds the HTTP/2 server from `https` when it is set and from `http` otherwise, so the default
+// per-stream window goes into that one and is sent in the server's first SETTINGS frame. A window the
+// user sets in those options wins.
+function withDefaultHttp2StreamWindow(
+  serverOptions: object,
+): { http: Http2ServerOptions } | { https: SecureServerOptions } {
+  const { http, https } = serverOptions as UserHttp2ServerOptions;
+  const withStreamWindow = <T extends Http2ServerOptions>(options: T): T => ({
+    ...options,
+    settings: { initialWindowSize: HTTP2_STREAM_RECEIVE_WINDOW_SIZE, ...options.settings },
+  });
+  if (https) {
+    return { https: withStreamWindow(https === true ? {} : https) };
+  }
+  return { http: withStreamWindow(http ?? {}) };
+}
+
+function userSetHttp2ConnectionWindow(serverOptions: object): boolean {
+  const { http, https } = serverOptions as UserHttp2ServerOptions;
+  return [http, https].some(
+    (options) => typeof options === 'object' && options !== null && 'connectionWindowSize' in options,
+  );
+}
 
 function multipartBodyTooLargeError() {
   const error = new Error(`Multipart request body exceeds the ${BODY_SIZE_LIMIT}-byte limit.`) as Error & {
@@ -621,10 +663,37 @@ export default function run(config: Partial<Config>) {
     http2Enabled
       ? fastify<Http2Server>({
           ...(commonServerOptions as FastifyServerOptions<Http2Server>),
+          ...withDefaultHttp2StreamWindow(serverOptions),
           http2: true,
         })
       : fastify(commonServerOptions as FastifyServerOptions)
   ) as FastifyInstance;
+
+  if (http2Enabled && !userSetHttp2ConnectionWindow(serverOptions)) {
+    // Node has no server option for the connection-level window on every supported version, so raise it
+    // per session. Node refills it as data arrives, so it holds no extra memory; it only stops one 64KB
+    // cap being shared by every upload on the connection. A throw here would crash the worker, so only
+    // log it.
+    const sessionsWithRaisedWindow = new WeakSet<Http2Session>();
+    const raiseConnectionWindow = (session: Http2Session | undefined) => {
+      if (!session || sessionsWithRaisedWindow.has(session)) return;
+      sessionsWithRaisedWindow.add(session);
+      try {
+        session.setLocalWindowSize(HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE);
+      } catch (error: unknown) {
+        log.warn({ msg: 'Could not raise the HTTP/2 connection receive window', error });
+      }
+    };
+    // Sessions on the main server get it as soon as they open, before any request body arrives.
+    (app.server as Http2Server).on('session', raiseConnectionWindow);
+    // When the host resolves to several addresses (the default 'localhost' can be both ::1 and
+    // 127.0.0.1), Fastify serves the extra ones from secondary servers whose sessions never reach
+    // app.server. Raise their window at their first request instead.
+    app.addHook('onRequest', (req, _reply, done) => {
+      raiseConnectionWindow((req.raw as { stream?: { session?: Http2Session } }).stream?.session);
+      done();
+    });
+  }
 
   handleGracefulShutdown(app);
 

@@ -68,6 +68,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Improved
 
+- **[Pro]** **Faster render-request uploads to the Node Renderer over HTTP/2**: The renderer's HTTP/2 server
+  used Node's default 64 KB flow-control windows, so Rails uploaded every render request larger than 64 KB in
+  64 KB steps, each waiting a network round trip. It now advertises a 1 MB per-stream window and an 8 MB
+  connection window, on every address it listens on; a 1 MB render request at 1 ms of network latency uploads
+  in about 9 ms instead of 70-95 ms. A per-stream `initialWindowSize` in `fastifyServerOptions.http.settings`
+  (or `https.settings` for a TLS renderer) and a `connectionWindowSize` you set there still take precedence.
+  **Action required for upgraders:** a request stream the renderer stops reading early (for example an
+  async-props request it rejects) can now hold up to 1 MB of unread request data instead of 64 KB until the
+  client closes it; if renderer memory is tight, check its headroom or set a smaller `initialWindowSize`
+  in `fastifyServerOptions.http.settings`.
+  [PR 5359](https://github.com/shakacode/react_on_rails/pull/5359) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Uncached server renders no longer hash the render code**: Pro now computes the MD5
   request digest over `js_code` and its serialized props only when prerender caching needs it as a
   cache key. Uncached renders send the Node Renderer a cheap `Component-pid-counter` id in the same
