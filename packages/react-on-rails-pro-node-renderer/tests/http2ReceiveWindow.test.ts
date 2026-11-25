@@ -13,6 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import dns from 'dns';
 import http2 from 'http2';
 import type { Config } from '../src/shared/configBuilder';
 import {
@@ -91,4 +92,101 @@ test('keeps a per-stream window the user sets in fastifyServerOptions.http.setti
     expect(client.remoteSettings.initialWindowSize).toBe(userStreamWindowSize);
     expect(client.state.remoteWindowSize).toBe(HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE);
   });
+});
+
+test('leaves the connection window alone when the user configures connectionWindowSize', async () => {
+  // Node versions that support this option apply it themselves; the renderer must not override it.
+  const fastifyServerOptions = {
+    http: { connectionWindowSize: 2 * 1024 * 1024 },
+  } as unknown as Config['fastifyServerOptions'];
+
+  await withRendererClient(fastifyServerOptions, (client) => {
+    expect(client.remoteSettings.initialWindowSize).toBe(HTTP2_STREAM_RECEIVE_WINDOW_SIZE);
+    expect(client.state.remoteWindowSize).not.toBe(HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE);
+  });
+});
+
+test('applies the per-stream window to the TLS server when fastifyServerOptions.https is set', async () => {
+  const createSecureServer = jest.spyOn(http2, 'createSecureServer');
+  await resetForTest(testName);
+  const fastifyServerOptions = { https: { allowHTTP1: false } } as unknown as Config['fastifyServerOptions'];
+  const app = worker({
+    fastifyServerOptions,
+    password,
+    serverBundleCachePath: serverBundleCachePath(testName),
+    stubTimers: false,
+  });
+
+  try {
+    expect(createSecureServer).toHaveBeenCalledTimes(1);
+    expect(createSecureServer.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        allowHTTP1: false,
+        settings: expect.objectContaining({ initialWindowSize: HTTP2_STREAM_RECEIVE_WINDOW_SIZE }),
+      }),
+    );
+  } finally {
+    createSecureServer.mockRestore();
+    await app.close();
+    await resetForTest(testName);
+  }
+});
+
+test('raises the connection window on every address when localhost resolves to several', async () => {
+  // Many hosts files map localhost to both 127.0.0.1 and ::1. Fastify then serves the second address from
+  // a secondary server, whose sessions never reach app.server.
+  const originalLookup = dns.lookup;
+  const lookup = jest.spyOn(dns, 'lookup').mockImplementation(((
+    hostname: string,
+    options: unknown,
+    callback: (...args: unknown[]) => void,
+  ) => {
+    if (hostname === 'localhost' && typeof options === 'object' && options !== null && 'all' in options) {
+      process.nextTick(callback, null, [
+        { address: '127.0.0.1', family: 4 },
+        { address: '::1', family: 6 },
+      ]);
+      return;
+    }
+    (originalLookup as (...args: unknown[]) => void)(hostname, options, callback);
+  }) as unknown as typeof dns.lookup);
+
+  await resetForTest(testName);
+  const app = worker({
+    password,
+    serverBundleCachePath: serverBundleCachePath(testName),
+    stubTimers: false,
+  });
+
+  try {
+    await app.listen({ host: 'localhost', port: 0 });
+    const addresses = app.addresses();
+    expect(addresses.map(({ address }) => address).sort()).toEqual(['127.0.0.1', '::1']);
+
+    for (const { address, family, port } of addresses) {
+      const host = family === 'IPv6' ? `[${address}]` : address;
+      const client = http2.connect(`http://${host}:${port}`);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise<void>((resolve, reject) => {
+          const request = client.request({ ':path': '/not-a-renderer-route' });
+          request.on('response', () => request.resume());
+          request.on('end', () => resolve());
+          request.on('error', reject);
+          request.end();
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise<void>((resolve, reject) => {
+          client.ping((error) => (error ? reject(error) : resolve()));
+        });
+        expect(client.state.remoteWindowSize).toBe(HTTP2_CONNECTION_RECEIVE_WINDOW_SIZE);
+      } finally {
+        client.close();
+      }
+    }
+  } finally {
+    lookup.mockRestore();
+    await app.close();
+    await resetForTest(testName);
+  }
 });
