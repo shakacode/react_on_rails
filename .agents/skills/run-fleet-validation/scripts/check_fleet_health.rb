@@ -83,7 +83,7 @@ module FleetValidation
   module FleetHealthCLI
     module_function
 
-    def run(argv, http: nil)
+    def run(argv, http: nil, env: ENV)
       options = {
         manifest_path: "internal/contributor-info/demo-fleet.yml",
         observations_path: nil,
@@ -110,10 +110,11 @@ module FleetValidation
         policy_commit: options.fetch(:policy_commit),
         generated_at: options.fetch(:generated_at)
       )
-      observations, registry_artifacts = evidence_inputs(options, contract, http:)
-      evidence = contract.evaluate(observations:, registry_artifacts:)
+      observations, registry_artifacts, latest_stable_release = evidence_inputs(options, contract, http:, env:)
+      evidence = contract.evaluate(observations:, registry_artifacts:, latest_stable_release:)
       contract.write_pack(options.fetch(:output_dir), evidence)
       puts "Wrote public fleet health pack to #{options.fetch(:output_dir)}"
+      puts "Pin check: #{evidence.dig('pin', 'status')}"
       puts "Aggregate: #{evidence.dig('aggregate', 'status')}"
       0
     rescue TransientPublicRequestError => e
@@ -177,19 +178,25 @@ module FleetValidation
       YAML.safe_load_file(path, permitted_classes: [], permitted_symbols: [], aliases: false)
     end
 
-    def evidence_inputs(options, contract, http: nil)
+    def evidence_inputs(options, contract, http: nil, env: ENV)
       unless options[:live]
         return [
           load_yaml(options.fetch(:observations_path)),
-          load_yaml(options.fetch(:registry_artifacts_path))
+          load_yaml(options.fetch(:registry_artifacts_path)),
+          nil
         ]
       end
 
       http ||= PublicHTTPClient.new
-      registry = PublicRegistryResolver.new(fetcher: ->(url) { http.json(url) }).resolve(
+      resolver = PublicRegistryResolver.new(fetcher: ->(url) { http.json(url) })
+      registry = resolver.resolve(
         release: options.fetch(:release),
         rsc_version: options.fetch(:rsc_version)
       )
+      latest_stable_release = resolver.latest_stable_release
+      # Report a stale pin before probing demos, so a later network failure
+      # cannot hide it.
+      report_stale_pin(contract.pin_currency(latest_stable_release), env:)
       probe = PublicGitHubProbe.new(
         client: PublicGitHubClient.new(http:),
         max_default_age_days: contract.max_default_age_days
@@ -197,7 +204,16 @@ module FleetValidation
       observations = contract.targets.to_h do |target|
         [target.fetch("id"), probe.observe(target, observed_at: options.fetch(:generated_at))]
       end
-      [observations, registry]
+      [observations, registry, latest_stable_release]
+    end
+
+    # In GitHub Actions the ::error line becomes an annotation on the run page,
+    # which stays visible even though the scheduled check has other failures.
+    def report_stale_pin(pin, env:)
+      return unless pin.fetch("status") == "stale"
+
+      message = pin.fetch("message")
+      puts env["GITHUB_ACTIONS"] == "true" ? "::error title=Stale fleet health pin::#{message}" : "STALE PIN: #{message}"
     end
   end
 end

@@ -65,6 +65,13 @@ jobs:
             tmp/fleet-health/fleet-health.md
           if-no-files-found: error
 
+      - name: Publish standing-health summary
+        if: always()
+        run: |
+          if [[ -f tmp/fleet-health/fleet-health.md ]]; then
+            cat tmp/fleet-health/fleet-health.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Enforce active public target health
         if: always()
         run: |
