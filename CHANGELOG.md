@@ -67,10 +67,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Async props on the RSC payload endpoint**:
   `config.register_async_props("ComponentName", "ProviderClassName")` registers the provider that supplies a
   component's async props when the RSC payload endpoint renders it, so `RSCRoute.refetch()` works for
-  components that read `getReactOnRailsAsyncProp`. Previously the endpoint rendered every component
-  without async props, and such a refetch failed. When the provider needs controller context such as `current_user`, override
-  `rsc_payload_async_props_block_override` in the payload controller instead. The endpoint now also
-  returns HTTP 400 when `props` is a non-empty value that is not a string, such as bracket-notation
+  components that read `getReactOnRailsAsyncProp`. Previously the built-in endpoint template rendered
+  every component without async props, so such a refetch failed unless the app shadowed that template.
+  The provider is called as `.call(emit, props, controller)`. To build the async props in the payload
+  controller itself, override `rsc_payload_async_props_block_override`; it takes precedence over the
+  registry for the components it handles. The endpoint now also returns HTTP 400 when `props` is a non-empty value that is not a string, such as bracket-notation
   `props[key]=value` (previously HTTP 500), or is JSON that is not an object. Fixes
   [Issue 5075](https://github.com/shakacode/react_on_rails/issues/5075).
   [PR 5091](https://github.com/shakacode/react_on_rails/pull/5091) by
