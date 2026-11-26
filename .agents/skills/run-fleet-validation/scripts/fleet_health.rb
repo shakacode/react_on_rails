@@ -42,8 +42,7 @@ module FleetValidation
       gem_version = ProductVersion.normalize(release, "gem")
       npm_version = ProductVersion.normalize(release, "npm")
       gem_artifacts = PRODUCT_GEMS.map do |name|
-        versions = @fetcher.call("#{RUBYGEMS}/api/v1/versions/#{name}.json")
-        unless Array(versions).any? { |entry| entry["number"] == gem_version && entry["yanked"] != true }
+        unless Array(gem_versions(name)).any? { |entry| entry["number"] == gem_version && entry["yanked"] != true }
           raise ManifestError, "#{name} #{gem_version} is not a public non-yanked RubyGems artifact"
         end
 
@@ -66,10 +65,10 @@ module FleetValidation
     end
 
     # The newest non-yanked, non-prerelease react_on_rails on RubyGems. The
-    # standing-health pin should never be older than this release.
+    # standing-health pin should never be older than this release. It shares
+    # the release list that resolve verifies, so the list is fetched once.
     def latest_stable_release
-      versions = @fetcher.call(LATEST_STABLE_SOURCE)
-      stable = Array(versions).filter_map do |entry|
+      stable = Array(gem_versions("react_on_rails")).filter_map do |entry|
         number = entry["number"].to_s
         next if entry["yanked"] == true || !Gem::Version.correct?(number)
 
@@ -82,6 +81,11 @@ module FleetValidation
     end
 
     private
+
+    def gem_versions(name)
+      @gem_versions ||= {}
+      @gem_versions[name] ||= @fetcher.call("#{RUBYGEMS}/api/v1/versions/#{name}.json")
+    end
 
     def registry_artifact(ecosystem, name, version, source)
       {
@@ -595,6 +599,8 @@ module FleetValidation
   end
 
   class FleetHealth
+    # Version 2 added the required top-level pin section.
+    EVIDENCE_SCHEMA_VERSION = 2
     PRODUCT_PACKAGES = {
       "gem" => %w[react_on_rails react_on_rails_pro],
       "npm" => %w[
@@ -647,7 +653,7 @@ module FleetValidation
       aggregate_findings << "active_targets" unless blocking_targets.empty?
 
       {
-        "schema_version" => 1,
+        "schema_version" => EVIDENCE_SCHEMA_VERSION,
         "pack" => {
           "pack_id" => @pack_id,
           "release" => @release,
@@ -695,7 +701,7 @@ module FleetValidation
         "additionalProperties" => false,
         "required" => %w[schema_version pack registry pin targets aggregate],
         "properties" => {
-          "schema_version" => { "const" => 1 },
+          "schema_version" => { "const" => EVIDENCE_SCHEMA_VERSION },
           "pack" => object_schema(
             %w[pack_id release rsc_version policy_commit generated_at],
             {

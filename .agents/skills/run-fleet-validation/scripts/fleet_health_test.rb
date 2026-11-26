@@ -347,6 +347,8 @@ class FleetHealthTest < Minitest::Test
   def test_pin_is_not_checked_without_a_registry_release_list
     evidence = @contract.evaluate(observations: @observations, registry_artifacts: stable_registry_artifacts)
 
+    assert_equal 2, evidence.fetch("schema_version")
+    assert_equal 2, @contract.schema.dig("properties", "schema_version", "const")
     assert_equal "not_checked", evidence.dig("pin", "status")
     assert_nil evidence.dig("pin", "latest_stable_release")
     refute_includes evidence.dig("aggregate", "findings"), "stale_pin"
@@ -403,6 +405,8 @@ class FleetHealthTest < Minitest::Test
       evidence = JSON.parse(File.read(File.join(output_dir, "fleet-health.json")))
       assert_equal "v17.0.0", evidence.dig("pack", "release")
       assert_equal "19.2.1", evidence.dig("pack", "rsc_version")
+      assert_equal "not_checked", evidence.dig("pin", "status")
+      assert_includes File.read(File.join(output_dir, "fleet-health.md")), "Pin check: not checked"
     end
   end
 
@@ -474,6 +478,36 @@ class FleetHealthTest < Minitest::Test
       result, stdout = run.call(["--release", "v17.2.1"])
       assert_equal 1, result
       refute_includes stdout, "Stale fleet health pin"
+    end
+  end
+
+  def test_live_cli_annotates_a_stale_pin_before_a_registry_failure
+    Dir.mktmpdir do |directory|
+      manifest = Marshal.load(Marshal.dump(@manifest))
+      manifest.fetch("standing_health").merge!("stable_release" => "v17.0.0", "rsc_version" => "19.2.1")
+      manifest_path = File.join(directory, "manifest.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+      client = Object.new
+      client.define_singleton_method(:json) do |url|
+        next [] if url.end_with?("react_on_rails_pro.json")
+
+        [{ "number" => "17.0.0", "yanked" => false }, { "number" => "17.2.1", "yanked" => false }]
+      end
+      arguments = [
+        "--manifest", manifest_path,
+        "--live",
+        "--policy-commit", "e" * 40,
+        "--output-dir", File.join(directory, "pack")
+      ]
+      result = nil
+
+      stdout, stderr = capture_io do
+        result = FleetValidation::FleetHealthCLI.run(arguments, http: client, env: { "GITHUB_ACTIONS" => "true" })
+      end
+
+      assert_equal 1, result
+      assert_match(/^::error title=Stale fleet health pin::.*17\.2\.1/, stdout)
+      assert_includes stderr, "react_on_rails_pro 17.0.0 is not a public non-yanked RubyGems artifact"
     end
   end
 
@@ -811,6 +845,23 @@ class FleetHealthTest < Minitest::Test
 
     assert_equal "17.2.1", resolver.latest_stable_release
     assert_equal ["https://rubygems.org/api/v1/versions/react_on_rails.json"], requested
+  end
+
+  def test_public_registry_resolver_fetches_the_release_list_once
+    requested = []
+    resolver = FleetValidation::PublicRegistryResolver.new(fetcher: lambda do |url|
+      requested << url
+      if URI(url).host == "rubygems.org"
+        [{ "number" => "17.0.0", "yanked" => false }]
+      else
+        { "versions" => { "17.0.0" => {}, "19.2.1" => {} } }
+      end
+    end)
+
+    resolver.latest_stable_release
+    resolver.resolve(release: "v17.0.0", rsc_version: "19.2.1")
+
+    assert_equal 1, requested.count("https://rubygems.org/api/v1/versions/react_on_rails.json")
   end
 
   def test_public_registry_resolver_rejects_a_release_list_without_a_stable_release

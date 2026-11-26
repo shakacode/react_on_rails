@@ -65,7 +65,7 @@ Pass `--release` and/or `--rsc-version` only for an intentional manual override.
 A live run compares the release it checks with the newest non-yanked, non-prerelease
 `react_on_rails` on RubyGems. An older release yields a `stale_pin` aggregate finding, a
 `Pin check: **STALE**` line in `fleet-health.md`, and a GitHub Actions error annotation. The
-annotation prints before any demo is probed. `rsc_version` is never compared automatically because
+annotation prints before registry artifacts are verified or any demo is probed. `rsc_version` is never compared automatically because
 it is versioned independently; review it with `stable_release`. Offline evidence reports the pin
 as `not_checked`.
 The command verifies both `react_on_rails` gems and all four unified-version npm packages, plus the

@@ -189,14 +189,14 @@ module FleetValidation
 
       http ||= PublicHTTPClient.new
       resolver = PublicRegistryResolver.new(fetcher: ->(url) { http.json(url) })
+      # Report a stale pin before verifying artifacts or probing demos, so a
+      # later registry or demo failure cannot hide it.
+      latest_stable_release = resolver.latest_stable_release
+      report_stale_pin(contract.pin_currency(latest_stable_release), env:)
       registry = resolver.resolve(
         release: options.fetch(:release),
         rsc_version: options.fetch(:rsc_version)
       )
-      latest_stable_release = resolver.latest_stable_release
-      # Report a stale pin before probing demos, so a later network failure
-      # cannot hide it.
-      report_stale_pin(contract.pin_currency(latest_stable_release), env:)
       probe = PublicGitHubProbe.new(
         client: PublicGitHubClient.new(http:),
         max_default_age_days: contract.max_default_age_days
