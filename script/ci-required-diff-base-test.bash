@@ -365,9 +365,9 @@ run_push_case() {
   cp "$REPO/script/ci-changes-detector" "$CLONE/script/ci-changes-detector"
 
   # A push event has no base or head branch name. Clear the ones this gate
-  # inherits when it runs for a pull request: the diff-base helper deepens
-  # GITHUB_BASE_REF, and only `main` exists in this fixture, so a pull request
-  # into any other branch failed these cases.
+  # inherits when it runs for a pull request: the diff-base helper fetches
+  # GITHUB_BASE_REF and prefers GITHUB_HEAD_REF as the current branch, and the
+  # fixture repository does not have the real pull request's branches.
   : > "$WORKDIR/github-output.txt"
   LAST_OUTPUT="$(
     cd "$CLONE" || exit 1
