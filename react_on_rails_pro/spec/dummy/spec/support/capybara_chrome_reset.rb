@@ -22,6 +22,7 @@
 # When Chrome rejects the wildcard, clear every cookie and the localStorage of each origin
 # in the tab's history instead. Older Chrome still takes the original call.
 # Delete this file once the dummy app uses a Capybara release that fixes reset! on Chrome 158.
+# The OSS and Pro dummy apps each keep an identical copy of this patch; change both together.
 require "capybara/selenium/driver"
 
 if Gem::Version.new(Capybara::VERSION) <= Gem::Version.new("3.40.0")
@@ -30,11 +31,13 @@ if Gem::Version.new(Capybara::VERSION) <= Gem::Version.new("3.40.0")
 
     def execute_cdp(cmd, params = {})
       super
-    rescue Selenium::WebDriver::Error::InvalidArgumentError
-      raise unless cmd == "Storage.clearDataForOrigin" && params[:origin] == "*"
+    rescue Selenium::WebDriver::Error::InvalidArgumentError => e
+      raise unless cmd == "Storage.clearDataForOrigin" && params[:origin] == "*" &&
+                   e.message.include?("is not a valid URL")
 
-      super("Network.clearBrowserCookies")
-      return unless params[:storageTypes].to_s.split(",").include?("local_storage")
+      storage_types = params[:storageTypes].to_s.split(",")
+      super("Network.clearBrowserCookies") if storage_types.include?("cookies")
+      return unless storage_types.include?("local_storage")
 
       visited_origins.each do |origin|
         super("Storage.clearDataForOrigin", { origin:, storageTypes: "local_storage" })
