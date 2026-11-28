@@ -931,6 +931,83 @@ describe ReactOnRailsHelper do
     end
   end
 
+  describe "#server_render_js console history" do
+    let(:runtime_available) do
+      ExecJS.runtime&.available?
+    rescue ExecJS::RuntimeUnavailable
+      false
+    end
+
+    # One JS context with the gem's real console polyfill, standing in for a pooled ExecJS context.
+    # Runtimes such as mini_racer keep that context between requests; ExecJS's Node runtime starts a
+    # fresh process per call, so every generated call is evaluated inside a single ExecJS call here.
+    let(:shared_js_context) do
+      ExecJS.compile(<<~JS)
+        #{ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript.console_polyfill}
+        var ReactOnRails = {
+          handleError: function() { return ''; },
+          getConsoleReplayScript: function() {
+            return console.history.map(function(entry) { return entry.arguments.join(' '); }).join('\\n');
+          },
+          prepareRenderResult: function(html, consoleReplayScript, hasErrors) {
+            return JSON.stringify({ html: html, consoleReplayScript: consoleReplayScript, hasErrors: hasErrors });
+          }
+        };
+        function runInOneContext(generatedCodes) {
+          return generatedCodes.map(function(generatedCode) {
+            try {
+              return JSON.parse(eval(generatedCode));
+            } catch (e) {
+              return { thrown: String(e) };
+            }
+          });
+        }
+      JS
+    end
+
+    before do
+      skip "ExecJS runtime not available" unless runtime_available
+    end
+
+    def generated_server_render_js_code
+      generated_codes = []
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
+          generated_codes << js_code
+          { "html" => "", "consoleReplayScript" => "", "hasErrors" => false }
+        end
+      yield
+      generated_codes
+    end
+
+    it "does not replay an earlier call's console output in a later call" do
+      generated_codes = generated_server_render_js_code do
+        server_render_js('(function() { console.log("first call"); return "a"; })()')
+        server_render_js('"b"')
+      end
+
+      first_result, second_result = shared_js_context.call("runInOneContext", generated_codes)
+
+      expect(first_result["consoleReplayScript"]).to eq("[SERVER] first call")
+      expect(second_result["consoleReplayScript"]).to eq("")
+    end
+
+    it "clears console output when the expression throws, with or without throw_js_errors" do
+      generated_codes = generated_server_render_js_code do
+        server_render_js('(function() { console.log("handled throw"); throw new Error("boom"); })()')
+        server_render_js('(function() { console.log("rethrown"); throw new Error("boom"); })()',
+                         throw_js_errors: true)
+        server_render_js('"c"')
+      end
+
+      handled_result, rethrown_result, later_result = shared_js_context.call("runInOneContext", generated_codes)
+
+      expect(handled_result).to include("hasErrors" => true, "consoleReplayScript" => "[SERVER] handled throw")
+      expect(rethrown_result["thrown"]).to include("boom")
+      expect(later_result["consoleReplayScript"]).to eq("")
+    end
+  end
+
   describe "#server_render_js error serialization" do
     let(:runtime_available) do
       ExecJS.runtime&.available?

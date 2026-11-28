@@ -274,45 +274,54 @@ module ReactOnRails
 
       js_code = <<~JS
         (function() {
-          var htmlResult = '';
-          var hasErrors = false;
-          var renderingError = null;
-          var renderingErrorObject = null;
-
           try {
-            htmlResult =
-              (function() {
-                return #{js_expression};
-              })();
-          } catch(e) {
-            renderingError = e;
-            if (#{render_options.throw_js_errors}) {
-              throw e;
-            }
-            htmlResult = ReactOnRails.handleError({e: e, name: null,
-              jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
-            hasErrors = true;
-            var errorMessage = String(renderingError);
-            var errorStack = null;
-            // Guard against non-Error throws (e.g., throw null / throw "string").
-            // Boxed primitives (for example new Boolean(false)) are objects too.
-            if (renderingError && typeof renderingError === 'object') {
-              if ('message' in renderingError) {
-                errorMessage = String(renderingError.message);
-              }
-              // Use != (not !==) to guard both null and undefined stack values.
-              if ('stack' in renderingError && renderingError.stack != null) {
-                errorStack = String(renderingError.stack);
-              }
-            }
-            renderingErrorObject = {
-              message: errorMessage,
-              stack: errorStack,
-            };
-          }
+            var htmlResult = '';
+            var hasErrors = false;
+            var renderingError = null;
+            var renderingErrorObject = null;
 
-          var consoleReplayScript = ReactOnRails.getConsoleReplayScript();
-          return ReactOnRails.prepareRenderResult(htmlResult, consoleReplayScript, hasErrors, renderingErrorObject);
+            try {
+              htmlResult =
+                (function() {
+                  return #{js_expression};
+                })();
+            } catch(e) {
+              renderingError = e;
+              if (#{render_options.throw_js_errors}) {
+                throw e;
+              }
+              htmlResult = ReactOnRails.handleError({e: e, name: null,
+                jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
+              hasErrors = true;
+              var errorMessage = String(renderingError);
+              var errorStack = null;
+              // Guard against non-Error throws (e.g., throw null / throw "string").
+              // Boxed primitives (for example new Boolean(false)) are objects too.
+              if (renderingError && typeof renderingError === 'object') {
+                if ('message' in renderingError) {
+                  errorMessage = String(renderingError.message);
+                }
+                // Use != (not !==) to guard both null and undefined stack values.
+                if ('stack' in renderingError && renderingError.stack != null) {
+                  errorStack = String(renderingError.stack);
+                }
+              }
+              renderingErrorObject = {
+                message: errorMessage,
+                stack: errorStack,
+              };
+            }
+
+            var consoleReplayScript = ReactOnRails.getConsoleReplayScript();
+            return ReactOnRails.prepareRenderResult(htmlResult, consoleReplayScript, hasErrors, renderingErrorObject);
+          } finally {
+            // A pooled JS context (for example mini_racer) keeps console.history between calls, so
+            // clear it or the next call replays this call's console output, as serverRenderReactComponent
+            // does after each render. The typeof check covers bare contexts without the console polyfill.
+            if (typeof console !== 'undefined') {
+              console.history = [];
+            }
+          }
         })()
       JS
 
