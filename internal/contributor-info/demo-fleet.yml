@@ -55,8 +55,8 @@ standing_health:
   # are queried. Do not list archived GitHub repositories here; they are not
   # mutation or health lanes.
   schema_version: 1
-  stable_release: v17.0.0
-  rsc_version: 19.2.1
+  stable_release: v17.2.1
+  rsc_version: 19.3.2
   max_minor_lag: 1
   max_default_age_days: 45
   dependabot_policy: v1
