@@ -106,6 +106,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`server_render_js` renders error HTML when the expression throws `null`, `undefined`, or another primitive**:
+  With the default `throw_js_errors: false`, an expression that threw `null` or `undefined` crashed
+  `ReactOnRails.handleError` with `TypeError: Cannot read properties of null (reading 'fileName')`, so Rails raised
+  instead of rendering the error HTML. Thrown strings and numbers rendered `Message: undefined`. `handleError` now wraps
+  thrown primitives in an `Error`, so the error HTML shows the thrown value. Thrown objects render as before.
+  [PR 5358](https://github.com/shakacode/react_on_rails/pull/5358) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** TanStack Router loader errors now hydrate consistently after JSON transport. Production SSR and hydration use a generic error message, omitting private error details. Development preserves names, messages, and stacks, and warns about non-JSON loader data such as Date values.
   [PR 5340](https://github.com/shakacode/react_on_rails/pull/5340) by [justin808](https://github.com/justin808).
 

@@ -1214,6 +1214,20 @@ describe ReactOnRailsHelper do
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
     it { is_expected.to eq hello_world }
+
+    it "renders the real error HTML when the expression throws a non-Error value" do
+      {
+        "null" => "null",
+        "undefined" => "undefined",
+        "'plain string failure'" => "plain string failure",
+        "{ message: 'object failure' }" => "object failure"
+      }.each do |thrown_value, expected_message|
+        result = server_render_js("(function() { throw #{thrown_value}; })()")
+
+        expect(result).to match(/<pre>Exception in rendering!\s+Message: #{Regexp.escape(expected_message)}\s/),
+                          "expected error HTML for `throw #{thrown_value}`, got: #{result}"
+      end
+    end
   end
 
   describe "#rails_context" do
