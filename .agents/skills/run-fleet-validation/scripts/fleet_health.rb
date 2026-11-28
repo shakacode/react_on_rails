@@ -32,6 +32,7 @@ module FleetValidation
       create-react-on-rails-app
     ].freeze
     RSC_NPM = "react-on-rails-rsc"
+    LATEST_STABLE_SOURCE = "#{RUBYGEMS}/api/v1/versions/react_on_rails.json".freeze
 
     def initialize(fetcher:)
       @fetcher = fetcher
@@ -41,8 +42,7 @@ module FleetValidation
       gem_version = ProductVersion.normalize(release, "gem")
       npm_version = ProductVersion.normalize(release, "npm")
       gem_artifacts = PRODUCT_GEMS.map do |name|
-        versions = @fetcher.call("#{RUBYGEMS}/api/v1/versions/#{name}.json")
-        unless Array(versions).any? { |entry| entry["number"] == gem_version && entry["yanked"] != true }
+        unless Array(gem_versions(name)).any? { |entry| entry["number"] == gem_version && entry["yanked"] != true }
           raise ManifestError, "#{name} #{gem_version} is not a public non-yanked RubyGems artifact"
         end
 
@@ -64,7 +64,28 @@ module FleetValidation
       gem_artifacts + npm_artifacts + [registry_artifact("npm", RSC_NPM, rsc_version, NPM)]
     end
 
+    # The newest non-yanked, non-prerelease react_on_rails on RubyGems. The
+    # standing-health pin should never be older than this release. It shares
+    # the release list that resolve verifies, so the list is fetched once.
+    def latest_stable_release
+      stable = Array(gem_versions("react_on_rails")).filter_map do |entry|
+        number = entry["number"].to_s
+        next if entry["yanked"] == true || !Gem::Version.correct?(number)
+
+        version = Gem::Version.new(number)
+        version unless version.prerelease?
+      end
+      raise ManifestError, "react_on_rails has no public non-yanked stable RubyGems release" if stable.empty?
+
+      stable.max.to_s
+    end
+
     private
+
+    def gem_versions(name)
+      @gem_versions ||= {}
+      @gem_versions[name] ||= @fetcher.call("#{RUBYGEMS}/api/v1/versions/#{name}.json")
+    end
 
     def registry_artifact(ecosystem, name, version, source)
       {
@@ -578,6 +599,8 @@ module FleetValidation
   end
 
   class FleetHealth
+    # Version 2 added the required top-level pin section.
+    EVIDENCE_SCHEMA_VERSION = 2
     PRODUCT_PACKAGES = {
       "gem" => %w[react_on_rails react_on_rails_pro],
       "npm" => %w[
@@ -613,8 +636,11 @@ module FleetValidation
       @targets = build_targets
     end
 
-    def evaluate(observations:, registry_artifacts:)
+    # latest_stable_release comes from the live RubyGems release list. Offline
+    # evidence has no such list, so the pin is reported as not_checked.
+    def evaluate(observations:, registry_artifacts:, latest_stable_release: nil)
       registry = evaluate_registry(registry_artifacts)
+      pin = pin_currency(latest_stable_release)
       evaluated_targets = targets.map do |target|
         evaluate_target(target, observations.fetch(target.fetch("id"), {}))
       end
@@ -623,10 +649,11 @@ module FleetValidation
       end
       aggregate_findings = []
       aggregate_findings << "registry" unless registry.fetch("status") == "passed"
+      aggregate_findings << "stale_pin" if pin.fetch("status") == "stale"
       aggregate_findings << "active_targets" unless blocking_targets.empty?
 
       {
-        "schema_version" => 1,
+        "schema_version" => EVIDENCE_SCHEMA_VERSION,
         "pack" => {
           "pack_id" => @pack_id,
           "release" => @release,
@@ -635,6 +662,7 @@ module FleetValidation
           "generated_at" => @generated_at
         },
         "registry" => registry,
+        "pin" => pin,
         "targets" => evaluated_targets,
         "aggregate" => {
           "status" => aggregate_findings.empty? ? "passed" : "blocked",
@@ -644,15 +672,36 @@ module FleetValidation
       }
     end
 
+    # Compares the release under check with the newest stable react_on_rails.
+    # rsc_version is versioned independently, so it is only named in the
+    # message for review alongside stable_release, never compared.
+    def pin_currency(latest_stable_release)
+      release = normalized_release("gem")
+      status = if latest_stable_release.nil?
+                 "not_checked"
+               elsif parse_version(release, "release") < parse_version(latest_stable_release, "latest stable release")
+                 "stale"
+               else
+                 "current"
+               end
+      {
+        "status" => status,
+        "release" => release,
+        "latest_stable_release" => latest_stable_release,
+        "source" => latest_stable_release && PublicRegistryResolver::LATEST_STABLE_SOURCE,
+        "message" => status == "stale" ? stale_pin_message(release, latest_stable_release) : nil
+      }
+    end
+
     def schema
       {
         "$schema" => "https://json-schema.org/draft/2020-12/schema",
         "title" => "React on Rails public demo fleet standing-health evidence",
         "type" => "object",
         "additionalProperties" => false,
-        "required" => %w[schema_version pack registry targets aggregate],
+        "required" => %w[schema_version pack registry pin targets aggregate],
         "properties" => {
-          "schema_version" => { "const" => 1 },
+          "schema_version" => { "const" => EVIDENCE_SCHEMA_VERSION },
           "pack" => object_schema(
             %w[pack_id release rsc_version policy_commit generated_at],
             {
@@ -673,6 +722,16 @@ module FleetValidation
                 "items" => registry_artifact_schema
               },
               "findings" => string_array
+            }
+          ),
+          "pin" => object_schema(
+            %w[status release latest_stable_release source message],
+            {
+              "status" => { "enum" => %w[current stale not_checked] },
+              "release" => nonempty_string,
+              "latest_stable_release" => nullable_string,
+              "source" => nullable_string,
+              "message" => nullable_string
             }
           ),
           "targets" => { "type" => "array", "items" => target_schema },
@@ -914,6 +973,18 @@ module FleetValidation
       ProductVersion.normalize(@release, ecosystem)
     end
 
+    def parse_version(value, label)
+      raise ManifestError, "#{label} #{value.inspect} is not a valid version" unless Gem::Version.correct?(value)
+
+      Gem::Version.new(value)
+    end
+
+    def stale_pin_message(release, latest_stable_release)
+      "Checked release #{release} is older than the newest stable react_on_rails #{latest_stable_release} " \
+        "on RubyGems. Update standing_health.stable_release in internal/contributor-info/demo-fleet.yml " \
+        "and review standing_health.rsc_version with it."
+    end
+
     def normalize_evidence_status(value)
       value = {} unless value.is_a?(Hash)
       status = value["status"]
@@ -977,11 +1048,22 @@ module FleetValidation
         Release: `#{escape(evidence.dig('pack', 'release'))}`
         RSC: `#{escape(evidence.dig('pack', 'rsc_version'))}`
         Aggregate: **#{escape(evidence.dig('aggregate', 'status').upcase)}**
+        #{render_pin_summary(evidence.fetch('pin'))}
 
         | Target | Disposition | GitHub archived | Status | Findings |
         | --- | --- | --- | --- | --- |
         #{rows.join("\n")}
       MARKDOWN
+    end
+
+    def render_pin_summary(pin)
+      status = pin.fetch("status")
+      return "Pin check: not checked (offline evidence has no RubyGems release list)" if status == "not_checked"
+
+      latest = "newest stable react_on_rails on RubyGems is `#{escape(pin.fetch('latest_stable_release'))}`"
+      return "Pin check: **CURRENT** (#{latest})" if status == "current"
+
+      "Pin check: **STALE** (#{latest}). #{escape(pin.fetch('message'))}"
     end
 
     def target_schema

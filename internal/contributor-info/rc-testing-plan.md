@@ -151,7 +151,9 @@ bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.
 
 The scheduled/default stable versions come from `standing_health.stable_release` and
 `standing_health.rsc_version` in the manifest. Pass explicit version flags only for a manual
-historical or forward-looking probe.
+historical or forward-looking probe. A live run reports a `stale_pin` finding whenever the checked
+release is older than the newest stable `react_on_rails` on RubyGems, so a historical probe
+reports it too.
 Only explicitly public standing-health entries are queried. Active public targets gate the
 standing-health result; soft-track targets are report-only. The evidence records
 exact-default-head currency, CI, reusable-smoke adoption, review-app capability, staleness, and

@@ -221,8 +221,14 @@ also dependencies, not substitutes: they shorten individual gates but do not own
 identities, combined audit, merge authority, or promotion closeout.
 
 After stable publication, update `standing_health.stable_release` and `standing_health.rsc_version`
-in `demo-fleet.yml` and commit that manifest change. Generate evidence only from a clean working
-tree so the policy commit names the exact checked-in manifest:
+in `demo-fleet.yml` and commit that manifest change. The live check reads the newest non-yanked,
+non-prerelease `react_on_rails` on RubyGems. When the checked release is older, it reports a
+`stale_pin` aggregate finding and a `Pin check: **STALE**` line in `fleet-health.md`. In GitHub
+Actions it also adds a run-page error annotation. So a skipped update shows on the next weekly run
+instead of hiding behind per-demo `currency` blocks. `rsc_version` is versioned independently and is
+never compared automatically; review it whenever you bump `stable_release`. Offline evidence reports
+the pin as `not_checked`. Generate evidence only from a clean working tree so the policy commit names
+the exact checked-in manifest:
 
 ```bash
 test -z "$(git status --porcelain)" || {

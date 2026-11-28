@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-bundle
         with:
@@ -64,6 +66,13 @@ jobs:
             tmp/fleet-health/fleet-health.schema.json
             tmp/fleet-health/fleet-health.md
           if-no-files-found: error
+
+      - name: Publish standing-health summary
+        if: always()
+        run: |
+          if [[ -f tmp/fleet-health/fleet-health.md ]]; then
+            cat tmp/fleet-health/fleet-health.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Enforce active public target health
         if: always()
