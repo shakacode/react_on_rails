@@ -150,9 +150,22 @@ type ServerRenderHashRenderedHtml = {
   [key: string]: string;
 };
 
+/**
+ * Optional HTTP response information that a render function can return from server rendering.
+ * Rails applies it to the page response: the status code and, for a redirect, the Location header.
+ * See the `apply_http_response` option of the `react_component` view helper.
+ */
+interface ServerRenderHttpResponse {
+  /** HTTP status code. Use 301, 302, 303, 307 or 308 together with `location`. Use 400-599 without it. */
+  status: number;
+  /** Redirect target. Must be a path on the same site, for example "/login". */
+  location?: string;
+}
+
 interface ServerRenderResult {
   renderedHtml?: string | ServerRenderHashRenderedHtml | ReactElement;
   clientProps?: Record<string, unknown>;
+  httpResponse?: ServerRenderHttpResponse;
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
@@ -337,6 +350,7 @@ export type {
   StoreGenerator,
   CreateReactOutputResult,
   ServerRenderResult,
+  ServerRenderHttpResponse,
   ServerRenderHashRenderedHtml,
   CreateReactOutputSyncResult,
   CreateReactOutputAsyncResult,
@@ -417,6 +431,7 @@ export type FinalHtmlResult = string | ServerRenderHashRenderedHtml;
 export interface RenderResult {
   html: FinalHtmlResult | null;
   clientProps?: Record<string, unknown>;
+  httpResponse?: ServerRenderHttpResponse;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
@@ -763,6 +778,7 @@ export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | Server
 export type RenderState = {
   result: null | RenderStateHtml;
   clientProps?: Record<string, unknown>;
+  httpResponse?: ServerRenderHttpResponse;
   hasErrors: boolean;
   error?: RenderingError;
 };

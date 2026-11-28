@@ -44,6 +44,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  redirect,
 } from '@tanstack/react-router';
 import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
@@ -144,7 +145,17 @@ const serverDataRoute = createRoute({
   path: '/tanstack_starter/server_data',
   component: ServerDataPage,
 });
-const routeTree = rootRoute.addChildren([homeRoute, aboutRoute, serverDataRoute]);
+// Demonstrates a redirect thrown by route code. On a full page load, Rails answers with
+// HTTP 307 and a Location header (see spec/requests/tanstack_starter_http_response_spec.rb).
+// On a client-side navigation, TanStack Router follows the redirect in the browser.
+const oldAboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tanstack_starter/old_about',
+  beforeLoad: () => {
+    throw redirect({ to: '/tanstack_starter/about' });
+  },
+});
+const routeTree = rootRoute.addChildren([homeRoute, aboutRoute, serverDataRoute, oldAboutRoute]);
 
 const TanStackStarterApp = createTanStackRouterRenderFunction(
   {

@@ -18,11 +18,12 @@ import type {
   DehydratedRouterState,
   TanStackHistory,
   TanStackRouter,
+  TanStackRouterRedirect,
   TanStackSsrMatch,
   TanStackSsrRouterState,
   TanStackRouterOptions,
 } from './types.ts';
-import type { RailsContext } from 'react-on-rails/types';
+import type { RailsContext, ServerRenderHttpResponse } from 'react-on-rails/types';
 import { createHydrationError, normalizeSearch } from './utils.ts';
 
 /**
@@ -194,6 +195,108 @@ function buildSsrRouterState(router: TanStackRouter): TanStackSsrRouterState {
 export interface TanStackServerRenderResult {
   appElement: ReactElement;
   dehydratedState: DehydratedRouterState;
+  /**
+   * Present only when the router did not finish with a normal page:
+   * a redirect thrown by route code, a not-found (404), or a loader error (500).
+   */
+  httpResponse?: ServerRenderHttpResponse;
+}
+
+type CreateMemoryHistory = (opts: { initialEntries: string[] }) => TanStackHistory;
+
+interface RouterLoadResult {
+  router: TanStackRouter;
+  /**
+   * true:  TanStack Router emitted `onBeforeLoad`. The URL passed the router's own URL check,
+   *        so route code (beforeLoad / loader) was allowed to run.
+   * false: the router stopped before it ran any route code.
+   * null:  this router has no `subscribe` method, so we cannot tell.
+   */
+  routeCodeRan: boolean | null;
+}
+
+/**
+ * Creates a fresh router, points it at `url` and loads it once.
+ * A fresh router per load is required: a router keeps state from its previous load.
+ */
+async function loadRouterAt(
+  options: TanStackRouterOptions,
+  createMemoryHistory: CreateMemoryHistory,
+  url: string,
+): Promise<RouterLoadResult> {
+  const router = options.createRouter();
+  router.update({ history: createMemoryHistory({ initialEntries: [url] }) });
+
+  if (typeof router.subscribe !== 'function') {
+    await router.load();
+    return { router, routeCodeRan: null };
+  }
+
+  let routeCodeRan = false;
+  const unsubscribe = router.subscribe('onBeforeLoad', () => {
+    routeCodeRan = true;
+  });
+  try {
+    // Async path uses router.load() public API, so no private store access is needed.
+    // No router.ssr flag is set here: React effects (including Transitioner's auto-load)
+    // do not execute during server-side renderToString.
+    await router.load();
+  } finally {
+    if (typeof unsubscribe === 'function') {
+      unsubscribe();
+    }
+  }
+  return { router, routeCodeRan };
+}
+
+interface RouterRedirect {
+  status: number;
+  location: string;
+}
+
+function toRouterRedirect(rawRedirect: TanStackRouterRedirect | undefined): RouterRedirect | null {
+  if (!rawRedirect) {
+    return null;
+  }
+
+  const location = rawRedirect.headers?.get('Location') ?? rawRedirect.options?.href;
+  if (typeof location !== 'string' || location === '' || typeof rawRedirect.status !== 'number') {
+    return null;
+  }
+  return { status: rawRedirect.status, location };
+}
+
+interface RouterLoadOutcome {
+  /** The redirect the router ended with, or null. */
+  redirect: RouterRedirect | null;
+  /** The HTTP status the router chose for the rendered page (200, 404, 500), when known. */
+  statusCode: number | undefined;
+}
+
+/**
+ * Reads what TanStack Router decided during the server-side load.
+ * Where the router keeps this information depends on its version:
+ *   - 1.139.0 to 1.170.0: `router.state.redirect` and `router.state.statusCode`
+ *   - 1.170.46: the private field `router._serverResult`
+ * Both places are read, so one build of this package works with both.
+ */
+function readLoadOutcome(router: TanStackRouter): RouterLoadOutcome {
+  // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
+  const serverResult = router._serverResult;
+  const rawRedirect =
+    router.state.redirect ?? (serverResult?.type === 'redirect' ? serverResult.redirect : undefined);
+  const statusCode =
+    router.state.statusCode ?? (serverResult?.type === 'render' ? serverResult.status : undefined);
+
+  return { redirect: toRouterRedirect(rawRedirect), statusCode };
+}
+
+/**
+ * True for a path on the same site ("/about"). False for "https://other.com/x", and for
+ * "//other.com/x" and "/\other.com/x", which browsers read as another website.
+ */
+function isLocalPath(location: string): boolean {
+  return location.startsWith('/') && !location.startsWith('//') && !location.startsWith('/\\');
 }
 
 /**
@@ -207,20 +310,37 @@ export async function serverRenderTanStackAppAsync(
   props: Record<string, unknown>,
   railsContext: RailsContext & { serverSide: true },
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
-  createMemoryHistory: (opts: { initialEntries: string[] }) => TanStackHistory,
+  createMemoryHistory: CreateMemoryHistory,
 ): Promise<TanStackServerRenderResult> {
-  const router = options.createRouter();
-  const url = railsContext.pathname + normalizeSearch(railsContext.search);
+  const requestedUrl = railsContext.pathname + normalizeSearch(railsContext.search);
 
-  const memoryHistory = createMemoryHistory({ initialEntries: [url] });
-  router.update({ history: memoryHistory });
+  let url = requestedUrl;
+  let { router, routeCodeRan } = await loadRouterAt(options, createMemoryHistory, url);
+  let { redirect, statusCode } = readLoadOutcome(router);
 
-  // Async path uses router.load() public API, so no private store access is needed.
-  // No router.ssr flag is set here: React effects (including Transitioner's auto-load)
-  // do not execute during server-side renderToString.
-  await router.load();
+  // URL normalization. On the server, TanStack Router compares the requested URL with its own
+  // normalized form (no trailing slash, its own query-string encoding). When they differ, it
+  // stores a redirect BEFORE it runs any route code. We do not send that redirect to the browser.
+  // We render the normalized URL in place: one more load, never more than one.
+  if (redirect && routeCodeRan === false && isLocalPath(redirect.location)) {
+    url = redirect.location;
+    ({ router, routeCodeRan } = await loadRouterAt(options, createMemoryHistory, url));
+    ({ redirect, statusCode } = readLoadOutcome(router));
+  }
+
+  let httpResponse: ServerRenderHttpResponse | undefined;
+  if (redirect) {
+    // Report a redirect only when we know that route code asked for it.
+    // In every other case keep the old behavior: empty HTML, and the browser follows the redirect.
+    if (routeCodeRan === true) {
+      httpResponse = { status: redirect.status, location: redirect.location };
+    }
+  } else if (typeof statusCode === 'number' && statusCode >= 400 && statusCode <= 599) {
+    httpResponse = { status: statusCode };
+  }
 
   // Sanitize before both rendering and dehydration so the initial HTML and props agree.
+  // `router` is the router that will render: after URL normalization it is the second one.
   sanitizeProductionErrors(router);
 
   // TanStack Router has no router.dehydrate() method; external state (for example a
@@ -230,6 +350,8 @@ export async function serverRenderTanStackAppAsync(
 
   const dehydratedState: DehydratedRouterState = {
     url,
+    // Only when the router normalized the URL: the client uses it to align the browser path.
+    ...(url !== requestedUrl ? { requestedUrl } : {}),
     dehydratedRouter: dehydratedData === undefined ? null : { dehydratedData },
     // Keep ssrRouter payload for compatibility and to restore server match data
     // before first client render.
@@ -239,5 +361,6 @@ export async function serverRenderTanStackAppAsync(
   return {
     appElement: buildAppElement(router, RouterProvider, options.AppWrapper, props),
     dehydratedState,
+    ...(httpResponse ? { httpResponse } : {}),
   };
 }

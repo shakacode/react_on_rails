@@ -118,11 +118,13 @@ export function createTanStackRouterRenderFunction(
         railsContext as RailsContext & { serverSide: true },
         RouterProvider,
         createMemoryHistory,
-      ).then(({ appElement, dehydratedState }) => ({
+      ).then(({ appElement, dehydratedState, httpResponse }) => ({
         renderedHtml: appElement,
         clientProps: {
           __tanstackRouterDehydratedState: dehydratedState,
         },
+        // Only present for a redirect, a not-found (404) or a loader error (500).
+        ...(httpResponse ? { httpResponse } : {}),
       }));
     }
 

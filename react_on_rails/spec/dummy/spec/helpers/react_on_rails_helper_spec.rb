@@ -609,6 +609,64 @@ describe ReactOnRailsHelper do
       end
     end
 
+    context "when server rendering returns httpResponse" do
+      def stub_server_render(http_response)
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => "<div>SSR App</div>",
+          "consoleReplayScript" => "",
+          "httpResponse" => http_response
+        )
+        allow(ReactOnRails::ServerRenderingJsCode).to receive(:js_code_renderer)
+          .and_return(ReactOnRails::ServerRenderingJsCode)
+      end
+
+      it "sets the response status and still returns the rendered HTML" do
+        stub_server_render({ "status" => 404 })
+
+        result = react_component("App", props:, prerender: true)
+
+        expect(controller.response.status).to eq(404)
+        expect(result).to include('<div id="App-react-component"><div>SSR App</div></div>')
+      end
+
+      it "sets the status and the Location header for a redirect" do
+        stub_server_render({ "status" => 307, "location" => "/login" })
+
+        react_component("App", props:, prerender: true)
+
+        expect(controller.response.status).to eq(307)
+        expect(controller.response.location).to eq("/login")
+      end
+
+      it "keeps the status that the controller already chose" do
+        controller.response.status = 403
+        stub_server_render({ "status" => 404 })
+
+        react_component("App", props:, prerender: true)
+
+        expect(controller.response.status).to eq(403)
+      end
+
+      it "does nothing when apply_http_response is false" do
+        stub_server_render({ "status" => 404 })
+
+        result = react_component("App", props:, prerender: true, apply_http_response: false)
+
+        expect(controller.response.status).to eq(200)
+        expect(result).not_to include("apply_http_response")
+      end
+
+      it "does not raise when the helper runs without a controller" do
+        plain_helper = PlainReactOnRailsHelper.new
+        render_options = ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: "App", options: {})
+
+        expect do
+          plain_helper.send(:apply_server_render_http_response, render_options,
+                            { "httpResponse" => { "status" => 404 } })
+        end.not_to raise_error
+      end
+    end
+
     describe "API with component name only (no props or other options)" do
       subject(:react_app) { react_component("App") }
 

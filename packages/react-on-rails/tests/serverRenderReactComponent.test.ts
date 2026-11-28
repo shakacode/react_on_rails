@@ -189,6 +189,51 @@ describe('serverRenderReactComponent', () => {
     expect(hasErrors).toBeFalsy();
   });
 
+  it('passes httpResponse from serverRenderHash to the final render result', () => {
+    const X3HttpResponse: RenderFunction = () => ({
+      renderedHtml: React.createElement('div', null, 'Page not found'),
+      httpResponse: { status: 404 },
+    });
+    X3HttpResponse.renderFunction = true;
+
+    ComponentRegistry.register({ X3HttpResponse });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X3HttpResponse',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: false,
+    });
+    assertIsString(renderResult);
+    const { html, hasErrors, httpResponse } = parseLengthPrefixed(renderResult);
+
+    expect(html).toEqual('<div>Page not found</div>');
+    expect(httpResponse).toEqual({ status: 404 });
+    expect(hasErrors).toBeFalsy();
+  });
+
+  it('does not add an httpResponse key when the render function returns none', () => {
+    const X3NoHttpResponse: RenderFunction = () => ({
+      renderedHtml: React.createElement('div', null, 'Normal page'),
+    });
+    X3NoHttpResponse.renderFunction = true;
+
+    ComponentRegistry.register({ X3NoHttpResponse });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X3NoHttpResponse',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: false,
+    });
+    assertIsString(renderResult);
+
+    // The metadata JSON for a normal page must stay exactly as it was before this feature.
+    expect(renderResult).not.toContain('httpResponse');
+  });
+
   it("doesn't render object without renderedHtml property", () => {
     const X4 = (): { foo: string } => ({
       foo: 'bar',
@@ -314,6 +359,30 @@ describe('serverRenderReactComponent', () => {
     expect(result.clientProps).toEqual({
       __tanstackRouterDehydratedState: { url: '/products?category=tools' },
     });
+  });
+
+  it('serverRenderReactComponent processes async serverRenderHash with httpResponse', async () => {
+    const X6WithHttpResponse = (() =>
+      Promise.resolve({
+        renderedHtml: '',
+        httpResponse: { status: 307, location: '/login' },
+      })) as RenderFunction;
+    X6WithHttpResponse.renderFunction = true;
+
+    ComponentRegistry.register({ X6WithHttpResponse });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X6WithHttpResponse',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: true,
+    });
+    assertIsPromise(renderResult);
+    const result = parseLengthPrefixed(await renderResult);
+    expect(result.html).toEqual('');
+    expect(result.httpResponse).toEqual({ status: 307, location: '/login' });
+    expect(result.hasErrors).toBeFalsy();
   });
 
   // Because the object returned by the async render function is returned as it is,

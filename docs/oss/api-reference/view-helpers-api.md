@@ -22,10 +22,11 @@ Uncommonly used options:
   trace: nil,
   replay_console: nil,
   raise_on_prerender_error: nil,
+  apply_http_response: true,
   id: nil,
 ```
 
-- **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps?, redirectLocation?, routeError? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
+- **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps?, httpResponse?, redirectLocation?, routeError? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
 
   > If your render function returns a hash with multiple HTML strings (e.g., `{ renderedHtml: { componentHtml, title, metaTags } }`), `react_component` raises a `ReactOnRails::Error` telling you to use [`react_component_hash`](#react_component_hash) instead. `react_component` is for rendering a single HTML result; `react_component_hash` is for rendering multiple HTML strings to place in different parts of the page.
 
@@ -46,6 +47,7 @@ Uncommonly used options:
   - **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   - **raise_on_prerender_error:** Default is `Rails.env.development?` (true in development, false in production). True will throw an error on server-side rendering. Your controller will have to handle the error.
+  - **apply_http_response:** Default is true. When the server render result includes `httpResponse` (an HTTP status, or a redirect with a `location`), React on Rails applies it to the Rails response. Pass `false` to ignore it. See [TanStack Router: HTTP Status and Redirects](../building-features/tanstack-router.md#http-status-and-redirects).
   - **`clientProps` merge behavior:** If a prerender result includes `clientProps`, React on Rails merges them into the generated client hydration props payload (`props.merge(clientProps)`). The original `props:` value must be a Ruby Hash or a JSON string representing an object.
 
 ---

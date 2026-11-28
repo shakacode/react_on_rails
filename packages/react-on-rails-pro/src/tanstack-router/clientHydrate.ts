@@ -279,6 +279,30 @@ function applyDehydratedMatchData(
   });
 }
 
+/**
+ * When TanStack Router normalized the requested URL on the server, the server HTML shows the
+ * normalized location. Examples: `/about/` rendered as `/about`, `?email=a@b.com` rendered as
+ * `?email=a%40b.com`, or a `validateSearch` default added as `?page=1`. Move the browser to that
+ * URL before the client router reads `window.location`, so the first client render matches.
+ *
+ * This is the URL TanStack Router's own redirect and links would show. Rails already received the
+ * original URL for this request. The browser's fragment (`#...`) is kept.
+ */
+function alignBrowserUrlWithServerRender(dehydratedState: DehydratedRouterState | null | undefined): void {
+  if (typeof window === 'undefined' || !dehydratedState?.requestedUrl) {
+    return;
+  }
+
+  const { url, requestedUrl } = dehydratedState;
+  const browserUrl = `${window.location.pathname}${window.location.search}`;
+  // The browser must still be at the URL Rails received; otherwise leave the URL alone.
+  if (url === requestedUrl || browserUrl !== requestedUrl) {
+    return;
+  }
+
+  window.history.replaceState(window.history.state, '', `${url}${window.location.hash}`);
+}
+
 function TanStackHydrationApp({
   options,
   incomingProps,
@@ -337,6 +361,10 @@ function TanStackHydrationApp({
     // React 18 StrictMode's double-render-with-fresh-hooks behavior — which
     // resets useRef on each pass, so this `routerRef.current === null` guard
     // alone fires twice when options.createRouter returns the same instance.
+    //
+    // The router reads window.location when it is created, so align the browser URL first.
+    // This is idempotent: a second render sees the browser already at the server URL.
+    alignBrowserUrlWithServerRender(dehydratedState);
     const router = options.createRouter();
     const cachedInit = sharedHydrationInitStates.get(router);
 

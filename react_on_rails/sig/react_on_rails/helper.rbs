@@ -69,5 +69,10 @@ module ReactOnRails
     ) -> Hash[String, safe_buffer]
 
     def prepend_render_rails_context: (String result) -> safe_buffer
+
+    def apply_server_render_http_response: (
+      untyped render_options,
+      Hash[String, untyped] result
+    ) -> bool?
   end
 end

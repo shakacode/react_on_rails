@@ -1,0 +1,34 @@
+module ReactOnRails
+  # Applies the optional "httpResponse" value of a server-render result to the Rails response.
+  module ServerRenderHttpResponse
+    interface _Response
+      def status: () -> Integer
+      def status=: (Integer) -> Integer
+      def location=: (String) -> String
+      def committed?: () -> bool
+    end
+
+    type normalized = { status: Integer, location: String? }
+
+    REDIRECT_STATUSES: Array[Integer]
+    ERROR_STATUSES: Range[Integer]
+    LOCAL_PATH: Regexp
+
+    def self.apply: (
+      untyped http_response,
+      response: _Response?,
+      current_path: String?,
+      component_name: String
+    ) -> bool
+
+    def self.normalize: (untyped http_response, component_name: String) -> normalized?
+
+    private
+
+    def self.normalize_status_only: (Hash[String, untyped] http_response, String component_name) -> normalized?
+
+    def self.normalize_redirect: (Hash[String, untyped] http_response, String component_name) -> normalized?
+
+    def self.log: (Symbol level, String component_name, String reason, untyped http_response) -> void
+  end
+end
